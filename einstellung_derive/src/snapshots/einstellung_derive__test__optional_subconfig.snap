@@ -23,7 +23,7 @@ impl ::einstellung::PartialConfig for TelemetryConfigPartial {
         Self {
             enabled: next.enabled.or(self.enabled),
             datadog: match (self.datadog, next.datadog) {
-                (Some(a), Some(b)) => ::einstellung::PartialConfig::merge(a, b),
+                (Some(a), Some(b)) => Some(::einstellung::PartialConfig::merge(a, b)),
                 (a, b) => a.or(b),
             },
         }

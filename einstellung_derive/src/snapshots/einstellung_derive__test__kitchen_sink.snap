@@ -30,11 +30,11 @@ struct FullSystemConfig {
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct FullSystemConfigPartial {
-    #[serde(serde(rename = "sys_name"))]
+    #[serde(rename = "sys_name")]
     name: Option<String>,
     port: Option<u16>,
     database: Option<<DatabaseConfig as ::einstellung::Config>::Partial>,
-    #[serde(serde(alias = "files"))]
+    #[serde(alias = "files")]
     log_files: Option<Vec<String>>,
     optional_cache: Option<<CacheConfig as ::einstellung::Config>::Partial>,
 }
@@ -45,7 +45,7 @@ impl ::einstellung::PartialConfig for FullSystemConfigPartial {
             name: next.name.or(self.name),
             port: next.port.or(self.port),
             database: match (self.database, next.database) {
-                (Some(a), Some(b)) => ::einstellung::PartialConfig::merge(a, b),
+                (Some(a), Some(b)) => Some(::einstellung::PartialConfig::merge(a, b)),
                 (a, b) => a.or(b),
             },
             log_files: match (self.log_files, next.log_files) {
@@ -56,7 +56,7 @@ impl ::einstellung::PartialConfig for FullSystemConfigPartial {
                 (a, b) => a.or(b),
             },
             optional_cache: match (self.optional_cache, next.optional_cache) {
-                (Some(a), Some(b)) => ::einstellung::PartialConfig::merge(a, b),
+                (Some(a), Some(b)) => Some(::einstellung::PartialConfig::merge(a, b)),
                 (a, b) => a.or(b),
             },
         }

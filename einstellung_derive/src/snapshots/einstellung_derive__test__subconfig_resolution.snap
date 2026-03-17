@@ -26,11 +26,11 @@ impl ::einstellung::PartialConfig for AppConfigPartial {
         Self {
             app_name: next.app_name.or(self.app_name),
             database: match (self.database, next.database) {
-                (Some(a), Some(b)) => ::einstellung::PartialConfig::merge(a, b),
+                (Some(a), Some(b)) => Some(::einstellung::PartialConfig::merge(a, b)),
                 (a, b) => a.or(b),
             },
             redis: match (self.redis, next.redis) {
-                (Some(a), Some(b)) => ::einstellung::PartialConfig::merge(a, b),
+                (Some(a), Some(b)) => Some(::einstellung::PartialConfig::merge(a, b)),
                 (a, b) => a.or(b),
             },
         }

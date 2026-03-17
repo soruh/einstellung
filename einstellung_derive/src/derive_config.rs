@@ -137,12 +137,11 @@ pub mod transformer {
             syn::Error::new(proc_macro2::Span::call_site(), "Named fields are required")
         })?;
 
+        // Reconstruct attributes by wrapping the Meta directly
         let serde_attrs = field
             .serde
             .into_iter()
-            .map(|meta| {
-                syn::parse_quote! { #[serde(#meta)] }
-            })
+            .map(|meta| syn::parse_quote! { #[#meta] })
             .collect();
 
         let inner_type_if_optional = extract_type_from_option(&field.ty);
@@ -269,7 +268,7 @@ pub mod generator {
                 },
                 ResolvedMerge::Subconfig => quote! {
                     #ident: match (self.#ident, next.#ident) {
-                        (Some(a), Some(b)) => ::einstellung::PartialConfig::merge(a, b),
+                        (Some(a), Some(b)) => Some(::einstellung::PartialConfig::merge(a, b)),
                         (a, b) => a.or(b)
                     }
                 },

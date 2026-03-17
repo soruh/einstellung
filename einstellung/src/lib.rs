@@ -50,6 +50,26 @@ pub trait ConfigProvider {
     fn load_partial<T: DeserializeOwned>(&self) -> Result<T, ConfigError>;
 }
 
+pub trait ReaderFactory: Send + Sync {
+    fn get_reader(&self) -> Result<Box<dyn Read + '_>, ConfigError>;
+
+    fn clone_dyn(&self) -> Box<dyn ReaderFactory + 'static> {
+        panic!(
+            "this reader factory is cloneable. Implement your own `ReaderFactory` for a custom cloneable FileProvider"
+        )
+    }
+}
+
+// Blanket implementation for closures that return 'static readers
+impl<F> ReaderFactory for F
+where
+    F: Fn() -> Result<Box<dyn Read + 'static>, ConfigError> + Send + Sync,
+{
+    fn get_reader(&self) -> Result<Box<dyn Read + '_>, ConfigError> {
+        self().map(|r| r as Box<dyn Read + '_>)
+    }
+}
+
 pub enum FileContentProvider<'i> {
     InlineBorrowed(&'i str),
     InlineOwned(String),
@@ -58,9 +78,9 @@ pub enum FileContentProvider<'i> {
     PathOwned(PathBuf),
 
     CustomFn(fn() -> Result<Box<dyn Read + 'static>, ConfigError>),
-    CustomBoxed(Box<dyn Fn() -> Result<Box<dyn Read + 'static>, ConfigError> + 'static>),
 
-    CustomRef(&'i dyn Fn() -> Result<Box<dyn Read + 'i>, ConfigError>),
+    CustomBoxed(Box<dyn ReaderFactory + 'static>),
+    CustomRef(&'i dyn ReaderFactory),
 }
 
 impl<'i> FileContentProvider<'i> {
@@ -74,8 +94,8 @@ impl<'i> FileContentProvider<'i> {
             FileContentProvider::InlineOwned(s) => f(&mut Cursor::new(s.as_str())),
             FileContentProvider::PathBorrowed(p) => f(&mut BufReader::new(File::open(p)?)),
             FileContentProvider::PathOwned(p) => f(&mut BufReader::new(File::open(p)?)),
-            FileContentProvider::CustomBoxed(factory) => f(factory()?.as_mut()),
-            FileContentProvider::CustomRef(factory) => f(factory()?.as_mut()),
+            FileContentProvider::CustomBoxed(factory) => f(factory.get_reader()?.as_mut()),
+            FileContentProvider::CustomRef(factory) => f(factory.get_reader()?.as_mut()),
             FileContentProvider::CustomFn(func) => f(func()?.as_mut()),
         }
     }
@@ -90,13 +110,21 @@ impl<'i> FileContentProvider<'i> {
             InlineOwned(s) => InlineOwned(s),
             PathOwned(p) => PathOwned(p),
             CustomFn(f) => CustomFn(f),
-            CustomBoxed(b) => CustomBoxed(b),
+            CustomBoxed(f) => CustomBoxed(f),
+            CustomRef(f) => CustomBoxed(f.clone_dyn()),
+        }
+    }
 
-            CustomRef(_) => {
-                panic!(
-                    "Cannot convert non-function-pointer custom to owned. provide a fn() or a Box<Fn + 'static>"
-                )
-            }
+    pub fn as_borrowed<'s>(&'s self) -> FileContentProvider<'s> {
+        use FileContentProvider::*;
+        match self {
+            InlineOwned(s) => InlineBorrowed(s.as_str()),
+            PathOwned(p) => PathBorrowed(p.as_path()),
+            InlineBorrowed(s) => InlineBorrowed(s),
+            PathBorrowed(p) => PathBorrowed(p),
+            CustomFn(f) => CustomFn(*f),
+            CustomBoxed(f) => CustomRef(&**f),
+            CustomRef(f) => CustomRef(*f),
         }
     }
 }
@@ -148,16 +176,17 @@ impl IntoFileContentProvider<'static> for fn() -> Result<Box<dyn Read + 'static>
 
 impl<F> IntoFileContentProvider<'static> for Box<F>
 where
-    F: Fn() -> Result<Box<dyn Read + 'static>, ConfigError> + 'static,
+    F: ReaderFactory + 'static,
 {
     fn into_provider(self) -> FileContentProvider<'static> {
         FileContentProvider::CustomBoxed(self)
     }
 }
 
+// Bridge for borrowing closures
 impl<'i, F> IntoFileContentProvider<'i> for &'i F
 where
-    F: Fn() -> Result<Box<dyn Read + 'i>, ConfigError> + 'i,
+    F: ReaderFactory + 'i,
 {
     fn into_provider(self) -> FileContentProvider<'i> {
         FileContentProvider::CustomRef(self)

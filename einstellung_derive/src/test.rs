@@ -75,6 +75,7 @@ macro_rules! assert_macro_test {
                 )*
 
                 let trybuild_tokens = ::quote::quote! {
+                    #[allow(unused_imports)] use einstellung::serde;
                     use einstellung_derive::Config;
                     #combined_input
                     fn main() {}

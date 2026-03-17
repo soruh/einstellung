@@ -21,7 +21,7 @@ pub enum ConfigError {
     MissingField(&'static str),
 
     #[error("Validation failed for field '{field}': {reason}")]
-    ValidationError { field: &'static str, reason: String },
+    Validation { field: &'static str, reason: String },
 }
 
 pub trait Config: Sized {

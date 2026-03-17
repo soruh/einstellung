@@ -1,4 +1,4 @@
-use quote::ToTokens;
+use quote::{ToTokens, quote};
 
 pub fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let input: syn::DeriveInput = match syn::parse2(input) {
@@ -6,27 +6,25 @@ pub fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
         Err(e) => return e.to_compile_error(),
     };
 
-    // 1. Parse (likely using darling)
+    // 1. Parse using darling
     let parsed = match parser::parse(input) {
         Ok(p) => p,
-        Err(e) => return e.write_errors(), // darling's error collection
+        Err(e) => return e.write_errors(),
     };
 
-    // 2. Transform (now returns syn::Result with combined errors)
+    // 2. Transform into our intermediate model
     let model = match transformer::transform(parsed) {
         Ok(m) => m,
         Err(e) => return e.to_compile_error(),
     };
 
-    // 3. Generate
+    // 3. Generate the output TokenStream
     model.to_token_stream()
 }
 
 pub mod parser {
-
     use darling::{FromDeriveInput, FromField, ast, util::SpannedValue};
 
-    /// Represents the parsed struct and its struct-level attributes.
     #[derive(FromDeriveInput)]
     #[darling(attributes(config), supports(struct_named))]
     pub struct ConfigStructReceiver {
@@ -35,14 +33,16 @@ pub mod parser {
         pub data: ast::Data<darling::util::Ignored, ConfigFieldReceiver>,
     }
 
-    /// Represents a parsed field and its `#[config(...)]` / `#[serde(...)]` attributes.
     #[derive(FromField)]
-    #[darling(attributes(config), forward_attrs(serde))]
+    #[darling(attributes(config))]
     pub struct ConfigFieldReceiver {
         pub ident: Option<syn::Ident>,
         pub vis: syn::Visibility,
         pub ty: syn::Type,
-        pub attrs: Vec<syn::Attribute>, // Holds forwarded attributes (e.g., serde)
+
+        /// Captures #[config(serde(...))] nested attributes
+        #[darling(default, multiple)]
+        pub serde: Vec<syn::Meta>,
 
         #[darling(default)]
         pub default: Option<syn::Expr>,
@@ -69,9 +69,8 @@ pub mod parser {
 }
 
 pub mod transformer {
-    use crate::derive_config::parser::MergeStrategy;
-
     use super::parser::{ConfigFieldReceiver, ConfigStructReceiver};
+    use crate::derive_config::parser::MergeStrategy;
     use syn::{GenericArgument, PathArguments, Type};
 
     pub struct TransformedStruct {
@@ -112,7 +111,6 @@ pub mod transformer {
             match transform_field(field) {
                 Ok(f) => fields.push(f),
                 Err(e) => {
-                    // If we already have errors, combine this one into the list
                     if let Some(ref mut errs) = errors {
                         errs.combine(e);
                     } else {
@@ -122,7 +120,6 @@ pub mod transformer {
             }
         }
 
-        // If any errors were accumulated, return them all now
         if let Some(err) = errors {
             return Err(err);
         }
@@ -136,27 +133,29 @@ pub mod transformer {
     }
 
     fn transform_field(field: ConfigFieldReceiver) -> syn::Result<TransformedField> {
-        // 0. Extract ident early to use its span for error reporting
         let ident = field.ident.clone().ok_or_else(|| {
             syn::Error::new(proc_macro2::Span::call_site(), "Named fields are required")
         })?;
-        // let field_span = ident.span();
 
-        // let original_type = field.ty.clone();
+        // Reconstruct #[serde(...)] attributes from nested #[config(serde(...))]
+        let serde_attrs = field
+            .serde
+            .into_iter()
+            .map(|meta| {
+                syn::parse_quote! { #[serde(#meta)] }
+            })
+            .collect();
 
-        // 1. Check if the type is Option<T>
         let inner_type_if_optional = extract_type_from_option(&field.ty);
         let is_optional = inner_type_if_optional.is_some();
         let core_type = inner_type_if_optional.cloned().unwrap_or(field.ty);
 
-        // 2. Determine the Partial Type
         let partial_type = if field.subconfig {
             syn::parse_quote!(Option<<#core_type as ::einstellung::Config>::Partial>)
         } else {
             syn::parse_quote!(Option<#core_type>)
         };
 
-        // 3. Determine Merge Strategy
         let merge_strategy = if let Some(strategy) = field.merge {
             if field.subconfig {
                 return Err(syn::Error::new(
@@ -164,7 +163,6 @@ pub mod transformer {
                     "It is invalid to specify a merge strategy on a subconfig",
                 ));
             }
-
             strategy.into_inner()
         } else if field.subconfig {
             MergeStrategy::Subconfig
@@ -175,18 +173,16 @@ pub mod transformer {
         Ok(TransformedField {
             ident,
             vis: field.vis,
-            // original_type,
             partial_type,
             is_optional,
             is_subconfig: field.subconfig,
             default_expr: field.default,
             merge_strategy,
             validate_func: field.validate,
-            serde_attrs: field.attrs,
+            serde_attrs,
         })
     }
 
-    /// Helper to extract `T` from `Option<T>`
     fn extract_type_from_option(ty: &Type) -> Option<&Type> {
         if let Type::Path(type_path) = ty
             && type_path.qself.is_none()
@@ -197,15 +193,13 @@ pub mod transformer {
         {
             return Some(inner_ty);
         }
-
         None
     }
 }
 
 pub mod generator {
-    use crate::derive_config::parser::MergeStrategy;
-
     use super::transformer::TransformedStruct;
+    use crate::derive_config::parser::MergeStrategy;
     use proc_macro2::TokenStream;
     use quote::{ToTokens, quote};
 
@@ -219,19 +213,19 @@ pub mod generator {
 
     fn generate_partial_struct(model: &TransformedStruct) -> TokenStream {
         let partial_ident = &model.partial_ident;
+        let vis = &model.vis;
 
         let fields = model.fields.iter().map(|f| {
             let ident = &f.ident;
             let ty = &f.partial_type;
             let attrs = &f.serde_attrs;
-            let vis = &f.vis;
+            let f_vis = &f.vis;
             quote! {
                 #(#attrs)*
-                #vis #ident: #ty
+                #f_vis #ident: #ty
             }
         });
 
-        let vis = &model.vis;
         quote! {
             #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
             #[serde(crate = "::einstellung::serde")]
@@ -260,9 +254,13 @@ pub mod generator {
                         (a, b) => a.or(b)
                     }
                 },
-                MergeStrategy::Function(ref func_name) => quote! {
-                    #ident: #func_name(self.#ident, next.#ident)
-                },
+                MergeStrategy::Function(ref func_name) => {
+                    let func_path: syn::Path =
+                        syn::parse_str(func_name).expect("Invalid merge function path");
+                    quote! {
+                        #ident: #func_path(self.#ident, next.#ident)
+                    }
+                }
                 MergeStrategy::Subconfig => quote! {
                     #ident: match (self.#ident, next.#ident) {
                         (Some(a), Some(b)) => ::einstellung::PartialConfig::merge(a, b),
@@ -276,7 +274,6 @@ pub mod generator {
             let ident = &f.ident;
             let ident_str = ident.to_string();
 
-            // 1. Resolve the value (handle optionality and defaults)
             let resolve = if f.is_subconfig {
                 if f.is_optional {
                     quote! { self.#ident.map(::einstellung::PartialConfig::build).transpose()? }
@@ -293,10 +290,7 @@ pub mod generator {
                 quote! { self.#ident.ok_or(::einstellung::ConfigError::MissingField(#ident_str))? }
             };
 
-            // 2. Validate the value (if a validation func is provided)
             if let Some(validate_func) = &f.validate_func {
-                // If it's an Option, we usually only validate if Some.
-                // For simplicity, we assume the validate func accepts the exact type `T` or `Option<T>`.
                 quote! {
                     let #ident = #resolve;
                     if let Err(e) = #validate_func(&#ident) {
@@ -323,7 +317,6 @@ pub mod generator {
 
                 fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
                     #(#build_fields)*
-
                     Ok(#complete_ident { #(#field_names,)* })
                 }
             }

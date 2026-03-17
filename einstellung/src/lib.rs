@@ -89,14 +89,16 @@ impl<'i> FileContentProvider<'i> {
         &self,
         f: impl FnOnce(&mut dyn Read) -> Result<R, ConfigError>,
     ) -> Result<R, ConfigError> {
+        use FileContentProvider::*;
+
         match self {
-            FileContentProvider::InlineBorrowed(s) => f(&mut Cursor::new(*s)),
-            FileContentProvider::InlineOwned(s) => f(&mut Cursor::new(s.as_str())),
-            FileContentProvider::PathBorrowed(p) => f(&mut BufReader::new(File::open(p)?)),
-            FileContentProvider::PathOwned(p) => f(&mut BufReader::new(File::open(p)?)),
-            FileContentProvider::CustomBoxed(factory) => f(factory.get_reader()?.as_mut()),
-            FileContentProvider::CustomRef(factory) => f(factory.get_reader()?.as_mut()),
-            FileContentProvider::CustomFn(func) => f(func()?.as_mut()),
+            InlineBorrowed(s) => f(&mut Cursor::new(*s)),
+            InlineOwned(s) => f(&mut Cursor::new(s.as_str())),
+            PathBorrowed(p) => f(&mut BufReader::new(File::open(p)?)),
+            PathOwned(p) => f(&mut BufReader::new(File::open(p)?)),
+            CustomBoxed(factory) => f(factory.get_reader()?.as_mut()),
+            CustomRef(factory) => f(factory.get_reader()?.as_mut()),
+            CustomFn(func) => f(func()?.as_mut()),
         }
     }
 
@@ -200,12 +202,10 @@ pub mod json {
     pub struct JsonFileProvider<'i>(FileContentProvider<'i>);
 
     impl<'i> JsonFileProvider<'i> {
-        /// Generic constructor via IntoFileContentProvider
         pub fn new(src: impl IntoFileContentProvider<'i>) -> Self {
             Self(src.into_provider())
         }
 
-        /// Upgrade to owned (`'static`) for Inline/Path variants
         pub fn into_owned(self) -> JsonFileProvider<'static> {
             JsonFileProvider(self.0.into_owned())
         }

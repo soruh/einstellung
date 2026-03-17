@@ -13,5 +13,5 @@ struct ServerConfig {
 
 /// --- output ---
 ::core::compile_error! {
-    "Unknown value: `subconfig`. Did you mean `subconfig`?"
+    "Unknown value: `subconfig`. Available values: `append`, `function`, `replace`"
 }

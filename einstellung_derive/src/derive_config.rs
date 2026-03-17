@@ -1,4 +1,4 @@
-use quote::{ToTokens, quote};
+use quote::ToTokens;
 
 pub fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let input: syn::DeriveInput = match syn::parse2(input) {
@@ -6,19 +6,16 @@ pub fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
         Err(e) => return e.to_compile_error(),
     };
 
-    // 1. Parse using darling
     let parsed = match parser::parse(input) {
         Ok(p) => p,
         Err(e) => return e.write_errors(),
     };
 
-    // 2. Transform into our intermediate model
     let model = match transformer::transform(parsed) {
         Ok(m) => m,
         Err(e) => return e.to_compile_error(),
     };
 
-    // 3. Generate the output TokenStream
     model.to_token_stream()
 }
 
@@ -40,7 +37,6 @@ pub mod parser {
         pub vis: syn::Visibility,
         pub ty: syn::Type,
 
-        /// Captures #[config(serde(...))] nested attributes
         #[darling(default, multiple)]
         pub serde: Vec<syn::Meta>,
 
@@ -59,8 +55,6 @@ pub mod parser {
         Replace,
         Append,
         Function(String),
-        #[darling(skip)]
-        Subconfig,
     }
 
     pub fn parse(input: syn::DeriveInput) -> Result<ConfigStructReceiver, darling::Error> {
@@ -71,13 +65,20 @@ pub mod parser {
 pub mod transformer {
     use super::parser::{ConfigFieldReceiver, ConfigStructReceiver};
     use crate::derive_config::parser::MergeStrategy;
-    use syn::{GenericArgument, PathArguments, Type};
+    use syn::{GenericArgument, Path, PathArguments, Type};
 
     pub struct TransformedStruct {
         pub complete_ident: syn::Ident,
         pub partial_ident: syn::Ident,
         pub vis: syn::Visibility,
         pub fields: Vec<TransformedField>,
+    }
+
+    pub enum ResolvedMerge {
+        Replace,
+        Append,
+        Function(Path),
+        Subconfig,
     }
 
     pub struct TransformedField {
@@ -87,7 +88,7 @@ pub mod transformer {
         pub is_optional: bool,
         pub is_subconfig: bool,
         pub default_expr: Option<syn::Expr>,
-        pub merge_strategy: MergeStrategy,
+        pub merge_strategy: ResolvedMerge,
         pub validate_func: Option<syn::Path>,
         pub serde_attrs: Vec<syn::Attribute>,
     }
@@ -96,13 +97,12 @@ pub mod transformer {
         let complete_ident = receiver.ident.clone();
         let partial_ident =
             syn::Ident::new(&format!("{complete_ident}Partial"), complete_ident.span());
-
         let vis = receiver.vis;
 
         let struct_data = receiver
             .data
             .take_struct()
-            .expect("Only named structs are supported");
+            .expect("Only named structs supported");
 
         let mut fields = Vec::new();
         let mut errors: Option<syn::Error> = None;
@@ -121,15 +121,15 @@ pub mod transformer {
         }
 
         if let Some(err) = errors {
-            return Err(err);
+            Err(err)
+        } else {
+            Ok(TransformedStruct {
+                complete_ident,
+                partial_ident,
+                vis,
+                fields,
+            })
         }
-
-        Ok(TransformedStruct {
-            complete_ident,
-            partial_ident,
-            vis,
-            fields,
-        })
     }
 
     fn transform_field(field: ConfigFieldReceiver) -> syn::Result<TransformedField> {
@@ -137,7 +137,6 @@ pub mod transformer {
             syn::Error::new(proc_macro2::Span::call_site(), "Named fields are required")
         })?;
 
-        // Reconstruct #[serde(...)] attributes from nested #[config(serde(...))]
         let serde_attrs = field
             .serde
             .into_iter()
@@ -156,18 +155,30 @@ pub mod transformer {
             syn::parse_quote!(Option<#core_type>)
         };
 
+        // Resolve Merge Strategy and handle parsing errors
         let merge_strategy = if let Some(strategy) = field.merge {
+            let span = strategy.span();
             if field.subconfig {
                 return Err(syn::Error::new(
-                    strategy.span(),
-                    "It is invalid to specify a merge strategy on a subconfig",
+                    span,
+                    "Merge strategy is invalid on a subconfig",
                 ));
             }
-            strategy.into_inner()
+
+            match strategy.into_inner() {
+                MergeStrategy::Replace => ResolvedMerge::Replace,
+                MergeStrategy::Append => ResolvedMerge::Append,
+                MergeStrategy::Function(s) => {
+                    let path = syn::parse_str::<Path>(&s).map_err(|_| {
+                        syn::Error::new(span, format!("Invalid function path: '{}'", s))
+                    })?;
+                    ResolvedMerge::Function(path)
+                }
+            }
         } else if field.subconfig {
-            MergeStrategy::Subconfig
+            ResolvedMerge::Subconfig
         } else {
-            MergeStrategy::Replace
+            ResolvedMerge::Replace
         };
 
         Ok(TransformedField {
@@ -198,8 +209,7 @@ pub mod transformer {
 }
 
 pub mod generator {
-    use super::transformer::TransformedStruct;
-    use crate::derive_config::parser::MergeStrategy;
+    use crate::derive_config::transformer::{ResolvedMerge, TransformedStruct};
     use proc_macro2::TokenStream;
     use quote::{ToTokens, quote};
 
@@ -241,11 +251,11 @@ pub mod generator {
 
         let merge_fields = model.fields.iter().map(|f| {
             let ident = &f.ident;
-            match f.merge_strategy {
-                MergeStrategy::Replace => quote! {
+            match &f.merge_strategy {
+                ResolvedMerge::Replace => quote! {
                     #ident: next.#ident.or(self.#ident)
                 },
-                MergeStrategy::Append => quote! {
+                ResolvedMerge::Append => quote! {
                     #ident: match (self.#ident, next.#ident) {
                         (Some(mut a), Some(b)) => {
                             a.extend(b);
@@ -254,14 +264,10 @@ pub mod generator {
                         (a, b) => a.or(b)
                     }
                 },
-                MergeStrategy::Function(ref func_name) => {
-                    let func_path: syn::Path =
-                        syn::parse_str(func_name).expect("Invalid merge function path");
-                    quote! {
-                        #ident: #func_path(self.#ident, next.#ident)
-                    }
-                }
-                MergeStrategy::Subconfig => quote! {
+                ResolvedMerge::Function(path) => quote! {
+                    #ident: #path(self.#ident, next.#ident)
+                },
+                ResolvedMerge::Subconfig => quote! {
                     #ident: match (self.#ident, next.#ident) {
                         (Some(a), Some(b)) => ::einstellung::PartialConfig::merge(a, b),
                         (a, b) => a.or(b)

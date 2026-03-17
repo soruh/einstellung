@@ -1,0 +1,5 @@
+error: Unknown value: `foo`. Available values: `append`, `function`, `replace`
+ --> src/trybuild_tests/test_invalid_merge.rs
+  |
+  |     #[config(merge = "foo")]
+  |                      ^^^^^

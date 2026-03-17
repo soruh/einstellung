@@ -12,7 +12,7 @@ fn validate_system_port(_: &u16) -> Result<(), String> {
 /// --- input ---
 #[derive(Config)]
 struct FullSystemConfig {
-    #[serde(rename = "sys_name")]
+    #[config(serde(rename = "sys_name"))]
     #[config(default = "\"production\".to_string()")]
     name: String,
     #[config(validate = "validate_system_port")]
@@ -20,7 +20,7 @@ struct FullSystemConfig {
     #[config(subconfig)]
     database: DatabaseConfig,
     #[config(merge = "append")]
-    #[serde(alias = "files")]
+    #[config(serde(alias = "files"))]
     log_files: Option<Vec<String>>,
     #[config(subconfig)]
     optional_cache: Option<CacheConfig>,
@@ -30,11 +30,11 @@ struct FullSystemConfig {
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct FullSystemConfigPartial {
-    #[serde(rename = "sys_name")]
+    #[serde(serde(rename = "sys_name"))]
     name: Option<String>,
     port: Option<u16>,
     database: Option<<DatabaseConfig as ::einstellung::Config>::Partial>,
-    #[serde(alias = "files")]
+    #[serde(serde(alias = "files"))]
     log_files: Option<Vec<String>>,
     optional_cache: Option<<CacheConfig as ::einstellung::Config>::Partial>,
 }

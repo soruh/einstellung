@@ -5,11 +5,11 @@ expression: formatted
 /// --- input ---
 #[derive(Config)]
 struct ApiConfig {
-    #[serde(rename = "API_KEY")]
+    #[config(serde(rename = "API_KEY"))]
     key: String,
-    #[serde(alias = "max_retries", default)]
+    #[config(serde(alias = "max_retries", default))]
     retries: u8,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[config(serde(skip_serializing_if = "Option::is_none"))]
     endpoint: Option<String>,
 }
 
@@ -17,11 +17,11 @@ struct ApiConfig {
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct ApiConfigPartial {
-    #[serde(rename = "API_KEY")]
+    #[serde(serde(rename = "API_KEY"))]
     key: Option<String>,
-    #[serde(alias = "max_retries", default)]
+    #[serde(serde(alias = "max_retries", default))]
     retries: Option<u8>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(serde(skip_serializing_if = "Option::is_none"))]
     endpoint: Option<String>,
 }
 impl ::einstellung::PartialConfig for ApiConfigPartial {

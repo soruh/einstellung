@@ -214,11 +214,11 @@ assert_macro_test!(PASS, test_merge_strategies: {
 assert_macro_test!(PASS, test_serde_attribute_forwarding: {
     #[derive(Config)]
     struct ApiConfig {
-        #[serde(rename = "API_KEY")]
+        #[config(serde(rename = "API_KEY"))]
         key: String,
-        #[serde(alias = "max_retries", default)]
+        #[config(serde(alias = "max_retries", default))]
         retries: u8,
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[config(serde(skip_serializing_if = "Option::is_none"))]
         endpoint: Option<String>,
     }
 });
@@ -248,7 +248,7 @@ assert_macro_test!(PASS, test_kitchen_sink:
     {
         #[derive(Config)]
         struct FullSystemConfig {
-            #[serde(rename = "sys_name")]
+            #[config(serde(rename = "sys_name"))]
             #[config(default = "\"production\".to_string()")]
             name: String,
             #[config(validate = "validate_system_port")]
@@ -256,7 +256,7 @@ assert_macro_test!(PASS, test_kitchen_sink:
             #[config(subconfig)]
             database: DatabaseConfig,
             #[config(merge = "append")]
-            #[serde(alias = "files")]
+            #[config(serde(alias = "files"))]
             log_files: Option<Vec<String>>,
             #[config(subconfig)]
             optional_cache: Option<CacheConfig>,

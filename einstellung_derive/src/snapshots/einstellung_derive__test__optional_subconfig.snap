@@ -1,0 +1,73 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- input ---
+#[derive(Config)]
+struct TelemetryConfig {
+    enabled: bool,
+    #[config(subconfig)]
+    datadog: Option<DatadogConfig>,
+}
+/// --- output ---
+#[derive(Default, Debug, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+pub struct TelemetryConfigPartial {
+    pub enabled: Option<bool>,
+    pub datadog: Option<<DatadogConfig as ::einstellung::Config>::Partial>,
+}
+impl ::einstellung::PartialConfig for TelemetryConfigPartial {
+    type Complete = TelemetryConfig;
+    fn merge(self, next: Self) -> Self {
+        Self {
+            enabled: next.enabled.or(self.enabled),
+            datadog: match (self.datadog, next.datadog) {
+                (Some(a), Some(b)) => ::einstellung::PartialConfig::merge(a, b),
+                (a, b) => a.or(b),
+            },
+        }
+    }
+    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+        let enabled = self
+            .enabled
+            .ok_or(::einstellung::ConfigError::MissingField("enabled"))?;
+        let datadog = self.datadog.map(::einstellung::PartialConfig::build).transpose()?;
+        Ok(TelemetryConfig {
+            enabled,
+            datadog,
+        })
+    }
+}
+impl ::einstellung::Config for TelemetryConfig {
+    type Partial = TelemetryConfigPartial;
+}
+
+// ---------------------------------
+/// --- input ---
+#[derive(Config)]
+struct DatadogConfig {
+    api_key: String,
+}
+/// --- output ---
+#[derive(Default, Debug, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+pub struct DatadogConfigPartial {
+    pub api_key: Option<String>,
+}
+impl ::einstellung::PartialConfig for DatadogConfigPartial {
+    type Complete = DatadogConfig;
+    fn merge(self, next: Self) -> Self {
+        Self {
+            api_key: next.api_key.or(self.api_key),
+        }
+    }
+    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+        let api_key = self
+            .api_key
+            .ok_or(::einstellung::ConfigError::MissingField("api_key"))?;
+        Ok(DatadogConfig { api_key })
+    }
+}
+impl ::einstellung::Config for DatadogConfig {
+    type Partial = DatadogConfigPartial;
+}

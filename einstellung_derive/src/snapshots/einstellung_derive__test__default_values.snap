@@ -1,0 +1,45 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- input ---
+#[derive(Config)]
+struct NetworkConfig {
+    #[config(default = "\"localhost\".to_string()")]
+    host: String,
+    #[config(default = "8080")]
+    port: u16,
+    #[config(default = "std::time::Duration::from_secs(30)")]
+    timeout: std::time::Duration,
+}
+/// --- output ---
+#[derive(Default, Debug, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+pub struct NetworkConfigPartial {
+    pub host: Option<String>,
+    pub port: Option<u16>,
+    pub timeout: Option<std::time::Duration>,
+}
+impl ::einstellung::PartialConfig for NetworkConfigPartial {
+    type Complete = NetworkConfig;
+    fn merge(self, next: Self) -> Self {
+        Self {
+            host: next.host.or(self.host),
+            port: next.port.or(self.port),
+            timeout: next.timeout.or(self.timeout),
+        }
+    }
+    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+        let host = self.host.unwrap_or_else(|| "localhost".to_string());
+        let port = self.port.unwrap_or(8080);
+        let timeout = self.timeout.unwrap_or_else(|| std::time::Duration::from_secs(30));
+        Ok(NetworkConfig {
+            host,
+            port,
+            timeout,
+        })
+    }
+}
+impl ::einstellung::Config for NetworkConfig {
+    type Partial = NetworkConfigPartial;
+}

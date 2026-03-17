@@ -1,0 +1,44 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- input ---
+#[derive(Config)]
+struct ServerConfig {
+    host: String,
+    port: u16,
+    is_active: bool,
+}
+/// --- output ---
+#[derive(Default, Debug, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+pub struct ServerConfigPartial {
+    pub host: Option<String>,
+    pub port: Option<u16>,
+    pub is_active: Option<bool>,
+}
+impl ::einstellung::PartialConfig for ServerConfigPartial {
+    type Complete = ServerConfig;
+    fn merge(self, next: Self) -> Self {
+        Self {
+            host: next.host.or(self.host),
+            port: next.port.or(self.port),
+            is_active: next.is_active.or(self.is_active),
+        }
+    }
+    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+        let host = self.host.ok_or(::einstellung::ConfigError::MissingField("host"))?;
+        let port = self.port.ok_or(::einstellung::ConfigError::MissingField("port"))?;
+        let is_active = self
+            .is_active
+            .ok_or(::einstellung::ConfigError::MissingField("is_active"))?;
+        Ok(ServerConfig {
+            host,
+            port,
+            is_active,
+        })
+    }
+}
+impl ::einstellung::Config for ServerConfig {
+    type Partial = ServerConfigPartial;
+}

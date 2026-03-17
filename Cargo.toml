@@ -1,0 +1,3 @@
+[workspace]
+members = ["einstellung", "einstellung_derive"]
+resolver = "3"

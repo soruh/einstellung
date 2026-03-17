@@ -225,6 +225,7 @@ pub mod generator {
 
         quote! {
             #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
+            #[serde(crate = "::einstellung::serde")]
             pub struct #partial_ident {
                 #(#fields,)*
             }

@@ -1,0 +1,50 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- input ---
+#[derive(Config)]
+struct TlsConfig {
+    #[config(validate = "crate::validators::validate_cert_path")]
+    cert_path: String,
+    #[config(validate = "crate::validators::validate_port")]
+    port: u16,
+}
+/// --- output ---
+#[derive(Default, Debug, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+pub struct TlsConfigPartial {
+    pub cert_path: Option<String>,
+    pub port: Option<u16>,
+}
+impl ::einstellung::PartialConfig for TlsConfigPartial {
+    type Complete = TlsConfig;
+    fn merge(self, next: Self) -> Self {
+        Self {
+            cert_path: next.cert_path.or(self.cert_path),
+            port: next.port.or(self.port),
+        }
+    }
+    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+        let cert_path = self
+            .cert_path
+            .ok_or(::einstellung::ConfigError::MissingField("cert_path"))?;
+        if let Err(e) = crate::validators::validate_cert_path(&cert_path) {
+            return Err(::einstellung::ConfigError::Validation {
+                field: "cert_path",
+                reason: e.to_string(),
+            });
+        }
+        let port = self.port.ok_or(::einstellung::ConfigError::MissingField("port"))?;
+        if let Err(e) = crate::validators::validate_port(&port) {
+            return Err(::einstellung::ConfigError::Validation {
+                field: "port",
+                reason: e.to_string(),
+            });
+        }
+        Ok(TlsConfig { cert_path, port })
+    }
+}
+impl ::einstellung::Config for TlsConfig {
+    type Partial = TlsConfigPartial;
+}

@@ -1,0 +1,116 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- input ---
+#[derive(Config)]
+struct AppConfig {
+    app_name: String,
+    #[config(subconfig)]
+    database: DatabaseConfig,
+    #[config(subconfig)]
+    redis: RedisConfig,
+}
+/// --- output ---
+#[derive(Default, Debug, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+pub struct AppConfigPartial {
+    pub app_name: Option<String>,
+    pub database: Option<<DatabaseConfig as ::einstellung::Config>::Partial>,
+    pub redis: Option<<RedisConfig as ::einstellung::Config>::Partial>,
+}
+impl ::einstellung::PartialConfig for AppConfigPartial {
+    type Complete = AppConfig;
+    fn merge(self, next: Self) -> Self {
+        Self {
+            app_name: next.app_name.or(self.app_name),
+            database: match (self.database, next.database) {
+                (Some(a), Some(b)) => ::einstellung::PartialConfig::merge(a, b),
+                (a, b) => a.or(b),
+            },
+            redis: match (self.redis, next.redis) {
+                (Some(a), Some(b)) => ::einstellung::PartialConfig::merge(a, b),
+                (a, b) => a.or(b),
+            },
+        }
+    }
+    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+        let app_name = self
+            .app_name
+            .ok_or(::einstellung::ConfigError::MissingField("app_name"))?;
+        let database = self.database.unwrap_or_default().build()?;
+        let redis = self.redis.unwrap_or_default().build()?;
+        Ok(AppConfig {
+            app_name,
+            database,
+            redis,
+        })
+    }
+}
+impl ::einstellung::Config for AppConfig {
+    type Partial = AppConfigPartial;
+}
+
+// ---------------------------------
+/// --- input ---
+#[derive(Config)]
+struct DatabaseConfig {
+    url: String,
+    pool_size: u32,
+}
+/// --- output ---
+#[derive(Default, Debug, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+pub struct DatabaseConfigPartial {
+    pub url: Option<String>,
+    pub pool_size: Option<u32>,
+}
+impl ::einstellung::PartialConfig for DatabaseConfigPartial {
+    type Complete = DatabaseConfig;
+    fn merge(self, next: Self) -> Self {
+        Self {
+            url: next.url.or(self.url),
+            pool_size: next.pool_size.or(self.pool_size),
+        }
+    }
+    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+        let url = self.url.ok_or(::einstellung::ConfigError::MissingField("url"))?;
+        let pool_size = self
+            .pool_size
+            .ok_or(::einstellung::ConfigError::MissingField("pool_size"))?;
+        Ok(DatabaseConfig { url, pool_size })
+    }
+}
+impl ::einstellung::Config for DatabaseConfig {
+    type Partial = DatabaseConfigPartial;
+}
+
+// ---------------------------------
+/// --- input ---
+#[derive(Config)]
+struct RedisConfig {
+    cluster_mode: bool,
+}
+/// --- output ---
+#[derive(Default, Debug, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+pub struct RedisConfigPartial {
+    pub cluster_mode: Option<bool>,
+}
+impl ::einstellung::PartialConfig for RedisConfigPartial {
+    type Complete = RedisConfig;
+    fn merge(self, next: Self) -> Self {
+        Self {
+            cluster_mode: next.cluster_mode.or(self.cluster_mode),
+        }
+    }
+    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+        let cluster_mode = self
+            .cluster_mode
+            .ok_or(::einstellung::ConfigError::MissingField("cluster_mode"))?;
+        Ok(RedisConfig { cluster_mode })
+    }
+}
+impl ::einstellung::Config for RedisConfig {
+    type Partial = RedisConfigPartial;
+}

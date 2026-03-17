@@ -1,0 +1,16 @@
+---
+source: src/test.rs
+expression: formatted
+---
+/// --- input ---
+#[derive(Config)]
+struct ServerConfig {
+    host: String,
+    port: u16,
+    #[config(merge = "subconfig")]
+    is_active: bool,
+}
+/// --- output ---
+::core::compile_error! {
+    "Unknown value: `subconfig`. Did you mean `subconfig`?"
+}

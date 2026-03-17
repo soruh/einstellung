@@ -1,5 +1,5 @@
 error: Unknown value: `subconfig`. Available values: `append`, `function`, `replace`
- --> src/trybuild_tests/test_invalid_merge2.rs
+ --> src/trybuild_tests/invalid_merge2.rs
   |
   |     #[config(merge = "subconfig")]
   |                      ^^^^^^^^^^^

@@ -1,5 +1,5 @@
 error: Unsupported shape `one unnamed field`. Expected named fields.
- --> src/trybuild_tests/test_invalid.rs
+ --> src/trybuild_tests/invalid.rs
   |
   | #[derive(Config)]
   |          ^^^^^^

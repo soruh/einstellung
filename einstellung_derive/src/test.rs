@@ -57,7 +57,7 @@ macro_rules! assert_macro_test {
     ( @munch $mode:ident, $name:ident, [ $($snaps:expr,)* ], [ $($compiles:expr,)* ], ) => {
         paste::paste! {
             #[test]
-            fn $name() {
+            fn [<output_ $name>]() {
                 let mut formatted_snapshots = Vec::new();
                 $(
                     // $snaps is already a formatted String now, just push it!
@@ -68,7 +68,7 @@ macro_rules! assert_macro_test {
             }
 
             #[test]
-            fn [<$name _compile>]() {
+            fn [<compile_ $name>]() {
                 let mut combined_input = proc_macro2::TokenStream::new();
                 $(
                     combined_input.extend($compiles);
@@ -102,7 +102,7 @@ macro_rules! assert_macro_test {
     };
 }
 
-assert_macro_test!(PASS, test_basic_primitives: {
+assert_macro_test!(PASS, basic_primitives: {
     #[derive(Config)]
     struct ServerConfig {
         host: String,
@@ -111,12 +111,12 @@ assert_macro_test!(PASS, test_basic_primitives: {
     }
 });
 
-assert_macro_test!(FAIL, test_invalid: {
+assert_macro_test!(FAIL, invalid: {
     #[derive(Config)]
     struct ServerConfig(u16);
 });
 
-assert_macro_test!(FAIL, test_invalid_merge: {
+assert_macro_test!(FAIL, invalid_merge: {
     #[derive(Config)]
     struct ServerConfig {
         host: String,
@@ -126,7 +126,7 @@ assert_macro_test!(FAIL, test_invalid_merge: {
     }
 });
 
-assert_macro_test!(FAIL, test_invalid_merge2: {
+assert_macro_test!(FAIL, invalid_merge2: {
     #[derive(Config)]
     struct ServerConfig {
         host: String,
@@ -136,7 +136,7 @@ assert_macro_test!(FAIL, test_invalid_merge2: {
     }
 });
 
-assert_macro_test!(PASS, test_optional_fields_no_double_option: {
+assert_macro_test!(PASS, optional_fields_no_double_option: {
     #[derive(Config)]
     struct ClientConfig {
         name: String,
@@ -145,7 +145,7 @@ assert_macro_test!(PASS, test_optional_fields_no_double_option: {
     }
 });
 
-assert_macro_test!(PASS, test_default_values: {
+assert_macro_test!(PASS, default_values: {
     #[derive(Config)]
     struct NetworkConfig {
         #[config(default = "\"localhost\".to_string()")]
@@ -157,7 +157,7 @@ assert_macro_test!(PASS, test_default_values: {
     }
 });
 
-assert_macro_test!(PASS, test_subconfig_resolution:
+assert_macro_test!(PASS, subconfig_resolution:
     {
         #[derive(Config)]
         struct AppConfig {
@@ -183,7 +183,7 @@ assert_macro_test!(PASS, test_subconfig_resolution:
     }
 );
 
-assert_macro_test!(PASS, test_optional_subconfig:
+assert_macro_test!(PASS, optional_subconfig:
     {
         #[derive(Config)]
         struct TelemetryConfig {
@@ -200,7 +200,7 @@ assert_macro_test!(PASS, test_optional_subconfig:
     }
 );
 
-assert_macro_test!(PASS, test_merge_strategies: {
+assert_macro_test!(PASS, merge_strategies: {
     #[derive(Config)]
     struct LoggerConfig {
         level: String,
@@ -211,7 +211,7 @@ assert_macro_test!(PASS, test_merge_strategies: {
     }
 });
 
-assert_macro_test!(PASS, test_serde_attribute_forwarding: {
+assert_macro_test!(PASS, serde_attribute_forwarding: {
     #[derive(Config)]
     struct ApiConfig {
         #[config(serde(rename = "API_KEY"))]
@@ -223,7 +223,7 @@ assert_macro_test!(PASS, test_serde_attribute_forwarding: {
     }
 });
 
-assert_macro_test!(PASS, test_validation_functions:
+assert_macro_test!(PASS, validation_functions:
     helper {
         pub mod validators {
             pub fn validate_cert_path(_: &String) -> Result<(), String> { Ok(()) }
@@ -241,7 +241,7 @@ assert_macro_test!(PASS, test_validation_functions:
     }
 );
 
-assert_macro_test!(PASS, test_kitchen_sink:
+assert_macro_test!(PASS, kitchen_sink:
     helper {
         fn validate_system_port(_: &u16) -> Result<(), String> { Ok(()) }
     },

@@ -145,7 +145,7 @@ pub mod transformer {
 
         // 2. Determine the Partial Type
         let partial_type = if field.subconfig {
-            syn::parse_quote!(Option<<#core_type as einstellung::Config>::Partial>)
+            syn::parse_quote!(Option<<#core_type as ::einstellung::Config>::Partial>)
         } else {
             syn::parse_quote!(Option<#core_type>)
         };
@@ -224,7 +224,7 @@ pub mod generator {
         });
 
         quote! {
-            #[derive(Default, Debug, serde::Deserialize)]
+            #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
             pub struct #partial_ident {
                 #(#fields,)*
             }
@@ -255,7 +255,7 @@ pub mod generator {
                 },
                 MergeStrategy::Subconfig => quote! {
                     #ident: match (self.#ident, next.#ident) {
-                        (Some(a), Some(b)) => einstellung::PartialConfig::merge(a, b),
+                        (Some(a), Some(b)) => ::einstellung::PartialConfig::merge(a, b),
                         (a, b) => a.or(b)
                     }
                 },
@@ -269,7 +269,7 @@ pub mod generator {
             // 1. Resolve the value (handle optionality and defaults)
             let resolve = if f.is_subconfig {
                 if f.is_optional {
-                    quote! { self.#ident.map(einstellung::PartialConfig::build).transpose()? }
+                    quote! { self.#ident.map(::einstellung::PartialConfig::build).transpose()? }
                 } else {
                     quote! { self.#ident.unwrap_or_default().build()? }
                 }
@@ -280,7 +280,7 @@ pub mod generator {
             } else if f.is_optional {
                 quote! { self.#ident }
             } else {
-                quote! { self.#ident.ok_or(einstellung::ConfigError::MissingField(#ident_str))? }
+                quote! { self.#ident.ok_or(::einstellung::ConfigError::MissingField(#ident_str))? }
             };
 
             // 2. Validate the value (if a validation func is provided)
@@ -290,7 +290,7 @@ pub mod generator {
                 quote! {
                     let #ident = #resolve;
                     if let Err(e) = #validate_func(&#ident) {
-                        return Err(einstellung::ConfigError::Validation {
+                        return Err(::einstellung::ConfigError::Validation {
                             field: #ident_str,
                             reason: e.to_string(),
                         });
@@ -304,14 +304,14 @@ pub mod generator {
         let field_names = model.fields.iter().map(|f| &f.ident);
 
         quote! {
-            impl einstellung::PartialConfig for #partial_ident {
-                type Output = #complete_ident;
+            impl ::einstellung::PartialConfig for #partial_ident {
+                type Complete = #complete_ident;
 
                 fn merge(self, next: Self) -> Self {
                     Self { #(#merge_fields,)* }
                 }
 
-                fn build(self) -> Result<Self::Output, einstellung::ConfigError> {
+                fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
                     #(#build_fields)*
 
                     Ok(#complete_ident { #(#field_names,)* })
@@ -325,7 +325,7 @@ pub mod generator {
         let partial_ident = &model.partial_ident;
 
         quote! {
-            impl einstellung::Config for #complete_ident {
+            impl ::einstellung::Config for #complete_ident {
                 type Partial = #partial_ident;
             }
         }

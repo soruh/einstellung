@@ -2,22 +2,27 @@ use serde::de::DeserializeOwned;
 use std::path::Path;
 use thiserror::Error;
 
+#[cfg(feature = "derive")]
+pub use einstellung_derive::Config;
+
+#[doc(hidden)]
+pub use serde;
+
 #[derive(Error, Debug)]
 pub enum ConfigError {
     #[error("IO Error: {0}")]
     Io(#[from] std::io::Error),
-    
+
     #[cfg(feature = "json")]
     #[error("JSON Parse Error: {0}")]
     Json(#[from] serde_json::Error),
-    
+
     #[error("Missing required configuration field: '{0}'")]
     MissingRequiredField(&'static str),
-    
+
     #[error("Validation failed for field '{field}': {reason}")]
     ValidationError { field: &'static str, reason: String },
 }
-
 
 pub trait Config: Sized {
     type Partial: PartialConfig<Complete = Self>;
@@ -38,7 +43,6 @@ pub trait ConfigProvider {
     fn load_partial<T: DeserializeOwned>(&self) -> Result<T, ConfigError>;
 }
 
-
 #[cfg(feature = "json")]
 pub mod json {
     use super::*;
@@ -49,7 +53,9 @@ pub mod json {
 
     impl<'a> ConfigProvider for JsonFileProvider<'a> {
         fn load_partial<T: DeserializeOwned>(&self) -> Result<T, ConfigError> {
-            Ok(serde_json::from_reader(BufReader::new(File::open(self.0)?))?)
+            Ok(serde_json::from_reader(BufReader::new(File::open(
+                self.0,
+            )?))?)
         }
     }
 }

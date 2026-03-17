@@ -16,5 +16,6 @@ trybuild = "1.0.116"
 [dev-dependencies]
 insta = "1.46.3"
 prettyplease = "0.2.37"
+tempfile = "3.27.0"
 trybuild = "1.0.116"
-
+einstellung = { path = "../einstellung" }

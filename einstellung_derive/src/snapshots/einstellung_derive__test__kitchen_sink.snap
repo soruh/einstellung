@@ -2,6 +2,13 @@
 source: einstellung_derive/src/test.rs
 expression: formatted
 ---
+/// --- helper ---
+fn validate_system_port(_: &u16) -> Result<(), String> {
+    Ok(())
+}
+
+// ---------------------------------
+
 /// --- input ---
 #[derive(Config)]
 struct FullSystemConfig {
@@ -18,6 +25,7 @@ struct FullSystemConfig {
     #[config(subconfig)]
     optional_cache: Option<CacheConfig>,
 }
+
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
@@ -82,6 +90,7 @@ impl ::einstellung::Config for FullSystemConfig {
 }
 
 // ---------------------------------
+
 /// --- input ---
 #[derive(Config)]
 struct DatabaseConfig {
@@ -89,6 +98,7 @@ struct DatabaseConfig {
     #[config(default = "5432")]
     port: u16,
 }
+
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
@@ -115,12 +125,14 @@ impl ::einstellung::Config for DatabaseConfig {
 }
 
 // ---------------------------------
+
 /// --- input ---
 #[derive(Config)]
 struct CacheConfig {
     #[config(default = "1024")]
     size_mb: u32,
 }
+
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]

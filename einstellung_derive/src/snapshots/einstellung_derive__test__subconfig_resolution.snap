@@ -11,6 +11,7 @@ struct AppConfig {
     #[config(subconfig)]
     redis: RedisConfig,
 }
+
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
@@ -52,12 +53,14 @@ impl ::einstellung::Config for AppConfig {
 }
 
 // ---------------------------------
+
 /// --- input ---
 #[derive(Config)]
 struct DatabaseConfig {
     url: String,
     pool_size: u32,
 }
+
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
@@ -86,11 +89,13 @@ impl ::einstellung::Config for DatabaseConfig {
 }
 
 // ---------------------------------
+
 /// --- input ---
 #[derive(Config)]
 struct RedisConfig {
     cluster_mode: bool,
 }
+
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]

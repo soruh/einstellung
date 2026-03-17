@@ -9,6 +9,7 @@ struct ServerConfig {
     port: u16,
     is_active: bool,
 }
+
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]

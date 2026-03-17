@@ -1,5 +1,5 @@
 ---
-source: src/test.rs
+source: einstellung_derive/src/test.rs
 expression: formatted
 ---
 /// --- input ---
@@ -10,6 +10,7 @@ struct ServerConfig {
     #[config(merge = "subconfig")]
     is_active: bool,
 }
+
 /// --- output ---
 ::core::compile_error! {
     "Unknown value: `subconfig`. Did you mean `subconfig`?"

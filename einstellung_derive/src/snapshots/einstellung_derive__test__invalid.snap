@@ -1,10 +1,11 @@
 ---
-source: src/test.rs
+source: einstellung_derive/src/test.rs
 expression: formatted
 ---
 /// --- input ---
 #[derive(Config)]
 struct ServerConfig(u16);
+
 /// --- output ---
 ::core::compile_error! {
     "Unsupported shape `one unnamed field`. Expected named fields."

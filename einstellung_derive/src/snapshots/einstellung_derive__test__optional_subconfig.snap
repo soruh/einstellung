@@ -9,6 +9,7 @@ struct TelemetryConfig {
     #[config(subconfig)]
     datadog: Option<DatadogConfig>,
 }
+
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
@@ -43,11 +44,13 @@ impl ::einstellung::Config for TelemetryConfig {
 }
 
 // ---------------------------------
+
 /// --- input ---
 #[derive(Config)]
 struct DatadogConfig {
     api_key: String,
 }
+
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]

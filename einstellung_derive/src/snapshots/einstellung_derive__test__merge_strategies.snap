@@ -11,6 +11,7 @@ struct LoggerConfig {
     #[config(merge = "replace")]
     output_format: String,
 }
+
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]

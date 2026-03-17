@@ -12,6 +12,7 @@ struct ApiConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     endpoint: Option<String>,
 }
+
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]

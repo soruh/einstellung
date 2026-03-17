@@ -1,90 +1,86 @@
 macro_rules! assert_macro_test {
-    (
-        $mode:ident, $name:ident:
-        $( $block:tt )+
-    ) => {
+    // Entry point
+    ( $mode:ident, $name:ident: $($tail:tt)* ) => {
+        assert_macro_test!(@munch $mode, $name, [], [], $($tail)*);
+    };
+
+    // Muncher: helper { ... }
+    ( @munch $mode:ident, $name:ident, [ $($snaps:expr,)* ], [ $($compiles:expr,)* ], helper { $($body:tt)* } $($tail:tt)* ) => {
+        assert_macro_test!(
+            @munch $mode, $name,
+            [
+                $($snaps,)* {
+                    let inner = ::quote::quote! { $($body)* };
+                    // Parse just the valid Rust code
+                    let tree: syn::File = syn::parse2(inner).expect("Helper parse fail");
+                    // Format as a string, then prepend our comment header
+                    format!("/// --- helper ---\n{}", prettyplease::unparse(&tree))
+                },
+            ],
+            [ $($compiles,)* ::quote::quote! { $($body)* }, ],
+            $($tail)*
+        );
+    };
+
+    // Muncher: standard block { ... }
+    ( @munch $mode:ident, $name:ident, [ $($snaps:expr,)* ], [ $($compiles:expr,)* ], { $($body:tt)* } $($tail:tt)* ) => {
+        assert_macro_test!(
+            @munch $mode, $name,
+            [
+                $($snaps,)* {
+                    let input = ::quote::quote! { $($body)* };
+                    let output = crate::derive_config::derive(input.clone());
+
+                    // Parse input and output separately (both are valid Rust code individually)
+                    let in_tree: syn::File = syn::parse2(input).expect("Input parse fail");
+                    let out_tree: syn::File = syn::parse2(output).expect("Output parse fail");
+
+                    // Stitch them together using standard string formatting
+                    format!(
+                        "/// --- input ---\n{}\n/// --- output ---\n{}",
+                        prettyplease::unparse(&in_tree),
+                        prettyplease::unparse(&out_tree)
+                    )
+                },
+            ],
+            [ $($compiles,)* ::quote::quote! { $($body)* }, ],
+            $($tail)*
+        );
+    };
+
+    // Muncher: comma skipper (allows optional commas between blocks)
+    ( @munch $mode:ident, $name:ident, $snaps:tt, $compiles:tt, , $($tail:tt)* ) => {
+        assert_macro_test!(@munch $mode, $name, $snaps, $compiles, $($tail)*);
+    };
+
+    // Termination
+    ( @munch $mode:ident, $name:ident, [ $($snaps:expr,)* ], [ $($compiles:expr,)* ], ) => {
         paste::paste! {
             #[test]
             fn $name() {
-                use quote::quote;
                 let mut formatted_snapshots = Vec::new();
-
                 $(
-                    let tokens = quote! { $block };
-                    let tokens_str = tokens.to_string();
-
-                    // 1. Resolve the inner content and whether it's a helper
-                    let (inner_tokens, is_helper) = if tokens_str.starts_with("helper") {
-                        let mut iter = tokens.into_iter();
-                        let _ = iter.next(); // skip 'helper'
-                        let group_tree = iter.next().expect("helper must be followed by a block");
-
-                        // group_tree is a TokenTree (the braces), we want its stream
-                        let group: proc_macro2::Group = syn::parse2(quote! { #group_tree })
-                            .expect("helper must be followed by braces { }");
-                        (group.stream(), true)
-                    } else {
-                        // Standard block: { struct ... }
-                        let group: proc_macro2::Group = syn::parse2(tokens)
-                            .expect("Expected a braced block { ... }");
-                        (group.stream(), false)
-                    };
-
-                    // 2. Build the snapshot entry
-                    let snapshot_entry = if is_helper {
-                        quote! {
-                            /// --- helper ---
-                            #inner_tokens
-                        }
-                    } else {
-                        let output = crate::derive_config::derive(inner_tokens.clone());
-                        quote! {
-                            /// --- input ---
-                            #inner_tokens
-                            /// --- output ---
-                            #output
-                        }
-                    };
-
-                    let syntax_tree: syn::File = syn::parse2(snapshot_entry.clone())
-                        .unwrap_or_else(|e| panic!("invalid syntax: {}\nTokens: {}", e, snapshot_entry));
-                    formatted_snapshots.push(prettyplease::unparse(&syntax_tree));
-                )+
-
-                let formatted = formatted_snapshots.join("\n// ---------------------------------\n");
+                    // $snaps is already a formatted String now, just push it!
+                    formatted_snapshots.push($snaps);
+                )*
+                let formatted = formatted_snapshots.join("\n// ---------------------------------\n\n");
                 insta::assert_snapshot!(formatted);
             }
 
             #[test]
             fn [<$name _compile>]() {
-                use quote::quote;
                 let mut combined_input = proc_macro2::TokenStream::new();
                 $(
-                    let tokens = quote! { $block };
-                    let tokens_str = tokens.to_string();
+                    combined_input.extend($compiles);
+                )*
 
-                    let content = if tokens_str.starts_with("helper") {
-                        let mut iter = tokens.into_iter();
-                        let _ = iter.next(); // skip 'helper'
-                        let group_tree = iter.next().expect("helper block missing");
-                        let group: proc_macro2::Group = syn::parse2(quote! { #group_tree }).expect("Expected braces");
-                        group.stream()
-                    } else {
-                        let group: proc_macro2::Group = syn::parse2(tokens).expect("Expected braces");
-                        group.stream()
-                    };
-
-                    combined_input.extend(content);
-                )+
-
-                let trybuild_tokens = quote! {
-                    #[allow(unused_imports)]
-                    use ::einstellung_derive::Config;
+                let trybuild_tokens = ::quote::quote! {
+                    use einstellung_derive::Config;
                     #combined_input
                     fn main() {}
                 };
 
-                let syntax_tree: syn::File = syn::parse2(trybuild_tokens).expect("Generated invalid code");
+                let syntax_tree: syn::File = syn::parse2(trybuild_tokens).expect("Compile parse fail");
                 let formatted_code = prettyplease::unparse(&syntax_tree);
 
                 let manifest_dir = env!("CARGO_MANIFEST_DIR");
@@ -92,13 +88,13 @@ macro_rules! assert_macro_test {
                 std::fs::create_dir_all(&dir_path).ok();
 
                 let file_path = dir_path.join(format!("{}.rs", stringify!($name)));
-                std::fs::write(&file_path, formatted_code).expect("failed to write");
+                std::fs::write(&file_path, formatted_code).expect("Write fail");
 
                 let t = trybuild::TestCases::new();
                 match stringify!($mode) {
                     "PASS" => t.pass(&file_path),
                     "FAIL" => t.compile_fail(&file_path),
-                    _ => panic!("invalid mode"),
+                    _ => panic!("Invalid mode"),
                 }
             }
         }

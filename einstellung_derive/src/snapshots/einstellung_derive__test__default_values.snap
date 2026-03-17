@@ -12,6 +12,7 @@ struct NetworkConfig {
     #[config(default = "std::time::Duration::from_secs(30)")]
     timeout: std::time::Duration,
 }
+
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]

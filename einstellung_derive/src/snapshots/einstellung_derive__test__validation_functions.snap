@@ -2,14 +2,27 @@
 source: einstellung_derive/src/test.rs
 expression: formatted
 ---
+/// --- helper ---
+pub mod validators {
+    pub fn validate_cert_path(_: &String) -> Result<(), String> {
+        Ok(())
+    }
+    pub fn validate_port(_: &u16) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+// ---------------------------------
+
 /// --- input ---
 #[derive(Config)]
 struct TlsConfig {
-    #[config(validate = "crate::validators::validate_cert_path")]
+    #[config(validate = "validators::validate_cert_path")]
     cert_path: String,
-    #[config(validate = "crate::validators::validate_port")]
+    #[config(validate = "validators::validate_port")]
     port: u16,
 }
+
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
@@ -29,14 +42,14 @@ impl ::einstellung::PartialConfig for TlsConfigPartial {
         let cert_path = self
             .cert_path
             .ok_or(::einstellung::ConfigError::MissingField("cert_path"))?;
-        if let Err(e) = crate::validators::validate_cert_path(&cert_path) {
+        if let Err(e) = validators::validate_cert_path(&cert_path) {
             return Err(::einstellung::ConfigError::Validation {
                 field: "cert_path",
                 reason: e.to_string(),
             });
         }
         let port = self.port.ok_or(::einstellung::ConfigError::MissingField("port"))?;
-        if let Err(e) = crate::validators::validate_port(&port) {
+        if let Err(e) = validators::validate_port(&port) {
             return Err(::einstellung::ConfigError::Validation {
                 field: "port",
                 reason: e.to_string(),

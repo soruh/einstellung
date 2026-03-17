@@ -1,5 +1,5 @@
 ---
-source: src/test.rs
+source: einstellung_derive/src/test.rs
 expression: formatted
 ---
 /// --- input ---
@@ -10,6 +10,7 @@ struct ServerConfig {
     #[config(merge = "foo")]
     is_active: bool,
 }
+
 /// --- output ---
 ::core::compile_error! {
     "Unknown value: `foo`. Available values: `append`, `function`, `replace`, `subconfig`"

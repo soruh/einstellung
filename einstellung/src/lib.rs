@@ -1,5 +1,10 @@
 use serde::de::DeserializeOwned;
-use std::path::Path;
+use std::{
+    borrow::Cow,
+    fs::File,
+    io::{BufReader, Read},
+    path::{Path, PathBuf},
+};
 use thiserror::Error;
 
 #[cfg(feature = "derive")]
@@ -46,19 +51,54 @@ pub trait ConfigProvider {
     fn load_partial<T: DeserializeOwned>(&self) -> Result<T, ConfigError>;
 }
 
+pub enum FileContentProvider<'i> {
+    Inline(Cow<'i, str>),
+    File(Cow<'i, PathBuf>),
+    Custom(Box<dyn Fn() -> Result<Box<dyn Read + 'i>, ConfigError> + 'i>),
+}
+
+pub enum FileContentReader<'i> {
+    Inline(std::io::Cursor<&'i str>),
+    File(BufReader<File>),
+    Generic(Box<dyn Read + 'i>),
+}
+
+impl<'i> FileContentProvider<'i> {
+    pub fn open(&self) -> Result<FileContentReader<'i>, ConfigError> {
+        Ok(match self {
+            FileContentProvider::Inline(inline) => {
+                FileContentReader::Inline(std::io::Cursor::new(inline))
+            }
+            FileContentProvider::File(path) => {
+                FileContentReader::File(File::open(&**path).map(BufReader::new)?)
+            }
+            FileContentProvider::Custom(producer) => FileContentReader::Generic(producer()?),
+        })
+    }
+}
+
 #[cfg(feature = "json")]
 pub mod json {
     use super::*;
-    use std::fs::File;
-    use std::io::BufReader;
 
-    pub struct JsonFileProvider<'a>(pub &'a Path);
+    pub struct JsonFileProvider<'i>(FileContentProvider<'i>);
 
-    impl<'a> ConfigProvider for JsonFileProvider<'a> {
+    impl<'i> JsonFileProvider<'i> {
+        pub fn inline(content: impl Into<Cow<'i, str>>) -> Self {
+            Self(FileContentProvider::Inline(content.into()))
+        }
+        pub fn path(path: impl Into<Cow<'i, PathBuf>>) -> Self {
+            Self(FileContentProvider::File(path.into()))
+        }
+    }
+
+    impl<'i> ConfigProvider for JsonFileProvider<'i> {
         fn load_partial<T: DeserializeOwned>(&self) -> Result<T, ConfigError> {
-            Ok(serde_json::from_reader(BufReader::new(File::open(
-                self.0,
-            )?))?)
+            match self.0.open()? {
+                FileContentReader::Inline(cursor) => Ok(serde_json::from_reader(cursor)?),
+                FileContentReader::File(buf_reader) => Ok(serde_json::from_reader(buf_reader)?),
+                FileContentReader::Generic(reader) => Ok(serde_json::from_reader(reader)?),
+            }
         }
     }
 }

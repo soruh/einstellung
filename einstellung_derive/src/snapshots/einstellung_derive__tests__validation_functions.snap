@@ -27,16 +27,14 @@ impl einstellung::PartialConfig for TlsConfigPartial {
     fn build(self) -> Result<Self::Output, einstellung::ConfigError> {
         let cert_path = self
             .cert_path
-            .ok_or_else(|| einstellung::ConfigError::MissingField("cert_path"))?;
+            .ok_or(einstellung::ConfigError::MissingField("cert_path"))?;
         if let Err(e) = crate::validators::validate_cert_path(&cert_path) {
             return Err(einstellung::ConfigError::Validation {
                 field: "cert_path",
                 reason: e.to_string(),
             });
         }
-        let port = self
-            .port
-            .ok_or_else(|| einstellung::ConfigError::MissingField("port"))?;
+        let port = self.port.ok_or(einstellung::ConfigError::MissingField("port"))?;
         if let Err(e) = crate::validators::validate_port(&port) {
             return Err(einstellung::ConfigError::Validation {
                 field: "port",

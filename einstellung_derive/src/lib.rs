@@ -1,7 +1,8 @@
 use proc_macro::TokenStream;
 
 #[cfg(test)]
-mod tests;
+mod snapshot;
+mod trybuild;
 
 mod derive_config;
 

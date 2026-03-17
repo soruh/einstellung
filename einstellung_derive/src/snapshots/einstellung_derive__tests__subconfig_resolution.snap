@@ -36,7 +36,7 @@ impl einstellung::PartialConfig for AppConfigPartial {
     fn build(self) -> Result<Self::Output, einstellung::ConfigError> {
         let app_name = self
             .app_name
-            .ok_or_else(|| einstellung::ConfigError::MissingField("app_name"))?;
+            .ok_or(einstellung::ConfigError::MissingField("app_name"))?;
         let database = self.database.unwrap_or_default().build()?;
         let redis = self.redis.unwrap_or_default().build()?;
         Ok(AppConfig {
@@ -72,10 +72,10 @@ impl einstellung::PartialConfig for DatabaseConfigPartial {
         }
     }
     fn build(self) -> Result<Self::Output, einstellung::ConfigError> {
-        let url = self.url.ok_or_else(|| einstellung::ConfigError::MissingField("url"))?;
+        let url = self.url.ok_or(einstellung::ConfigError::MissingField("url"))?;
         let pool_size = self
             .pool_size
-            .ok_or_else(|| einstellung::ConfigError::MissingField("pool_size"))?;
+            .ok_or(einstellung::ConfigError::MissingField("pool_size"))?;
         Ok(DatabaseConfig { url, pool_size })
     }
 }
@@ -104,7 +104,7 @@ impl einstellung::PartialConfig for RedisConfigPartial {
     fn build(self) -> Result<Self::Output, einstellung::ConfigError> {
         let cluster_mode = self
             .cluster_mode
-            .ok_or_else(|| einstellung::ConfigError::MissingField("cluster_mode"))?;
+            .ok_or(einstellung::ConfigError::MissingField("cluster_mode"))?;
         Ok(RedisConfig { cluster_mode })
     }
 }

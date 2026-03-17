@@ -269,7 +269,7 @@ pub mod generator {
             // 1. Resolve the value (handle optionality and defaults)
             let resolve = if f.is_subconfig {
                 if f.is_optional {
-                    quote! { self.#ident.map(|p| p.build()).transpose()? }
+                    quote! { self.#ident.map(einstellung::PartialConfig::build).transpose()? }
                 } else {
                     quote! { self.#ident.unwrap_or_default().build()? }
                 }
@@ -280,12 +280,12 @@ pub mod generator {
             } else if f.is_optional {
                 quote! { self.#ident }
             } else {
-                quote! { self.#ident.ok_or_else(|| einstellung::ConfigError::MissingField(#ident_str))? }
+                quote! { self.#ident.ok_or(einstellung::ConfigError::MissingField(#ident_str))? }
             };
 
             // 2. Validate the value (if a validation func is provided)
             if let Some(validate_func) = &f.validate_func {
-                // If it's an Option, we usually only validate if Some. 
+                // If it's an Option, we usually only validate if Some.
                 // For simplicity, we assume the validate func accepts the exact type `T` or `Option<T>`.
                 quote! {
                     let #ident = #resolve;
@@ -308,17 +308,13 @@ pub mod generator {
                 type Output = #complete_ident;
 
                 fn merge(self, next: Self) -> Self {
-                    Self {
-                        #(#merge_fields,)*
-                    }
+                    Self { #(#merge_fields,)* }
                 }
 
                 fn build(self) -> Result<Self::Output, einstellung::ConfigError> {
                     #(#build_fields)*
 
-                    Ok(#complete_ident {
-                        #(#field_names,)*
-                    })
+                    Ok(#complete_ident { #(#field_names,)* })
                 }
             }
         }

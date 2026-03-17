@@ -29,8 +29,8 @@ impl einstellung::PartialConfig for TelemetryConfigPartial {
     fn build(self) -> Result<Self::Output, einstellung::ConfigError> {
         let enabled = self
             .enabled
-            .ok_or_else(|| einstellung::ConfigError::MissingField("enabled"))?;
-        let datadog = self.datadog.map(|p| p.build()).transpose()?;
+            .ok_or(einstellung::ConfigError::MissingField("enabled"))?;
+        let datadog = self.datadog.map(einstellung::PartialConfig::build).transpose()?;
         Ok(TelemetryConfig {
             enabled,
             datadog,
@@ -62,7 +62,7 @@ impl einstellung::PartialConfig for DatadogConfigPartial {
     fn build(self) -> Result<Self::Output, einstellung::ConfigError> {
         let api_key = self
             .api_key
-            .ok_or_else(|| einstellung::ConfigError::MissingField("api_key"))?;
+            .ok_or(einstellung::ConfigError::MissingField("api_key"))?;
         Ok(DatadogConfig { api_key })
     }
 }

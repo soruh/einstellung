@@ -32,10 +32,10 @@ impl einstellung::PartialConfig for ApiConfigPartial {
         }
     }
     fn build(self) -> Result<Self::Output, einstellung::ConfigError> {
-        let key = self.key.ok_or_else(|| einstellung::ConfigError::MissingField("key"))?;
+        let key = self.key.ok_or(einstellung::ConfigError::MissingField("key"))?;
         let retries = self
             .retries
-            .ok_or_else(|| einstellung::ConfigError::MissingField("retries"))?;
+            .ok_or(einstellung::ConfigError::MissingField("retries"))?;
         let endpoint = self.endpoint;
         Ok(ApiConfig {
             key,

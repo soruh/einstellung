@@ -54,9 +54,7 @@ impl einstellung::PartialConfig for FullSystemConfigPartial {
     }
     fn build(self) -> Result<Self::Output, einstellung::ConfigError> {
         let name = self.name.unwrap_or_else(|| "production".to_string());
-        let port = self
-            .port
-            .ok_or_else(|| einstellung::ConfigError::MissingField("port"))?;
+        let port = self.port.ok_or(einstellung::ConfigError::MissingField("port"))?;
         if let Err(e) = validate_system_port(&port) {
             return Err(einstellung::ConfigError::Validation {
                 field: "port",
@@ -65,7 +63,10 @@ impl einstellung::PartialConfig for FullSystemConfigPartial {
         }
         let database = self.database.unwrap_or_default().build()?;
         let log_files = self.log_files;
-        let optional_cache = self.optional_cache.map(|p| p.build()).transpose()?;
+        let optional_cache = self
+            .optional_cache
+            .map(einstellung::PartialConfig::build)
+            .transpose()?;
         Ok(FullSystemConfig {
             name,
             port,
@@ -102,7 +103,7 @@ impl einstellung::PartialConfig for DatabaseConfigPartial {
         }
     }
     fn build(self) -> Result<Self::Output, einstellung::ConfigError> {
-        let url = self.url.ok_or_else(|| einstellung::ConfigError::MissingField("url"))?;
+        let url = self.url.ok_or(einstellung::ConfigError::MissingField("url"))?;
         let port = self.port.unwrap_or(5432);
         Ok(DatabaseConfig { url, port })
     }

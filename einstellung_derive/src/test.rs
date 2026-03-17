@@ -116,7 +116,7 @@ assert_macro_test!(FAIL, invalid: {
     struct ServerConfig(u16);
 });
 
-assert_macro_test!(FAIL, invalid_merge: {
+assert_macro_test!(FAIL, invalid_merge_foo: {
     #[derive(Config)]
     struct ServerConfig {
         host: String,
@@ -126,7 +126,7 @@ assert_macro_test!(FAIL, invalid_merge: {
     }
 });
 
-assert_macro_test!(FAIL, invalid_merge2: {
+assert_macro_test!(FAIL, invalid_merge_subconfig: {
     #[derive(Config)]
     struct ServerConfig {
         host: String,

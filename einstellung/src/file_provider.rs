@@ -26,6 +26,7 @@ where
     }
 }
 
+#[non_exhaustive]
 pub enum FileContentProvider<'i> {
     InlineBorrowed(&'i str),
     InlineOwned(String),

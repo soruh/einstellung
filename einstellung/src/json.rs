@@ -2,7 +2,7 @@ use crate::file_provider::{FileContentProvider, IntoFileContentProvider};
 
 use super::*;
 
-pub struct JsonFileProvider<'i>(FileContentProvider<'i>);
+pub struct JsonFileProvider<'i>(pub FileContentProvider<'i>);
 
 impl<'i> JsonFileProvider<'i> {
     pub fn new(src: impl IntoFileContentProvider<'i>) -> Self {

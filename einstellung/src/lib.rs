@@ -39,6 +39,7 @@ pub trait ConfigProvider {
 }
 
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum ConfigError {
     #[error("IO Error: {0}")]
     Io(#[from] std::io::Error),

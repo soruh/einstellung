@@ -1,7 +1,7 @@
 use super::*;
 use crate::file_provider::{FileContentProvider, IntoFileContentProvider};
 
-pub struct TomlFileProvider<'i>(FileContentProvider<'i>);
+pub struct TomlFileProvider<'i>(pub FileContentProvider<'i>);
 
 impl<'i> TomlFileProvider<'i> {
     pub fn new(src: impl IntoFileContentProvider<'i>) -> Self {

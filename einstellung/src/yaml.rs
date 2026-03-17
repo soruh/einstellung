@@ -1,7 +1,7 @@
 use super::*;
 use crate::file_provider::{FileContentProvider, IntoFileContentProvider};
 
-pub struct YamlFileProvider<'i>(FileContentProvider<'i>);
+pub struct YamlFileProvider<'i>(pub FileContentProvider<'i>);
 
 impl<'i> YamlFileProvider<'i> {
     pub fn new(src: impl IntoFileContentProvider<'i>) -> Self {

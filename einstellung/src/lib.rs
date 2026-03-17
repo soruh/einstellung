@@ -1,8 +1,7 @@
 use serde::de::DeserializeOwned;
 use std::{
-    borrow::Cow,
     fs::File,
-    io::{BufReader, Read},
+    io::{BufReader, Cursor, Read},
     path::{Path, PathBuf},
 };
 use thiserror::Error;
@@ -52,28 +51,116 @@ pub trait ConfigProvider {
 }
 
 pub enum FileContentProvider<'i> {
-    Inline(Cow<'i, str>),
-    File(Cow<'i, PathBuf>),
-    Custom(Box<dyn Fn() -> Result<Box<dyn Read + 'i>, ConfigError> + 'i>),
-}
+    InlineBorrowed(&'i str),
+    InlineOwned(String),
 
-pub enum FileContentReader<'i> {
-    Inline(std::io::Cursor<&'i str>),
-    File(BufReader<File>),
-    Generic(Box<dyn Read + 'i>),
+    PathBorrowed(&'i Path),
+    PathOwned(PathBuf),
+
+    CustomFn(fn() -> Result<Box<dyn Read + 'static>, ConfigError>),
+    CustomBoxed(Box<dyn Fn() -> Result<Box<dyn Read + 'static>, ConfigError> + 'static>),
+
+    CustomRef(&'i dyn Fn() -> Result<Box<dyn Read + 'i>, ConfigError>),
 }
 
 impl<'i> FileContentProvider<'i> {
-    pub fn open(&self) -> Result<FileContentReader<'i>, ConfigError> {
-        Ok(match self {
-            FileContentProvider::Inline(inline) => {
-                FileContentReader::Inline(std::io::Cursor::new(inline))
+    /// Internal: call the provider to produce a reader
+    fn with_reader<R>(
+        &self,
+        f: impl FnOnce(&mut dyn Read) -> Result<R, ConfigError>,
+    ) -> Result<R, ConfigError> {
+        match self {
+            FileContentProvider::InlineBorrowed(s) => f(&mut Cursor::new(*s)),
+            FileContentProvider::InlineOwned(s) => f(&mut Cursor::new(s.as_str())),
+            FileContentProvider::PathBorrowed(p) => f(&mut BufReader::new(File::open(p)?)),
+            FileContentProvider::PathOwned(p) => f(&mut BufReader::new(File::open(p)?)),
+            FileContentProvider::CustomBoxed(factory) => f(factory()?.as_mut()),
+            FileContentProvider::CustomRef(factory) => f(factory()?.as_mut()),
+            FileContentProvider::CustomFn(func) => f(func()?.as_mut()),
+        }
+    }
+
+    /// Convert to `'static` owned data.
+    /// Only valid for Inline/Path variants.
+    pub fn into_owned(self) -> FileContentProvider<'static> {
+        use FileContentProvider::*;
+        match self {
+            InlineBorrowed(s) => InlineOwned(s.to_owned()),
+            PathBorrowed(p) => PathOwned(p.to_path_buf()),
+            InlineOwned(s) => InlineOwned(s),
+            PathOwned(p) => PathOwned(p),
+            CustomFn(f) => CustomFn(f),
+            CustomBoxed(b) => CustomBoxed(b),
+
+            CustomRef(_) => {
+                panic!(
+                    "Cannot convert non-function-pointer custom to owned. provide a fn() or a Box<Fn + 'static>"
+                )
             }
-            FileContentProvider::File(path) => {
-                FileContentReader::File(File::open(&**path).map(BufReader::new)?)
-            }
-            FileContentProvider::Custom(producer) => FileContentReader::Generic(producer()?),
-        })
+        }
+    }
+}
+
+pub trait IntoFileContentProvider<'i> {
+    fn into_provider(self) -> FileContentProvider<'i>;
+
+    fn into_owned_provider(self) -> FileContentProvider<'static>
+    where
+        Self: Sized,
+    {
+        self.into_provider().into_owned()
+    }
+}
+
+impl<'i> IntoFileContentProvider<'i> for FileContentProvider<'i> {
+    fn into_provider(self) -> FileContentProvider<'i> {
+        self
+    }
+}
+
+impl<'i> IntoFileContentProvider<'i> for &'i str {
+    fn into_provider(self) -> FileContentProvider<'i> {
+        FileContentProvider::InlineBorrowed(self)
+    }
+}
+impl IntoFileContentProvider<'static> for String {
+    fn into_provider(self) -> FileContentProvider<'static> {
+        FileContentProvider::InlineOwned(self)
+    }
+}
+
+impl<'i> IntoFileContentProvider<'i> for &'i Path {
+    fn into_provider(self) -> FileContentProvider<'i> {
+        FileContentProvider::PathBorrowed(self)
+    }
+}
+impl IntoFileContentProvider<'static> for PathBuf {
+    fn into_provider(self) -> FileContentProvider<'static> {
+        FileContentProvider::PathOwned(self)
+    }
+}
+
+impl IntoFileContentProvider<'static> for fn() -> Result<Box<dyn Read + 'static>, ConfigError> {
+    fn into_provider(self) -> FileContentProvider<'static> {
+        FileContentProvider::CustomFn(self)
+    }
+}
+
+impl<F> IntoFileContentProvider<'static> for Box<F>
+where
+    F: Fn() -> Result<Box<dyn Read + 'static>, ConfigError> + 'static,
+{
+    fn into_provider(self) -> FileContentProvider<'static> {
+        FileContentProvider::CustomBoxed(self)
+    }
+}
+
+impl<'i, F> IntoFileContentProvider<'i> for &'i F
+where
+    F: Fn() -> Result<Box<dyn Read + 'i>, ConfigError> + 'i,
+{
+    fn into_provider(self) -> FileContentProvider<'i> {
+        FileContentProvider::CustomRef(self)
     }
 }
 
@@ -84,21 +171,21 @@ pub mod json {
     pub struct JsonFileProvider<'i>(FileContentProvider<'i>);
 
     impl<'i> JsonFileProvider<'i> {
-        pub fn inline(content: impl Into<Cow<'i, str>>) -> Self {
-            Self(FileContentProvider::Inline(content.into()))
+        /// Generic constructor via IntoFileContentProvider
+        pub fn new(src: impl IntoFileContentProvider<'i>) -> Self {
+            Self(src.into_provider())
         }
-        pub fn path(path: impl Into<Cow<'i, PathBuf>>) -> Self {
-            Self(FileContentProvider::File(path.into()))
+
+        /// Upgrade to owned (`'static`) for Inline/Path variants
+        pub fn into_owned(self) -> JsonFileProvider<'static> {
+            JsonFileProvider(self.0.into_owned())
         }
     }
 
-    impl<'i> ConfigProvider for JsonFileProvider<'i> {
-        fn load_partial<T: DeserializeOwned>(&self) -> Result<T, ConfigError> {
-            match self.0.open()? {
-                FileContentReader::Inline(cursor) => Ok(serde_json::from_reader(cursor)?),
-                FileContentReader::File(buf_reader) => Ok(serde_json::from_reader(buf_reader)?),
-                FileContentReader::Generic(reader) => Ok(serde_json::from_reader(reader)?),
-            }
+    impl<'i> super::ConfigProvider for JsonFileProvider<'i> {
+        fn load_partial<T: serde::de::DeserializeOwned>(&self) -> Result<T, ConfigError> {
+            self.0
+                .with_reader(|reader| Ok(serde_json::from_reader(reader)?))
         }
     }
 }

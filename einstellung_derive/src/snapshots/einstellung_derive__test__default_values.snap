@@ -15,10 +15,10 @@ struct NetworkConfig {
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
-pub struct NetworkConfigPartial {
-    pub host: Option<String>,
-    pub port: Option<u16>,
-    pub timeout: Option<std::time::Duration>,
+struct NetworkConfigPartial {
+    host: Option<String>,
+    port: Option<u16>,
+    timeout: Option<std::time::Duration>,
 }
 impl ::einstellung::PartialConfig for NetworkConfigPartial {
     type Complete = NetworkConfig;

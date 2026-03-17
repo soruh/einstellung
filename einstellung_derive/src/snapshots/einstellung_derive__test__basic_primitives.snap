@@ -12,10 +12,10 @@ struct ServerConfig {
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
-pub struct ServerConfigPartial {
-    pub host: Option<String>,
-    pub port: Option<u16>,
-    pub is_active: Option<bool>,
+struct ServerConfigPartial {
+    host: Option<String>,
+    port: Option<u16>,
+    is_active: Option<bool>,
 }
 impl ::einstellung::PartialConfig for ServerConfigPartial {
     type Complete = ServerConfig;

@@ -12,10 +12,10 @@ struct ClientConfig {
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
-pub struct ClientConfigPartial {
-    pub name: Option<String>,
-    pub timeout_ms: Option<u32>,
-    pub proxy: Option<String>,
+struct ClientConfigPartial {
+    name: Option<String>,
+    timeout_ms: Option<u32>,
+    proxy: Option<String>,
 }
 impl ::einstellung::PartialConfig for ClientConfigPartial {
     type Complete = ClientConfig;

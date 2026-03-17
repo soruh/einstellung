@@ -13,9 +13,9 @@ struct TlsConfig {
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
-pub struct TlsConfigPartial {
-    pub cert_path: Option<String>,
-    pub port: Option<u16>,
+struct TlsConfigPartial {
+    cert_path: Option<String>,
+    port: Option<u16>,
 }
 impl ::einstellung::PartialConfig for TlsConfigPartial {
     type Complete = TlsConfig;

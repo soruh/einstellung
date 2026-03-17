@@ -31,6 +31,7 @@ pub mod parser {
     #[darling(attributes(config), supports(struct_named))]
     pub struct ConfigStructReceiver {
         pub ident: syn::Ident,
+        pub vis: syn::Visibility,
         pub data: ast::Data<darling::util::Ignored, ConfigFieldReceiver>,
     }
 
@@ -39,6 +40,7 @@ pub mod parser {
     #[darling(attributes(config), forward_attrs(serde))]
     pub struct ConfigFieldReceiver {
         pub ident: Option<syn::Ident>,
+        pub vis: syn::Visibility,
         pub ty: syn::Type,
         pub attrs: Vec<syn::Attribute>, // Holds forwarded attributes (e.g., serde)
 
@@ -75,12 +77,13 @@ pub mod transformer {
     pub struct TransformedStruct {
         pub complete_ident: syn::Ident,
         pub partial_ident: syn::Ident,
+        pub vis: syn::Visibility,
         pub fields: Vec<TransformedField>,
     }
 
     pub struct TransformedField {
         pub ident: syn::Ident,
-        // pub original_type: syn::Type,
+        pub vis: syn::Visibility,
         pub partial_type: syn::Type,
         pub is_optional: bool,
         pub is_subconfig: bool,
@@ -94,6 +97,8 @@ pub mod transformer {
         let complete_ident = receiver.ident.clone();
         let partial_ident =
             syn::Ident::new(&format!("{complete_ident}Partial"), complete_ident.span());
+
+        let vis = receiver.vis;
 
         let struct_data = receiver
             .data
@@ -125,6 +130,7 @@ pub mod transformer {
         Ok(TransformedStruct {
             complete_ident,
             partial_ident,
+            vis,
             fields,
         })
     }
@@ -168,6 +174,7 @@ pub mod transformer {
 
         Ok(TransformedField {
             ident,
+            vis: field.vis,
             // original_type,
             partial_type,
             is_optional,
@@ -217,16 +224,18 @@ pub mod generator {
             let ident = &f.ident;
             let ty = &f.partial_type;
             let attrs = &f.serde_attrs;
+            let vis = &f.vis;
             quote! {
                 #(#attrs)*
-                pub #ident: #ty
+                #vis #ident: #ty
             }
         });
 
+        let vis = &model.vis;
         quote! {
             #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
             #[serde(crate = "::einstellung::serde")]
-            pub struct #partial_ident {
+            #vis struct #partial_ident {
                 #(#fields,)*
             }
         }

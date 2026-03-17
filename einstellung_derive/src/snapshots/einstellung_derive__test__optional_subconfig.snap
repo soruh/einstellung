@@ -12,9 +12,9 @@ struct TelemetryConfig {
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
-pub struct TelemetryConfigPartial {
-    pub enabled: Option<bool>,
-    pub datadog: Option<<DatadogConfig as ::einstellung::Config>::Partial>,
+struct TelemetryConfigPartial {
+    enabled: Option<bool>,
+    datadog: Option<<DatadogConfig as ::einstellung::Config>::Partial>,
 }
 impl ::einstellung::PartialConfig for TelemetryConfigPartial {
     type Complete = TelemetryConfig;
@@ -51,8 +51,8 @@ struct DatadogConfig {
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
-pub struct DatadogConfigPartial {
-    pub api_key: Option<String>,
+struct DatadogConfigPartial {
+    api_key: Option<String>,
 }
 impl ::einstellung::PartialConfig for DatadogConfigPartial {
     type Complete = DatadogConfig;

@@ -14,10 +14,10 @@ struct AppConfig {
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
-pub struct AppConfigPartial {
-    pub app_name: Option<String>,
-    pub database: Option<<DatabaseConfig as ::einstellung::Config>::Partial>,
-    pub redis: Option<<RedisConfig as ::einstellung::Config>::Partial>,
+struct AppConfigPartial {
+    app_name: Option<String>,
+    database: Option<<DatabaseConfig as ::einstellung::Config>::Partial>,
+    redis: Option<<RedisConfig as ::einstellung::Config>::Partial>,
 }
 impl ::einstellung::PartialConfig for AppConfigPartial {
     type Complete = AppConfig;
@@ -61,9 +61,9 @@ struct DatabaseConfig {
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
-pub struct DatabaseConfigPartial {
-    pub url: Option<String>,
-    pub pool_size: Option<u32>,
+struct DatabaseConfigPartial {
+    url: Option<String>,
+    pool_size: Option<u32>,
 }
 impl ::einstellung::PartialConfig for DatabaseConfigPartial {
     type Complete = DatabaseConfig;
@@ -94,8 +94,8 @@ struct RedisConfig {
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
-pub struct RedisConfigPartial {
-    pub cluster_mode: Option<bool>,
+struct RedisConfigPartial {
+    cluster_mode: Option<bool>,
 }
 impl ::einstellung::PartialConfig for RedisConfigPartial {
     type Complete = RedisConfig;

@@ -21,14 +21,14 @@ struct FullSystemConfig {
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
-pub struct FullSystemConfigPartial {
+struct FullSystemConfigPartial {
     #[serde(rename = "sys_name")]
-    pub name: Option<String>,
-    pub port: Option<u16>,
-    pub database: Option<<DatabaseConfig as ::einstellung::Config>::Partial>,
+    name: Option<String>,
+    port: Option<u16>,
+    database: Option<<DatabaseConfig as ::einstellung::Config>::Partial>,
     #[serde(alias = "files")]
-    pub log_files: Option<Vec<String>>,
-    pub optional_cache: Option<<CacheConfig as ::einstellung::Config>::Partial>,
+    log_files: Option<Vec<String>>,
+    optional_cache: Option<<CacheConfig as ::einstellung::Config>::Partial>,
 }
 impl ::einstellung::PartialConfig for FullSystemConfigPartial {
     type Complete = FullSystemConfig;
@@ -92,9 +92,9 @@ struct DatabaseConfig {
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
-pub struct DatabaseConfigPartial {
-    pub url: Option<String>,
-    pub port: Option<u16>,
+struct DatabaseConfigPartial {
+    url: Option<String>,
+    port: Option<u16>,
 }
 impl ::einstellung::PartialConfig for DatabaseConfigPartial {
     type Complete = DatabaseConfig;
@@ -124,8 +124,8 @@ struct CacheConfig {
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
-pub struct CacheConfigPartial {
-    pub size_mb: Option<u32>,
+struct CacheConfigPartial {
+    size_mb: Option<u32>,
 }
 impl ::einstellung::PartialConfig for CacheConfigPartial {
     type Complete = CacheConfig;

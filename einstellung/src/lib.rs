@@ -18,7 +18,7 @@ pub enum ConfigError {
     Json(#[from] serde_json::Error),
 
     #[error("Missing required configuration field: '{0}'")]
-    MissingRequiredField(&'static str),
+    MissingField(&'static str),
 
     #[error("Validation failed for field '{field}': {reason}")]
     ValidationError { field: &'static str, reason: String },

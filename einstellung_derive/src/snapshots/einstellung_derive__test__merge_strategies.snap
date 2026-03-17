@@ -14,10 +14,10 @@ struct LoggerConfig {
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
-pub struct LoggerConfigPartial {
-    pub level: Option<String>,
-    pub log_files: Option<Vec<String>>,
-    pub output_format: Option<String>,
+struct LoggerConfigPartial {
+    level: Option<String>,
+    log_files: Option<Vec<String>>,
+    output_format: Option<String>,
 }
 impl ::einstellung::PartialConfig for LoggerConfigPartial {
     type Complete = LoggerConfig;

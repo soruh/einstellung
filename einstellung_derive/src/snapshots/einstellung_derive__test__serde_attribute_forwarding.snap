@@ -15,13 +15,13 @@ struct ApiConfig {
 /// --- output ---
 #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
-pub struct ApiConfigPartial {
+struct ApiConfigPartial {
     #[serde(rename = "API_KEY")]
-    pub key: Option<String>,
+    key: Option<String>,
     #[serde(alias = "max_retries", default)]
-    pub retries: Option<u8>,
+    retries: Option<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub endpoint: Option<String>,
+    endpoint: Option<String>,
 }
 impl ::einstellung::PartialConfig for ApiConfigPartial {
     type Complete = ApiConfig;

@@ -204,7 +204,7 @@ assert_macro_test!(PASS, merge_strategies: {
     #[derive(Config)]
     struct LoggerConfig {
         level: String,
-        #[config(merge = "append")]
+        #[config(merge = "extend")]
         log_files: Vec<String>,
         #[config(merge = "replace")]
         output_format: String,
@@ -255,7 +255,7 @@ assert_macro_test!(PASS, kitchen_sink:
             port: u16,
             #[config(subconfig)]
             database: DatabaseConfig,
-            #[config(merge = "append")]
+            #[config(merge = "extend")]
             #[config(serde(alias = "files"))]
             log_files: Option<Vec<String>>,
             #[config(subconfig)]

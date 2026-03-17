@@ -22,5 +22,4 @@ yaml = ["dep:serde_yaml"]
 
 full = ["json", "toml", "yaml"]
 
-# todo: remove
-default = ["full"]
+default = ["full", "derive"]

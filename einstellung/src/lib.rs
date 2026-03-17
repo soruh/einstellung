@@ -22,8 +22,12 @@ pub mod toml;
 pub trait Config: Sized {
     type Partial: PartialConfig<Complete = Self>;
 
-    fn load_from(provider: &impl ConfigProvider) -> Result<Self, ConfigError> {
-        provider.load_partial::<Self::Partial>()?.build()
+    fn load_partial(provider: &impl ConfigProvider) -> Result<Self::Partial, ConfigError> {
+        provider.load_partial::<Self::Partial>()
+    }
+
+    fn load_complete(provider: &impl ConfigProvider) -> Result<Self, ConfigError> {
+        Self::load_partial(provider)?.build()
     }
 }
 

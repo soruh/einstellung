@@ -53,7 +53,7 @@ pub mod parser {
     #[derive(Debug, darling::FromMeta)]
     pub enum MergeStrategy {
         Replace,
-        Append,
+        Extend,
         Function(String),
     }
 
@@ -166,7 +166,7 @@ pub mod transformer {
 
             match strategy.into_inner() {
                 MergeStrategy::Replace => ResolvedMerge::Replace,
-                MergeStrategy::Append => ResolvedMerge::Append,
+                MergeStrategy::Extend => ResolvedMerge::Append,
                 MergeStrategy::Function(s) => {
                     let path = syn::parse_str::<Path>(&s).map_err(|_| {
                         syn::Error::new(span, format!("Invalid function path: '{}'", s))

@@ -1,0 +1,10 @@
+app_name: MyCoolApp
+
+
+listen:
+  address: 0.0.0.0
+  port: 80
+
+users:
+  - jeff
+  - bob

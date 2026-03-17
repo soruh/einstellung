@@ -71,6 +71,7 @@ name = "einstellung"
 version = "0.1.0"
 dependencies = [
  "einstellung_derive",
+ "insta",
  "serde",
  "serde_json",
  "serde_yaml",

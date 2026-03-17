@@ -21,6 +21,8 @@ pub fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
 
 pub mod parser {
     use darling::{FromDeriveInput, FromField, ast, util::SpannedValue};
+    use proc_macro2::Span;
+    use syn::{Ident, PathArguments};
 
     #[derive(FromDeriveInput)]
     #[darling(attributes(config), supports(struct_named))]
@@ -28,6 +30,16 @@ pub mod parser {
         pub ident: syn::Ident,
         pub vis: syn::Visibility,
         pub data: ast::Data<darling::util::Ignored, ConfigFieldReceiver>,
+
+        #[darling(rename = "crate")]
+        #[darling(default = || syn::Path {
+            leading_colon: Some(Default::default()),
+            segments: std::iter::once(syn::PathSegment {
+                ident: Ident::new("einstellung", Span::call_site()),
+                arguments: PathArguments::None,
+            }).collect(),
+        })]
+        pub einstellung: syn::Path,
     }
 
     #[derive(FromField)]
@@ -72,6 +84,7 @@ pub mod transformer {
         pub partial_ident: syn::Ident,
         pub vis: syn::Visibility,
         pub fields: Vec<TransformedField>,
+        pub einstellung: syn::Path,
     }
 
     pub enum ResolvedMerge {
@@ -98,6 +111,7 @@ pub mod transformer {
         let partial_ident =
             syn::Ident::new(&format!("{complete_ident}Partial"), complete_ident.span());
         let vis = receiver.vis;
+        let einstellung = receiver.einstellung;
 
         let struct_data = receiver
             .data
@@ -108,7 +122,7 @@ pub mod transformer {
         let mut errors: Option<syn::Error> = None;
 
         for field in struct_data {
-            match transform_field(field) {
+            match transform_field(field, &einstellung) {
                 Ok(f) => fields.push(f),
                 Err(e) => {
                     if let Some(ref mut errs) = errors {
@@ -128,11 +142,15 @@ pub mod transformer {
                 partial_ident,
                 vis,
                 fields,
+                einstellung,
             })
         }
     }
 
-    fn transform_field(field: ConfigFieldReceiver) -> syn::Result<TransformedField> {
+    fn transform_field(
+        field: ConfigFieldReceiver,
+        einstellung: &syn::Path,
+    ) -> syn::Result<TransformedField> {
         let ident = field.ident.clone().ok_or_else(|| {
             syn::Error::new(proc_macro2::Span::call_site(), "Named fields are required")
         })?;
@@ -149,7 +167,7 @@ pub mod transformer {
         let core_type = inner_type_if_optional.cloned().unwrap_or(field.ty);
 
         let partial_type = if field.subconfig {
-            syn::parse_quote!(Option<<#core_type as ::einstellung::Config>::Partial>)
+            syn::parse_quote!(Option<<#core_type as #einstellung::Config>::Partial>)
         } else {
             syn::parse_quote!(Option<#core_type>)
         };
@@ -211,6 +229,7 @@ pub mod generator {
     use crate::derive_config::transformer::{ResolvedMerge, TransformedStruct};
     use proc_macro2::TokenStream;
     use quote::{ToTokens, quote};
+    use syn::{parse_quote_spanned, spanned::Spanned};
 
     impl ToTokens for TransformedStruct {
         fn to_tokens(&self, tokens: &mut TokenStream) {
@@ -220,9 +239,21 @@ pub mod generator {
         }
     }
 
+    fn path_to_litstr(path: &syn::Path) -> syn::LitStr {
+        let s = path
+            .segments
+            .iter()
+            .map(|seg| seg.ident.to_string())
+            .collect::<Vec<_>>()
+            .join("::");
+
+        syn::LitStr::new(&s, path.span())
+    }
+
     fn generate_partial_struct(model: &TransformedStruct) -> TokenStream {
         let partial_ident = &model.partial_ident;
         let vis = &model.vis;
+        let einstellung = &model.einstellung;
 
         let fields = model.fields.iter().map(|f| {
             let ident = &f.ident;
@@ -235,9 +266,12 @@ pub mod generator {
             }
         });
 
+        let serde: syn::Path = parse_quote_spanned!(einstellung.span() => #einstellung::serde);
+        let serde_lit = path_to_litstr(&serde);
+
         quote! {
-            #[derive(Default, Debug, ::einstellung::serde::Deserialize)]
-            #[serde(crate = "::einstellung::serde")]
+            #[derive(Default, Debug, #einstellung::serde::Deserialize)]
+            #[serde(crate = #serde_lit)]
             #vis struct #partial_ident {
                 #(#fields,)*
             }
@@ -247,6 +281,7 @@ pub mod generator {
     fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
         let partial_ident = &model.partial_ident;
         let complete_ident = &model.complete_ident;
+        let einstellung = &model.einstellung;
 
         let merge_fields = model.fields.iter().map(|f| {
             let ident = &f.ident;
@@ -268,7 +303,7 @@ pub mod generator {
                 },
                 ResolvedMerge::Subconfig => quote! {
                     #ident: match (self.#ident, next.#ident) {
-                        (Some(a), Some(b)) => Some(::einstellung::PartialConfig::merge(a, b)),
+                        (Some(a), Some(b)) => Some(#einstellung::PartialConfig::merge(a, b)),
                         (a, b) => a.or(b)
                     }
                 },
@@ -281,7 +316,7 @@ pub mod generator {
 
             let resolve = if f.is_subconfig {
                 if f.is_optional {
-                    quote! { self.#ident.map(::einstellung::PartialConfig::build).transpose()? }
+                    quote! { self.#ident.map(#einstellung::PartialConfig::build).transpose()? }
                 } else {
                     quote! { self.#ident.unwrap_or_default().build()? }
                 }
@@ -292,14 +327,14 @@ pub mod generator {
             } else if f.is_optional {
                 quote! { self.#ident }
             } else {
-                quote! { self.#ident.ok_or(::einstellung::ConfigError::MissingField(#ident_str))? }
+                quote! { self.#ident.ok_or(#einstellung::ConfigError::MissingField(#ident_str))? }
             };
 
             if let Some(validate_func) = &f.validate_func {
                 quote! {
                     let #ident = #resolve;
                     if let Err(e) = #validate_func(&#ident) {
-                        return Err(::einstellung::ConfigError::Validation {
+                        return Err(#einstellung::ConfigError::Validation {
                             field: #ident_str,
                             reason: e.into(),
                         });
@@ -313,14 +348,14 @@ pub mod generator {
         let field_names = model.fields.iter().map(|f| &f.ident);
 
         quote! {
-            impl ::einstellung::PartialConfig for #partial_ident {
+            impl #einstellung::PartialConfig for #partial_ident {
                 type Complete = #complete_ident;
 
                 fn merge(self, next: Self) -> Self {
                     Self { #(#merge_fields,)* }
                 }
 
-                fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+                fn build(self) -> Result<Self::Complete, #einstellung::ConfigError> {
                     #(#build_fields)*
                     Ok(#complete_ident { #(#field_names,)* })
                 }
@@ -331,9 +366,10 @@ pub mod generator {
     fn generate_config_impl(model: &TransformedStruct) -> TokenStream {
         let complete_ident = &model.complete_ident;
         let partial_ident = &model.partial_ident;
+        let einstellung = &model.einstellung;
 
         quote! {
-            impl ::einstellung::Config for #complete_ident {
+            impl #einstellung::Config for #complete_ident {
                 type Partial = #partial_ident;
             }
         }

@@ -8,6 +8,9 @@ pub use einstellung_derive::Config;
 #[doc(hidden)]
 pub use serde;
 
+#[cfg(test)]
+pub mod tests;
+
 mod file_provider;
 
 #[cfg(feature = "json")]

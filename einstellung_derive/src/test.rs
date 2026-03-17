@@ -1,27 +1,45 @@
 macro_rules! assert_macro_test {
     (
         $mode:ident, $name:ident:
-        $( { $($tokens:tt)* } ),+ $(,)?
+        $( $block:tt )+
     ) => {
         paste::paste! {
-            // --- Snapshot Test ---
             #[test]
             fn $name() {
                 use quote::quote;
                 let mut formatted_snapshots = Vec::new();
 
                 $(
-                    let input = quote! { $($tokens)* };
-                    let output = crate::derive_config::derive(input.clone());
+                    // Internal macro logic to distinguish 'helper { ... }' from '{ ... }'
+                    let snapshot_entry = match quote! { $block } {
+                        // Pattern match: is it a helper block?
+                        tokens if tokens.to_string().starts_with("helper") => {
+                            // Extract just the content inside the braces
+                            let content = quote! { $block };
+                            // We strip 'helper' by skipping the first token
+                            let mut iter = content.into_iter();
+                            iter.next(); // skip 'helper'
+                            let inner = iter.next().expect("helper must be followed by a block");
 
-                    let combined_snapshot = quote! {
-                        /// --- input ---
-                        #input
-                        /// --- output ---
-                        #output
+                            quote! {
+                                /// --- helper ---
+                                #inner
+                            }
+                        },
+                        // Otherwise, treat it as a standard derive block
+                        _ => {
+                            let input = quote! { $block };
+                            let output = crate::derive_config::derive(input.clone());
+                            quote! {
+                                /// --- input ---
+                                #input
+                                /// --- output ---
+                                #output
+                            }
+                        }
                     };
-                    let syntax_tree: syn::File = syn::parse2(combined_snapshot.clone())
-                        .expect("invalid combined syntax");
+
+                    let syntax_tree: syn::File = syn::parse2(snapshot_entry).expect("invalid syntax");
                     formatted_snapshots.push(prettyplease::unparse(&syntax_tree));
                 )+
 
@@ -29,18 +47,25 @@ macro_rules! assert_macro_test {
                 insta::assert_snapshot!(formatted);
             }
 
-            // --- Trybuild Test ---
             #[test]
             fn [<$name _compile>]() {
                 use quote::quote;
                 let mut combined_input = quote! {};
                 $(
-                    combined_input.extend(quote! { $($tokens)* });
+                    let tokens = quote! { $block };
+                    if tokens.to_string().starts_with("helper") {
+                        let mut iter = tokens.into_iter();
+                        iter.next(); // skip 'helper'
+                        let inner = iter.next().unwrap();
+                        combined_input.extend(quote! { #inner });
+                    } else {
+                        combined_input.extend(tokens);
+                    }
                 )+
 
                 let trybuild_tokens = quote! {
                     #[allow(unused_imports)]
-                    use einstellung_derive::Config;
+                    use einstellung::Config;
                     #combined_input
                     fn main() {}
                 };
@@ -50,16 +75,16 @@ macro_rules! assert_macro_test {
 
                 let manifest_dir = env!("CARGO_MANIFEST_DIR");
                 let dir_path = std::path::Path::new(manifest_dir).join("src").join("trybuild_tests");
-                std::fs::create_dir_all(&dir_path).expect("failed to create trybuild directory");
+                std::fs::create_dir_all(&dir_path).ok();
 
                 let file_path = dir_path.join(format!("{}.rs", stringify!($name)));
-                std::fs::write(&file_path, formatted_code).expect("failed to write trybuild file");
+                std::fs::write(&file_path, formatted_code).expect("failed to write");
 
                 let t = trybuild::TestCases::new();
                 match stringify!($mode) {
                     "PASS" => t.pass(&file_path),
                     "FAIL" => t.compile_fail(&file_path),
-                    other => panic!("invalid mode: {}", other),
+                    _ => panic!("invalid mode"),
                 }
             }
         }
@@ -175,16 +200,6 @@ assert_macro_test!(PASS, test_merge_strategies: {
     }
 });
 
-assert_macro_test!(PASS, test_validation_functions: {
-    #[derive(Config)]
-    struct TlsConfig {
-        #[config(validate = "crate::validators::validate_cert_path")]
-        cert_path: String,
-        #[config(validate = "crate::validators::validate_port")]
-        port: u16,
-    }
-});
-
 assert_macro_test!(PASS, test_serde_attribute_forwarding: {
     #[derive(Config)]
     struct ApiConfig {
@@ -197,7 +212,28 @@ assert_macro_test!(PASS, test_serde_attribute_forwarding: {
     }
 });
 
+assert_macro_test!(PASS, test_validation_functions:
+    helper {
+        pub mod validators {
+            pub fn validate_cert_path(_: &String) -> Result<(), String> { Ok(()) }
+            pub fn validate_port(_: &u16) -> Result<(), String> { Ok(()) }
+        }
+    },
+    {
+        #[derive(Config)]
+        struct TlsConfig {
+            #[config(validate = "validators::validate_cert_path")]
+            cert_path: String,
+            #[config(validate = "validators::validate_port")]
+            port: u16,
+        }
+    }
+);
+
 assert_macro_test!(PASS, test_kitchen_sink:
+    helper {
+        fn validate_system_port(_: &u16) -> Result<(), String> { Ok(()) }
+    },
     {
         #[derive(Config)]
         struct FullSystemConfig {

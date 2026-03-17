@@ -1,0 +1,36 @@
+---
+source: src/tests.rs
+expression: formatted
+---
+struct DBConfig {
+    url: String,
+}
+impl einstellung::Config for DBConfig {
+    fn metadata() -> &'static einstellung::ConfigMetadata {}
+    fn load(
+        source: &dyn einstellung::ConfigSource,
+    ) -> Result<Self, einstellung::ConfigError> {}
+}
+
+// ---------------------------------
+struct BackendConfig {
+    database: DBConfig,
+}
+impl einstellung::Config for BackendConfig {
+    fn metadata() -> &'static einstellung::ConfigMetadata {}
+    fn load(
+        source: &dyn einstellung::ConfigSource,
+    ) -> Result<Self, einstellung::ConfigError> {}
+}
+
+// ---------------------------------
+struct AppConfig {
+    backend: BackendConfig,
+    port: u16,
+}
+impl einstellung::Config for AppConfig {
+    fn metadata() -> &'static einstellung::ConfigMetadata {}
+    fn load(
+        source: &dyn einstellung::ConfigSource,
+    ) -> Result<Self, einstellung::ConfigError> {}
+}

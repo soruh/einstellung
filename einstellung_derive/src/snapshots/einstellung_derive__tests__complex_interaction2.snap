@@ -1,0 +1,16 @@
+---
+source: src/tests.rs
+expression: formatted
+---
+struct NetworkConfig {
+    #[config(default = "127.0.0.1")]
+    host: Option<String>,
+    #[config(default = 8080)]
+    ports: Vec<u16>,
+}
+impl einstellung::Config for NetworkConfig {
+    fn metadata() -> &'static einstellung::ConfigMetadata {}
+    fn load(
+        source: &dyn einstellung::ConfigSource,
+    ) -> Result<Self, einstellung::ConfigError> {}
+}

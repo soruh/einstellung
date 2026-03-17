@@ -1,0 +1,16 @@
+---
+source: src/tests.rs
+expression: formatted
+---
+struct DefaultConfig {
+    #[config(default = "localhost")]
+    host: String,
+    #[config(default = 8080)]
+    port: u16,
+}
+impl einstellung::Config for DefaultConfig {
+    fn metadata() -> &'static einstellung::ConfigMetadata {}
+    fn load(
+        source: &dyn einstellung::ConfigSource,
+    ) -> Result<Self, einstellung::ConfigError> {}
+}

@@ -1,0 +1,14 @@
+---
+source: src/tests.rs
+expression: formatted
+---
+struct OptionalConfig {
+    host: Option<String>,
+    port: Option<u16>,
+}
+impl einstellung::Config for OptionalConfig {
+    fn metadata() -> &'static einstellung::ConfigMetadata {}
+    fn load(
+        source: &dyn einstellung::ConfigSource,
+    ) -> Result<Self, einstellung::ConfigError> {}
+}

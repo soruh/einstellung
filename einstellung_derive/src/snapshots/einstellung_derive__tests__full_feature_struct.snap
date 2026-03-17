@@ -1,0 +1,34 @@
+---
+source: src/tests.rs
+expression: formatted
+---
+#[config(validate = "Self::validate")]
+struct FullConfig {
+    #[config(required)]
+    name: String,
+    #[config(default = 8080)]
+    port: u16,
+    #[config(rename = "db_config")]
+    database: DatabaseConfig,
+    log_files: Option<Vec<String>>,
+}
+impl einstellung::Config for FullConfig {
+    fn metadata() -> &'static einstellung::ConfigMetadata {}
+    fn load(
+        source: &dyn einstellung::ConfigSource,
+    ) -> Result<Self, einstellung::ConfigError> {}
+}
+
+// ---------------------------------
+struct DatabaseConfig {
+    #[config(required)]
+    url: String,
+    #[config(default = "postgres")]
+    driver: String,
+}
+impl einstellung::Config for DatabaseConfig {
+    fn metadata() -> &'static einstellung::ConfigMetadata {}
+    fn load(
+        source: &dyn einstellung::ConfigSource,
+    ) -> Result<Self, einstellung::ConfigError> {}
+}

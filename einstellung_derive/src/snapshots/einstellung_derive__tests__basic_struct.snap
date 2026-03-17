@@ -1,0 +1,14 @@
+---
+source: src/tests.rs
+expression: formatted
+---
+struct BasicConfig {
+    host: String,
+    port: u16,
+}
+impl einstellung::Config for BasicConfig {
+    fn metadata() -> &'static einstellung::ConfigMetadata {}
+    fn load(
+        source: &dyn einstellung::ConfigSource,
+    ) -> Result<Self, einstellung::ConfigError> {}
+}

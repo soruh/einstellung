@@ -1,0 +1,28 @@
+---
+source: src/tests.rs
+expression: formatted
+---
+struct DatabaseConfig {
+    #[config(required)]
+    url: String,
+}
+impl einstellung::Config for DatabaseConfig {
+    fn metadata() -> &'static einstellung::ConfigMetadata {}
+    fn load(
+        source: &dyn einstellung::ConfigSource,
+    ) -> Result<Self, einstellung::ConfigError> {}
+}
+
+// ---------------------------------
+struct AppConfig {
+    #[config(rename = "db_config")]
+    database: DatabaseConfig,
+    #[config(default = 3000)]
+    port: u16,
+}
+impl einstellung::Config for AppConfig {
+    fn metadata() -> &'static einstellung::ConfigMetadata {}
+    fn load(
+        source: &dyn einstellung::ConfigSource,
+    ) -> Result<Self, einstellung::ConfigError> {}
+}

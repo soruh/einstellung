@@ -10,36 +10,44 @@ macro_rules! assert_macro_test {
                 let mut formatted_snapshots = Vec::new();
 
                 $(
-                    // Internal macro logic to distinguish 'helper { ... }' from '{ ... }'
-                    let snapshot_entry = match quote! { $block } {
-                        // Pattern match: is it a helper block?
-                        tokens if tokens.to_string().starts_with("helper") => {
-                            // Extract just the content inside the braces
-                            let content = quote! { $block };
-                            // We strip 'helper' by skipping the first token
-                            let mut iter = content.into_iter();
-                            iter.next(); // skip 'helper'
-                            let inner = iter.next().expect("helper must be followed by a block");
+                    let tokens = quote! { $block };
+                    let tokens_str = tokens.to_string();
 
-                            quote! {
-                                /// --- helper ---
-                                #inner
-                            }
-                        },
-                        // Otherwise, treat it as a standard derive block
-                        _ => {
-                            let input = quote! { $block };
-                            let output = crate::derive_config::derive(input.clone());
-                            quote! {
-                                /// --- input ---
-                                #input
-                                /// --- output ---
-                                #output
-                            }
+                    // 1. Resolve the inner content and whether it's a helper
+                    let (inner_tokens, is_helper) = if tokens_str.starts_with("helper") {
+                        let mut iter = tokens.into_iter();
+                        let _ = iter.next(); // skip 'helper'
+                        let group_tree = iter.next().expect("helper must be followed by a block");
+
+                        // group_tree is a TokenTree (the braces), we want its stream
+                        let group: proc_macro2::Group = syn::parse2(quote! { #group_tree })
+                            .expect("helper must be followed by braces { }");
+                        (group.stream(), true)
+                    } else {
+                        // Standard block: { struct ... }
+                        let group: proc_macro2::Group = syn::parse2(tokens)
+                            .expect("Expected a braced block { ... }");
+                        (group.stream(), false)
+                    };
+
+                    // 2. Build the snapshot entry
+                    let snapshot_entry = if is_helper {
+                        quote! {
+                            /// --- helper ---
+                            #inner_tokens
+                        }
+                    } else {
+                        let output = crate::derive_config::derive(inner_tokens.clone());
+                        quote! {
+                            /// --- input ---
+                            #inner_tokens
+                            /// --- output ---
+                            #output
                         }
                     };
 
-                    let syntax_tree: syn::File = syn::parse2(snapshot_entry).expect("invalid syntax");
+                    let syntax_tree: syn::File = syn::parse2(snapshot_entry.clone())
+                        .unwrap_or_else(|e| panic!("invalid syntax: {}\nTokens: {}", e, snapshot_entry));
                     formatted_snapshots.push(prettyplease::unparse(&syntax_tree));
                 )+
 
@@ -50,22 +58,28 @@ macro_rules! assert_macro_test {
             #[test]
             fn [<$name _compile>]() {
                 use quote::quote;
-                let mut combined_input = quote! {};
+                let mut combined_input = proc_macro2::TokenStream::new();
                 $(
                     let tokens = quote! { $block };
-                    if tokens.to_string().starts_with("helper") {
+                    let tokens_str = tokens.to_string();
+
+                    let content = if tokens_str.starts_with("helper") {
                         let mut iter = tokens.into_iter();
-                        iter.next(); // skip 'helper'
-                        let inner = iter.next().unwrap();
-                        combined_input.extend(quote! { #inner });
+                        let _ = iter.next(); // skip 'helper'
+                        let group_tree = iter.next().expect("helper block missing");
+                        let group: proc_macro2::Group = syn::parse2(quote! { #group_tree }).expect("Expected braces");
+                        group.stream()
                     } else {
-                        combined_input.extend(tokens);
-                    }
+                        let group: proc_macro2::Group = syn::parse2(tokens).expect("Expected braces");
+                        group.stream()
+                    };
+
+                    combined_input.extend(content);
                 )+
 
                 let trybuild_tokens = quote! {
                     #[allow(unused_imports)]
-                    use einstellung::Config;
+                    use ::einstellung_derive::Config;
                     #combined_input
                     fn main() {}
                 };

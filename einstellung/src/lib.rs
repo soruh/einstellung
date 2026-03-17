@@ -1,41 +1,55 @@
-pub trait Config: Sized {
+use serde::de::DeserializeOwned;
+use std::path::Path;
+use thiserror::Error;
 
-    fn store(&self, receiver: impl ConfigReceiver) ;
-    fn load(provider: impl ConfigProvider) -> Self;
-    fn merge_into_self(&mut self, other: &Self);
-    fn merge(&self, other: &Self) -> Self where Self: Clone{
-        let mut res = Self::clone(self);
-        res.merge_into_self(other);
-        res
-    }
+#[derive(Error, Debug)]
+pub enum ConfigError {
+    #[error("IO Error: {0}")]
+    Io(#[from] std::io::Error),
+    
+    #[cfg(feature = "json")]
+    #[error("JSON Parse Error: {0}")]
+    Json(#[from] serde_json::Error),
+    
+    #[error("Missing required configuration field: '{0}'")]
+    MissingRequiredField(&'static str),
+    
+    #[error("Validation failed for field '{field}': {reason}")]
+    ValidationError { field: &'static str, reason: String },
 }
 
 
-pub trait ConfigProvider {}
-pub trait ConfigReceiver {}
+pub trait Config: Sized {
+    type Partial: PartialConfig<Complete = Self>;
 
+    fn load_from(provider: &impl ConfigProvider) -> Result<Self, ConfigError> {
+        provider.load_partial::<Self::Partial>()?.build()
+    }
+}
 
-pub struct SerdeProvider;
-pub struct SerdeReceiver;
+pub trait PartialConfig: Default + DeserializeOwned {
+    type Complete;
 
-impl ConfigProvider for SerdeProvider {}
-impl ConfigReceiver for SerdeReceiver {}
+    fn merge(self, next: Self) -> Self;
+    fn build(self) -> Result<Self::Complete, ConfigError>;
+}
+
+pub trait ConfigProvider {
+    fn load_partial<T: DeserializeOwned>(&self) -> Result<T, ConfigError>;
+}
 
 
 #[cfg(feature = "json")]
 pub mod json {
+    use super::*;
+    use std::fs::File;
+    use std::io::BufReader;
 
-    pub struct JsonProvider;
-    pub struct JsonReceiver;
-    
-    impl ConfigProvider for JsonProvider {
-        fn provide() {
-            SerdeReceiver::provide(serde_json::do_stuff());
-        }
-    }
-    impl ConfigReceiver for JsonReceiver {
-        fn receive() {
-            serde_json::do_stuff(SerdeReceiver::receive());
+    pub struct JsonFileProvider<'a>(pub &'a Path);
+
+    impl<'a> ConfigProvider for JsonFileProvider<'a> {
+        fn load_partial<T: DeserializeOwned>(&self) -> Result<T, ConfigError> {
+            Ok(serde_json::from_reader(BufReader::new(File::open(self.0)?))?)
         }
     }
 }

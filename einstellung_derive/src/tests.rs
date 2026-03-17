@@ -1,242 +1,295 @@
+use proc_macro2::TokenStream;
+
 macro_rules! assert_expansion {
     ( $( { $($tokens:tt)* } ),+ $(,)? ) => {{
+
         let formatted = [
-            $( ::quote::quote! { $($tokens)* } ),+
+            $( quote::quote! { $($tokens)* } ),+
         ]
-        .into_iter() // Ensure we are iterating
         .map(|input| {
-            let output = crate::derive_config::expand(input.clone());
-            
-            // Combine them into one stream
-            let combined = ::quote::quote! { 
-                #input 
-                #output 
+            let output = crate::derive_config::derive(input.clone());
+
+            let combined = quote::quote! {
+                /// --- input ---
+                #input
+
+                /// --- output ---
+                #output
             };
-            
-            let syntax_tree: ::syn::File = ::syn::parse2(combined)
-                .expect("Combined input and output is not valid Rust syntax");
-            
-            ::prettyplease::unparse(&syntax_tree)
+
+            let syntax_tree: syn::File = match syn::parse2(combined) {
+                Ok(res) => res,
+                Err(err) => {
+                    let combined = quote::quote! {
+                        #input
+                        #output
+                    };
+
+                    let fmt = format_tokenstream_fallback(combined).unwrap_or_else(|err| panic!("invalid output: {err}"));
+
+                    panic!("Combined input and output is not valid Rust syntax: {err}\n{fmt}")
+                }
+            };
+
+
+            prettyplease::unparse(&syntax_tree)
         })
-        .collect::<Vec<_>>()
         .join("\n// ---------------------------------\n");
 
-        ::insta::assert_snapshot!(formatted);
+        insta::assert_snapshot!(formatted);
     }};
 }
 
+pub fn format_tokenstream_fallback(ts: TokenStream) -> Result<String, Box<dyn std::error::Error>> {
+    use std::io::Write;
+
+    let code = ts.to_string();
+
+    let mut rustfmt = std::process::Command::new("rustfmt")
+        .args(["--emit", "stdout"])
+        .args(["--color", "always"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()?;
+
+    {
+        let stdin = rustfmt.stdin.as_mut().ok_or("Failed to open stdin")?;
+        stdin.write_all(code.as_bytes())?;
+    }
+
+    let output = rustfmt.wait_with_output()?;
+
+    if !output.status.success() {
+        let err = String::from_utf8_lossy(&output.stderr);
+        return Err(err.into());
+    }
+
+    Ok(String::from_utf8(output.stdout)?)
+}
+
 #[test]
-fn basic_struct() {
+fn test_basic_primitives() {
     assert_expansion!({
-        struct BasicConfig {
+        #[derive(Config)]
+        struct ServerConfig {
             host: String,
             port: u16,
+            is_active: bool,
         }
     });
 }
+
 #[test]
-fn default_values() {
+fn test_invalid() {
     assert_expansion!({
-        struct DefaultConfig {
-            #[config(default = "localhost")]
+        #[derive(Config)]
+        struct ServerConfig(u16);
+    });
+}
+
+#[test]
+fn test_invalid_merge() {
+    assert_expansion!({
+        #[derive(Config)]
+        struct ServerConfig {
             host: String,
-
-            #[config(default = 8080)]
             port: u16,
+            #[config(merge = "foo")]
+            is_active: bool,
         }
     });
 }
+
 #[test]
-fn required_fields() {
+fn test_invalid_merge2() {
     assert_expansion!({
-        struct RequiredConfig {
-            #[config(required)]
+        #[derive(Config)]
+        struct ServerConfig {
             host: String,
-
-            #[config(required)]
             port: u16,
+            #[config(merge = "subconfig")]
+            is_active: bool,
         }
     });
 }
-#[test]
-fn nested_config() {
-    assert_expansion!(
-        {
-            struct DatabaseConfig {
-                url: String,
-            }
-        },
-        {
-            struct AppConfig {
-                database: DatabaseConfig,
-                #[config(default = 8080)]
-                port: u16,
-            }
-        },
-    );
-}
-#[test]
-fn optional_fields() {
-    assert_expansion!({
-        struct OptionalConfig {
-            host: Option<String>,
-            port: Option<u16>,
-        }
-    });
-}
-#[test]
-fn collection_fields() {
-    assert_expansion!({
-        struct CollectionConfig {
-            servers: Vec<String>,
-            retries: Vec<u32>,
-        }
-    });
-}
-#[test]
-fn rename_fields() {
-    assert_expansion!({
-        struct RenameConfig {
-            #[config(rename = "server_host")]
-            host: String,
 
-            #[config(rename = "server_port")]
-            port: u16,
-        }
-    });
-}
 #[test]
-fn validation_method() {
+fn test_optional_fields_no_double_option() {
+    // Ensures Option<T> is handled correctly and doesn't become Option<Option<T>>
     assert_expansion!({
-        #[config(validate = "Self::validate")]
-        struct ValidateConfig {
-            port: u16
+        #[derive(Config)]
+        struct ClientConfig {
+            name: String,
+            timeout_ms: Option<u32>,
+            proxy: Option<String>,
         }
     });
 }
-#[test]
-fn complex_interaction1() {
-    assert_expansion!(
-        {
-            struct DatabaseConfig {
-                #[config(required)]
-                url: String,
-            }
-        },
-        {
-            struct AppConfig {
-                #[config(rename = "db_config")]
-                database: DatabaseConfig,
 
-                #[config(default = 3000)]
-                port: u16,
-            }
-        },
-    );
-}
 #[test]
-fn complex_interaction2() {
+fn test_default_values() {
+    // Tests both primitive defaults and function call defaults
     assert_expansion!({
+        #[derive(Config)]
         struct NetworkConfig {
-            #[config(default = "127.0.0.1")]
-            host: Option<String>,
+            #[config(default = "\"localhost\".to_string()")]
+            host: String,
 
-            #[config(default = 8080)]
-            ports: Vec<u16>,
+            #[config(default = "8080")]
+            port: u16,
+
+            #[config(default = "std::time::Duration::from_secs(30)")]
+            timeout: std::time::Duration,
         }
     });
 }
+
 #[test]
-fn nested_layers() {
+fn test_subconfig_resolution() {
+    // Tests the `subconfig` flag and multiple structs in the expansion
     assert_expansion!(
         {
-            struct DBConfig {
-                url: String,
-            }
-        },
-        {
-            struct BackendConfig {
-                database: DBConfig,
-            }
-        },
-        {
+            #[derive(Config)]
             struct AppConfig {
-                backend: BackendConfig,
-                port: u16,
+                app_name: String,
+
+                #[config(subconfig)]
+                database: DatabaseConfig,
+
+                #[config(subconfig)]
+                redis: RedisConfig,
             }
         },
+        {
+            #[derive(Config)]
+            struct DatabaseConfig {
+                url: String,
+                pool_size: u32,
+            }
+        },
+        {
+            #[derive(Config)]
+            struct RedisConfig {
+                cluster_mode: bool,
+            }
+        }
     );
 }
+
 #[test]
-fn empty_struct() {
-    assert_expansion!({
-        struct EmptyConfig {}
-    });
+fn test_optional_subconfig() {
+    // Tests a subconfig that is wrapped in an Option
+    assert_expansion!(
+        {
+            #[derive(Config)]
+            struct TelemetryConfig {
+                enabled: bool,
+
+                #[config(subconfig)]
+                datadog: Option<DatadogConfig>,
+            }
+        },
+        {
+            #[derive(Config)]
+            struct DatadogConfig {
+                api_key: String,
+            }
+        }
+    );
 }
+
 #[test]
-fn mix_option_vec_default_required() {
+fn test_merge_strategies() {
+    // Tests the "append" and default "replace" merge behaviors
     assert_expansion!({
-        struct MixedConfig {
-            #[config(required)]
-            url: String,
+        #[derive(Config)]
+        struct LoggerConfig {
+            level: String,
 
-            #[config(default = 5)]
-            retries: u32,
+            #[config(merge = "append")]
+            log_files: Vec<String>,
 
-            cache_servers: Option<Vec<String>>,
+            #[config(merge = "replace")]
+            output_format: String,
         }
     });
 }
+
 #[test]
-fn full_feature_struct() {
+fn test_validation_functions() {
+    // Tests the injection of validation functions in the build() step
+    assert_expansion!({
+        #[derive(Config)]
+        struct TlsConfig {
+            #[config(validate = "crate::validators::validate_cert_path")]
+            cert_path: String,
+
+            #[config(validate = "crate::validators::validate_port")]
+            port: u16,
+        }
+    });
+}
+
+#[test]
+fn test_serde_attribute_forwarding() {
+    // Tests that darling's forward_attrs correctly passes #[serde(...)]
+    // down to the generated Partial struct.
+    assert_expansion!({
+        #[derive(Config)]
+        struct ApiConfig {
+            #[serde(rename = "API_KEY")]
+            key: String,
+
+            #[serde(alias = "max_retries", default)]
+            retries: u8,
+
+            #[serde(skip_serializing_if = "Option::is_none")]
+            endpoint: Option<String>,
+        }
+    });
+}
+
+#[test]
+fn test_kitchen_sink() {
+    // A massive struct testing the interaction of all attributes combined
     assert_expansion!(
         {
-            #[config(validate = "Self::validate")]
-            struct FullConfig {
-                #[config(required)]
+            #[derive(Config)]
+            struct FullSystemConfig {
+                #[serde(rename = "sys_name")]
+                #[config(default = "\"production\".to_string()")]
                 name: String,
 
-                #[config(default = 8080)]
+                #[config(validate = "validate_system_port")]
                 port: u16,
 
-                #[config(rename = "db_config")]
+                #[config(subconfig)]
                 database: DatabaseConfig,
 
+                #[config(merge = "append")]
+                #[serde(alias = "files")]
                 log_files: Option<Vec<String>>,
+
+                #[config(subconfig)]
+                optional_cache: Option<CacheConfig>,
             }
         },
         {
+            #[derive(Config)]
             struct DatabaseConfig {
-                #[config(required)]
                 url: String,
 
-                #[config(default = "postgres")]
-                driver: String,
+                #[config(default = "5432")]
+                port: u16,
             }
-
         },
-    );
-}
-#[test]
-fn multiple_structs() {
-    assert_expansion!(
-        { struct ConfigA { a: String }},
-        { struct ConfigB { b: u32 }},
-        { struct ConfigC { c: Option<Vec<String>> }},
-    );
-}
-#[test]
-fn literal_types() {
-    assert_expansion!({
-        struct LiteralConfig {
-            #[config(default = 42)]
-            max_connections: u32,
-
-            #[config(default = "info")]
-            log_level: String,
-
-            #[config(default = true)]
-            enabled: bool,
+        {
+            #[derive(Config)]
+            struct CacheConfig {
+                #[config(default = "1024")]
+                size_mb: u32,
+            }
         }
-    });
+    );
 }

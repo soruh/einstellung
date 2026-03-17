@@ -1,0 +1,55 @@
+---
+source: src/tests.rs
+expression: formatted
+---
+/// --- input ---
+#[derive(Config)]
+struct LoggerConfig {
+    level: String,
+    #[config(merge = "append")]
+    log_files: Vec<String>,
+    #[config(merge = "replace")]
+    output_format: String,
+}
+/// --- output ---
+#[derive(Default, Debug, serde::Deserialize)]
+pub struct LoggerConfigPartial {
+    pub level: Option<String>,
+    pub log_files: Option<Vec<String>>,
+    pub output_format: Option<String>,
+}
+impl einstellung::PartialConfig for LoggerConfigPartial {
+    type Output = LoggerConfig;
+    fn merge(self, next: Self) -> Self {
+        Self {
+            level: next.level.or(self.level),
+            log_files: match (self.log_files, next.log_files) {
+                (Some(mut a), Some(b)) => {
+                    a.extend(b);
+                    Some(a)
+                }
+                (a, b) => a.or(b),
+            },
+            output_format: next.output_format.or(self.output_format),
+        }
+    }
+    fn build(self) -> Result<Self::Output, einstellung::ConfigError> {
+        let level = self
+            .level
+            .ok_or_else(|| einstellung::ConfigError::MissingField("level"))?;
+        let log_files = self
+            .log_files
+            .ok_or_else(|| einstellung::ConfigError::MissingField("log_files"))?;
+        let output_format = self
+            .output_format
+            .ok_or_else(|| einstellung::ConfigError::MissingField("output_format"))?;
+        Ok(LoggerConfig {
+            level,
+            log_files,
+            output_format,
+        })
+    }
+}
+impl einstellung::Config for LoggerConfig {
+    type Partial = LoggerConfigPartial;
+}

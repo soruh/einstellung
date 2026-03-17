@@ -4,4 +4,19 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-serde = "1.0.228"
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "2.0"
+
+serde_json = { version = "1.0", optional = true }
+toml = { version = "1.0", optional = true }
+serde_yaml = { version = "0.9", optional = true }
+
+[features]
+json = ["dep:serde_json"]
+toml = ["dep:toml"]
+yaml = ["dep:serde_yaml"]
+
+full = ["json", "toml", "yaml"]
+
+# todo: remove
+default = ["json"]

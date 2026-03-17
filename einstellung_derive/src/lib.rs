@@ -7,5 +7,5 @@ mod derive_config;
 
 #[proc_macro_derive(Config, attributes(config))]
 pub fn derive_config(input: TokenStream) -> TokenStream {
-    derive_config::expand(input.into()).into()
+    derive_config::derive(input.into()).into()
 }

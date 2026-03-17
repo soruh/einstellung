@@ -13,6 +13,12 @@ mod file_provider;
 #[cfg(feature = "json")]
 pub mod json;
 
+#[cfg(feature = "yaml")]
+pub mod yaml;
+
+#[cfg(feature = "toml")]
+pub mod toml;
+
 pub trait Config: Sized {
     type Partial: PartialConfig<Complete = Self>;
 
@@ -40,6 +46,14 @@ pub enum ConfigError {
     #[cfg(feature = "json")]
     #[error("JSON Parse Error: {0}")]
     Json(#[from] serde_json::Error),
+
+    #[cfg(feature = "yaml")]
+    #[error("YAML Parse Error: {0}")]
+    Yaml(#[from] serde_yaml::Error),
+
+    #[cfg(feature = "toml")]
+    #[error("TOML Parse Error: {0}")]
+    Toml(#[from] ::toml::de::Error),
 
     #[error("Missing required configuration field: '{0}'")]
     MissingField(&'static str),

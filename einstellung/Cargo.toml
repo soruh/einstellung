@@ -8,8 +8,8 @@ serde = { version = "1.0", features = ["derive"] }
 thiserror = "2.0"
 
 serde_json = { version = "1.0", optional = true }
-serde_yaml = { version = "0.9", optional = true }
-toml = { version = "1.0", optional = true }
+serde_yaml = { version = "0.9.34", optional = true }
+toml = { version = "0.9.8", optional = true }
 
 einstellung_derive = { version = "0.1.0", path = "../einstellung_derive", optional = true }
 
@@ -23,4 +23,4 @@ yaml = ["dep:serde_yaml"]
 full = ["json", "toml", "yaml"]
 
 # todo: remove
-default = ["json"]
+default = ["full"]

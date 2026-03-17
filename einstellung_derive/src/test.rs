@@ -226,8 +226,8 @@ assert_macro_test!(PASS, serde_attribute_forwarding: {
 assert_macro_test!(PASS, validation_functions:
     helper {
         pub mod validators {
-            pub fn validate_cert_path(_: &String) -> Result<(), String> { Ok(()) }
-            pub fn validate_port(_: &u16) -> Result<(), String> { Ok(()) }
+            pub fn validate_cert_path(_: &String) -> Result<(), Box<dyn std::error::Error>> { Ok(()) }
+            pub fn validate_port(_: &u16) -> Result<(), Box<dyn std::error::Error>> { Ok(()) }
         }
     },
     {
@@ -243,7 +243,7 @@ assert_macro_test!(PASS, validation_functions:
 
 assert_macro_test!(PASS, kitchen_sink:
     helper {
-        fn validate_system_port(_: &u16) -> Result<(), String> { Ok(()) }
+        fn validate_system_port(_: &u16) -> Result<(), Box<dyn std::error::Error>> { Ok(()) }
     },
     {
         #[derive(Config)]

@@ -3,7 +3,7 @@ source: einstellung_derive/src/test.rs
 expression: formatted
 ---
 /// --- helper ---
-fn validate_system_port(_: &u16) -> Result<(), String> {
+fn validate_system_port(_: &u16) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
@@ -67,7 +67,7 @@ impl ::einstellung::PartialConfig for FullSystemConfigPartial {
         if let Err(e) = validate_system_port(&port) {
             return Err(::einstellung::ConfigError::Validation {
                 field: "port",
-                reason: e.to_string(),
+                reason: e.into(),
             });
         }
         let database = self.database.unwrap_or_default().build()?;

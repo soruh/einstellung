@@ -301,7 +301,7 @@ pub mod generator {
                     if let Err(e) = #validate_func(&#ident) {
                         return Err(::einstellung::ConfigError::Validation {
                             field: #ident_str,
-                            reason: e.to_string(),
+                            reason: e.into(),
                         });
                     }
                 }

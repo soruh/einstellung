@@ -21,7 +21,10 @@ pub enum ConfigError {
     MissingField(&'static str),
 
     #[error("Validation failed for field '{field}': {reason}")]
-    Validation { field: &'static str, reason: String },
+    Validation {
+        field: &'static str,
+        reason: Box<dyn std::error::Error>,
+    },
 }
 
 pub trait Config: Sized {

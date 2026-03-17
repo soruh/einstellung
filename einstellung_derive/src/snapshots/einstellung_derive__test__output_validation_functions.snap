@@ -4,10 +4,10 @@ expression: formatted
 ---
 /// --- helper ---
 pub mod validators {
-    pub fn validate_cert_path(_: &String) -> Result<(), String> {
+    pub fn validate_cert_path(_: &String) -> Result<(), Box<dyn std::error::Error>> {
         Ok(())
     }
-    pub fn validate_port(_: &u16) -> Result<(), String> {
+    pub fn validate_port(_: &u16) -> Result<(), Box<dyn std::error::Error>> {
         Ok(())
     }
 }
@@ -45,14 +45,14 @@ impl ::einstellung::PartialConfig for TlsConfigPartial {
         if let Err(e) = validators::validate_cert_path(&cert_path) {
             return Err(::einstellung::ConfigError::Validation {
                 field: "cert_path",
-                reason: e.to_string(),
+                reason: e.into(),
             });
         }
         let port = self.port.ok_or(::einstellung::ConfigError::MissingField("port"))?;
         if let Err(e) = validators::validate_port(&port) {
             return Err(::einstellung::ConfigError::Validation {
                 field: "port",
-                reason: e.to_string(),
+                reason: e.into(),
             });
         }
         Ok(TlsConfig { cert_path, port })

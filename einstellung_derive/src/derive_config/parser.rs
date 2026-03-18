@@ -1,6 +1,6 @@
 use darling::{FromDeriveInput, FromField, ast, util::SpannedValue};
 use proc_macro2::Span;
-use syn::{Ident, PathArguments, parse_quote};
+use syn::{Ident, PathArguments, parse_quote_spanned, spanned::Spanned};
 
 #[derive(Debug)]
 pub struct PartialReceiver(pub Vec<darling::ast::NestedMeta>);
@@ -51,18 +51,13 @@ fn parse_default_expr(meta: &syn::Meta) -> darling::Result<DefaultStrategy> {
         syn::Meta::NameValue(nv) => {
             let expr = &nv.value;
 
-            match expr {
-                // Match closures: `default = || ...`
-                // OR explicit calls: `default = my_function()`
-                syn::Expr::Closure(_) => Ok(DefaultStrategy::Call(expr.clone())),
-
-                syn::Expr::Call(call) if call.args.is_empty() => {
-                    Ok(DefaultStrategy::Call((*call.func).clone()))
-                }
-                syn::Expr::Call(_) => Ok(DefaultStrategy::Call(parse_quote!(|| #expr))),
-                // Everything else (MyEnum::Variant, "strings", numbers) falls through to Value
-                _ => Ok(DefaultStrategy::Value(expr.clone())),
-            }
+            use syn::Expr::*;
+            Ok(match expr {
+                Closure(_) => DefaultStrategy::Call(expr.clone()),
+                Call(call) if call.args.is_empty() => DefaultStrategy::Call((*call.func).clone()),
+                Call(_) => DefaultStrategy::Call(parse_quote_spanned!(expr.span() => || #expr)),
+                _ => DefaultStrategy::Value(expr.clone()),
+            })
         }
         _ => Err(darling::Error::unsupported_format(
             "expected default or default = ...",

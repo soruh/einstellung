@@ -196,7 +196,7 @@ fn config_enum_missing() {
 #[config(crate = crate)]
 #[config(partial(derive(Clone)))]
 struct ConfigFreezable1 {
-    #[config(default = "Freezable Config 1".to_string())]
+    #[config(default = || "Freezable Config 1".to_string())]
     name: String,
     pass: u8,
     #[config(freezable)]
@@ -208,7 +208,7 @@ struct ConfigFreezable1 {
 #[config(freezable)]
 #[config(partial(derive(Clone)))]
 struct ConfigFreezable2 {
-    #[config(default = "Freezable Config 2".to_string())]
+    #[config(default = || "Freezable Config 2".to_string())]
     name: String,
     pass: u8,
     private_key: String,

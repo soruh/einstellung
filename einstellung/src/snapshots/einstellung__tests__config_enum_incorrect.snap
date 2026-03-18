@@ -1,0 +1,9 @@
+---
+source: einstellung/src/tests.rs
+expression: "print_res(res, false)"
+---
+error:
+JSON Parse Error: unknown variant `ModeZ`, expected `ModeA` or `ModeB` at line 1 column 17
+Json(
+    Error("unknown variant `ModeZ`, expected `ModeA` or `ModeB`", line: 1, column: 17),
+)

@@ -160,3 +160,25 @@ fn user_config_option() {
 fn user_config_option_allowed_empty() {
     snapshot!(UserConfig4, true, r#"{ }"#);
 }
+
+#[derive(Debug, ::serde::Deserialize)]
+enum ConfigMode {
+    ModeA,
+    ModeB,
+}
+
+#[derive(Config, Debug)]
+#[config(crate = crate)]
+struct ConfigWithEnum {
+    mode: ConfigMode,
+}
+
+#[test]
+fn config_enum_correct() {
+    snapshot!(ConfigWithEnum, true, r#"{ "mode": "ModeA" }"#);
+}
+
+#[test]
+fn config_enum_incorrect() {
+    snapshot!(ConfigWithEnum, false, r#"{ "mode": "ModeZ" }"#);
+}

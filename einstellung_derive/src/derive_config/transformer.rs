@@ -2,6 +2,7 @@ use super::parser::{ConfigFieldReceiver, ConfigStructReceiver};
 use crate::derive_config::parser::{DefaultStrategy, MergeStrategy};
 use syn::{GenericArgument, Path, PathArguments, Type};
 
+#[derive(Debug)]
 pub struct TransformedStruct {
     pub complete_ident: syn::Ident,
     pub partial_ident: syn::Ident,
@@ -10,7 +11,7 @@ pub struct TransformedStruct {
     pub einstellung: syn::Path,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum ResolvedMerge {
     Replace,
     Extend,
@@ -18,13 +19,15 @@ pub enum ResolvedMerge {
     Subconfig,
 }
 
+#[derive(Debug)]
 pub struct TransformedField {
     pub ident: syn::Ident,
     pub vis: syn::Visibility,
     pub partial_type: syn::Type,
-    pub is_optional: bool,
+    pub complete_option_wrapped: bool,
+    pub partial_option_wrapped: bool,
     pub is_subconfig: bool,
-    pub default_expr: DefaultStrategy,
+    pub default: DefaultStrategy,
     pub merge_strategy: ResolvedMerge,
     pub validate_func: Option<syn::Expr>,
     pub serde_attrs: Vec<syn::Attribute>,
@@ -86,7 +89,7 @@ fn transform_field(
         .collect();
 
     let inner_type_if_optional = extract_type_from_option(&field.ty);
-    let is_optional = inner_type_if_optional.is_some();
+    let complete_option_wrapped = inner_type_if_optional.is_some();
     let core_type = inner_type_if_optional.cloned().unwrap_or(field.ty);
 
     // Resolve Merge Strategy and handle parsing errors
@@ -115,9 +118,15 @@ fn transform_field(
         ResolvedMerge::Replace
     };
 
+    let partial_option_wrapped = if merge_strategy == ResolvedMerge::Extend {
+        complete_option_wrapped || field.default == DefaultStrategy::Required
+    } else {
+        true
+    };
+
     let partial_type = if field.subconfig {
         syn::parse_quote!(Option<<#core_type as #einstellung::Config>::Partial>)
-    } else if merge_strategy == ResolvedMerge::Extend && !is_optional {
+    } else if merge_strategy == ResolvedMerge::Extend && !partial_option_wrapped {
         syn::parse_quote!(#core_type)
     } else {
         syn::parse_quote!(Option<#core_type>)
@@ -127,9 +136,10 @@ fn transform_field(
         ident,
         vis: field.vis,
         partial_type,
-        is_optional,
+        complete_option_wrapped,
+        partial_option_wrapped,
         is_subconfig: field.subconfig,
-        default_expr: field.default,
+        default: field.default,
         merge_strategy,
         validate_func: field.validate,
         serde_attrs,

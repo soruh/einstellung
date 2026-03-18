@@ -1,6 +1,6 @@
 ---
 source: einstellung/src/tests.rs
-expression: print_res(res)
+expression: "print_res(res, false)"
 ---
 error:
 Missing required configuration field: 'AppConfig::network::listen::address'

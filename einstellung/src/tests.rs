@@ -123,7 +123,7 @@ fn user_config_no_default() {
 }
 
 #[test]
-fn user_config_no_default_allowed_empty() {
+fn user_config_no_default_not_allowed_empty() {
     snapshot!(UserConfig2, false, r#"{ }"#);
 }
 

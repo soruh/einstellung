@@ -12,6 +12,12 @@ use einstellung::{
 };
 
 #[derive(einstellung::Config, Debug)]
+struct UserConfig2 {
+    #[config(merge = "extend")]
+    users: std::collections::BTreeSet<String>,
+}
+
+#[derive(einstellung::Config, Debug)]
 struct AppConfig {
     app_name: String,
 

@@ -1,6 +1,6 @@
 ---
 source: einstellung/src/tests.rs
-expression: print_res(res)
+expression: "print_res(res, false)"
 ---
 error:
 Validation failed for field 'AppConfig::network::listen::address': Address must not be a multicast address

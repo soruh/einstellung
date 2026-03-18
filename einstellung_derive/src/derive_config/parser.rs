@@ -20,7 +20,7 @@ pub struct ConfigStructReceiver {
     pub einstellung: syn::Path,
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub enum DefaultStrategy {
     #[default]
     Required,

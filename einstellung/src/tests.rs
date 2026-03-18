@@ -35,7 +35,7 @@ struct NetworkConfig {
 struct ListenConfig {
     #[config(validate = not_loopback)]
     address: IpAddr,
-    #[config(default = "443")]
+    #[config(default = 443)]
     port: u16,
 }
 
@@ -79,7 +79,7 @@ fn success() {
 #[derive(Config, Debug)]
 #[config(crate = crate)]
 struct UserConfig {
-    #[config(merge = "extend")]
+    #[config(merge = "extend", default)]
     users: BTreeSet<String>,
 }
 
@@ -91,4 +91,55 @@ fn user_config() {
 #[test]
 fn user_config_allowed_empty() {
     snapshot!(UserConfig, r#"{ }"#);
+}
+
+#[derive(Config, Debug)]
+#[config(crate = crate)]
+struct UserConfig2 {
+    #[config(merge = "extend")]
+    users: BTreeSet<String>,
+}
+
+#[test]
+fn user_config_no_default() {
+    snapshot!(UserConfig2, r#"{ "users": ["root", "bob"] }"#);
+}
+
+#[test]
+fn user_config_no_default_not_allowed_empty() {
+    snapshot!(UserConfig2, r#"{ }"#);
+}
+
+#[derive(Config, Debug)]
+#[config(crate = crate)]
+struct UserConfig3 {
+    #[config(merge = "extend")]
+    users: Option<BTreeSet<String>>,
+}
+
+#[test]
+fn user_config_option_no_default() {
+    snapshot!(UserConfig3, r#"{ "users": ["root", "bob"] }"#);
+}
+
+#[test]
+fn user_config_option_no_default_not_allowed_empty() {
+    snapshot!(UserConfig3, r#"{ }"#);
+}
+
+#[derive(Config, Debug)]
+#[config(crate = crate)]
+struct UserConfig4 {
+    #[config(merge = "extend", default)]
+    users: Option<BTreeSet<String>>,
+}
+
+#[test]
+fn user_config_option() {
+    snapshot!(UserConfig4, r#"{ "users": ["root", "bob"] }"#);
+}
+
+#[test]
+fn user_config_option_not_allowed_empty() {
+    snapshot!(UserConfig4, r#"{ }"#);
 }

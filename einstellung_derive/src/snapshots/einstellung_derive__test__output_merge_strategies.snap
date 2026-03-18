@@ -17,7 +17,8 @@ struct LoggerConfig {
 #[serde(crate = "::einstellung::serde")]
 struct LoggerConfigPartial {
     level: Option<String>,
-    log_files: Option<Vec<String>>,
+    #[serde(default)]
+    log_files: Vec<String>,
     output_format: Option<String>,
 }
 impl ::einstellung::PartialConfig for LoggerConfigPartial {
@@ -25,12 +26,10 @@ impl ::einstellung::PartialConfig for LoggerConfigPartial {
     fn merge(self, next: Self) -> Self {
         Self {
             level: next.level.or(self.level),
-            log_files: match (self.log_files, next.log_files) {
-                (Some(mut a), Some(b)) => {
-                    a.extend(b);
-                    Some(a)
-                }
-                (a, b) => a.or(b),
+            log_files: {
+                let mut log_files = self.log_files;
+                log_files.extend(next.log_files);
+                log_files
             },
             output_format: next.output_format.or(self.output_format),
         }
@@ -43,13 +42,7 @@ impl ::einstellung::PartialConfig for LoggerConfigPartial {
                     ::einstellung::FieldPath::new("LoggerConfig", "level"),
                 ),
             )?;
-        let log_files = self
-            .log_files
-            .ok_or(
-                ::einstellung::ConfigError::MissingField(
-                    ::einstellung::FieldPath::new("LoggerConfig", "log_files"),
-                ),
-            )?;
+        let log_files = self.log_files;
         let output_format = self
             .output_format
             .ok_or(

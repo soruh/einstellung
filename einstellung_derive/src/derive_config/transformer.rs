@@ -1,5 +1,5 @@
 use super::parser::{ConfigFieldReceiver, ConfigStructReceiver};
-use crate::derive_config::parser::MergeStrategy;
+use crate::derive_config::parser::{DefaultStrategy, MergeStrategy};
 use syn::{GenericArgument, Path, PathArguments, Type};
 
 pub struct TransformedStruct {
@@ -10,9 +10,10 @@ pub struct TransformedStruct {
     pub einstellung: syn::Path,
 }
 
+#[derive(Clone, PartialEq)]
 pub enum ResolvedMerge {
     Replace,
-    Append,
+    Extend,
     Function(Path),
     Subconfig,
 }
@@ -23,7 +24,7 @@ pub struct TransformedField {
     pub partial_type: syn::Type,
     pub is_optional: bool,
     pub is_subconfig: bool,
-    pub default_expr: Option<syn::Expr>,
+    pub default_expr: DefaultStrategy,
     pub merge_strategy: ResolvedMerge,
     pub validate_func: Option<syn::Expr>,
     pub serde_attrs: Vec<syn::Attribute>,
@@ -88,12 +89,6 @@ fn transform_field(
     let is_optional = inner_type_if_optional.is_some();
     let core_type = inner_type_if_optional.cloned().unwrap_or(field.ty);
 
-    let partial_type = if field.subconfig {
-        syn::parse_quote!(Option<<#core_type as #einstellung::Config>::Partial>)
-    } else {
-        syn::parse_quote!(Option<#core_type>)
-    };
-
     // Resolve Merge Strategy and handle parsing errors
     let merge_strategy = if let Some(strategy) = field.merge {
         let span = strategy.span();
@@ -106,7 +101,7 @@ fn transform_field(
 
         match strategy.into_inner() {
             MergeStrategy::Replace => ResolvedMerge::Replace,
-            MergeStrategy::Extend => ResolvedMerge::Append,
+            MergeStrategy::Extend => ResolvedMerge::Extend,
             MergeStrategy::Function(s) => {
                 let path = syn::parse_str::<Path>(&s).map_err(|_| {
                     syn::Error::new(span, format!("Invalid function path: '{}'", s))
@@ -118,6 +113,14 @@ fn transform_field(
         ResolvedMerge::Subconfig
     } else {
         ResolvedMerge::Replace
+    };
+
+    let partial_type = if field.subconfig {
+        syn::parse_quote!(Option<<#core_type as #einstellung::Config>::Partial>)
+    } else if merge_strategy == ResolvedMerge::Extend {
+        syn::parse_quote!(#core_type)
+    } else {
+        syn::parse_quote!(Option<#core_type>)
     };
 
     Ok(TransformedField {

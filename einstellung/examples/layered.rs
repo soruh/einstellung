@@ -2,6 +2,7 @@
 
 use std::{
     collections::HashSet,
+    default,
     net::IpAddr,
     path::{Path, PathBuf},
 };
@@ -27,13 +28,14 @@ struct AppConfig {
 #[derive(einstellung::Config, Debug)]
 struct ColorConfig {
     primary: String,
+    #[config(default = || "#0ff".to_string())]
     secondary: String,
 }
 
 #[derive(einstellung::Config, Debug)]
 struct ListenConfig {
     address: IpAddr,
-    #[config(default = "443")]
+    #[config(default = 443)]
     port: u16,
 }
 

@@ -1,4 +1,7 @@
-use crate::derive_config::transformer::{ResolvedMerge, TransformedStruct};
+use crate::derive_config::{
+    parser::DefaultStrategy,
+    transformer::{ResolvedMerge, TransformedStruct},
+};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{parse_quote_spanned, spanned::Spanned};
@@ -41,7 +44,15 @@ fn generate_partial_struct(model: &TransformedStruct) -> TokenStream {
         let ty = &f.partial_type;
         let attrs = &f.serde_attrs;
         let f_vis = &f.vis;
+
+        let default = if f.merge_strategy == ResolvedMerge::Extend {
+            quote! { #[serde(default)] }
+        } else {
+            quote! {}
+        };
+
         quote! {
+            #default
             #(#attrs)*
             #f_vis #ident: #ty
         }
@@ -72,13 +83,11 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
             ResolvedMerge::Replace => quote! {
                 #ident: next.#ident.or(self.#ident)
             },
-            ResolvedMerge::Append => quote! {
-                #ident: match (self.#ident, next.#ident) {
-                    (Some(mut a), Some(b)) => {
-                        a.extend(b);
-                        Some(a)
-                    },
-                    (a, b) => a.or(b)
+            ResolvedMerge::Extend => quote! {
+                #ident: {
+                    let mut #ident = self.#ident;
+                    #ident.extend(next.#ident);
+                    #ident
                 }
             },
             ResolvedMerge::Function(path) => quote! {
@@ -103,14 +112,20 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
             } else {
                 quote! { #einstellung::build_with_context(self.#ident.unwrap_or_default(), #complete_str, #ident_str)? }
             }
-        } else if let Some(syn::Expr::Lit(default_literal)) = &f.default_expr {
-            quote! { self.#ident.unwrap_or(#default_literal) }
-        } else if let Some(default_expr) = &f.default_expr {
-            quote! { self.#ident.unwrap_or_else(|| #default_expr) }
-        } else if f.is_optional {
+        } else if f.merge_strategy == ResolvedMerge::Extend {
             quote! { self.#ident }
+        } else if let DefaultStrategy::Value(value) = &f.default_expr {
+            quote! { self.#ident.unwrap_or(#value) }
+        } else if let DefaultStrategy::Call(value) = &f.default_expr {
+            quote! { self.#ident.unwrap_or_else(#value) }
+        } else if let DefaultStrategy::Inherit = &f.default_expr {
+            quote! { self.#ident.unwrap_or_else(::core::Default::default) }
         } else {
-            quote! { self.#ident.ok_or(#einstellung::ConfigError::MissingField(#einstellung::FieldPath::new(#complete_str, #ident_str)))? }
+            if f.is_optional {
+                quote! { self.#ident }
+            } else {
+                quote! { self.#ident.ok_or(#einstellung::ConfigError::MissingField(#einstellung::FieldPath::new(#complete_str, #ident_str)))? }
+            }
         };
 
         if let Some(validate_func) = &f.validate_func {

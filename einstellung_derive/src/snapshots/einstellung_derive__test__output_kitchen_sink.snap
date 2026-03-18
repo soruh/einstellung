@@ -36,9 +36,11 @@ struct FullSystemConfigPartial {
     name: Option<String>,
     port: Option<u16>,
     database: Option<<DatabaseConfig as ::einstellung::Config>::Partial>,
+    #[serde(default)]
     #[serde(alias = "files")]
-    log_files: Option<Vec<String>>,
-    users: Option<std::collections::HashSet<String>>,
+    log_files: Vec<String>,
+    #[serde(default)]
+    users: std::collections::HashSet<String>,
     optional_cache: Option<<CacheConfig as ::einstellung::Config>::Partial>,
 }
 impl ::einstellung::PartialConfig for FullSystemConfigPartial {
@@ -51,19 +53,15 @@ impl ::einstellung::PartialConfig for FullSystemConfigPartial {
                 (Some(a), Some(b)) => Some(::einstellung::PartialConfig::merge(a, b)),
                 (a, b) => a.or(b),
             },
-            log_files: match (self.log_files, next.log_files) {
-                (Some(mut a), Some(b)) => {
-                    a.extend(b);
-                    Some(a)
-                }
-                (a, b) => a.or(b),
+            log_files: {
+                let mut log_files = self.log_files;
+                log_files.extend(next.log_files);
+                log_files
             },
-            users: match (self.users, next.users) {
-                (Some(mut a), Some(b)) => {
-                    a.extend(b);
-                    Some(a)
-                }
-                (a, b) => a.or(b),
+            users: {
+                let mut users = self.users;
+                users.extend(next.users);
+                users
             },
             optional_cache: match (self.optional_cache, next.optional_cache) {
                 (Some(a), Some(b)) => Some(::einstellung::PartialConfig::merge(a, b)),
@@ -91,20 +89,8 @@ impl ::einstellung::PartialConfig for FullSystemConfigPartial {
             "FullSystemConfig",
             "database",
         )?;
-        let log_files = self
-            .log_files
-            .ok_or(
-                ::einstellung::ConfigError::MissingField(
-                    ::einstellung::FieldPath::new("FullSystemConfig", "log_files"),
-                ),
-            )?;
-        let users = self
-            .users
-            .ok_or(
-                ::einstellung::ConfigError::MissingField(
-                    ::einstellung::FieldPath::new("FullSystemConfig", "users"),
-                ),
-            )?;
+        let log_files = self.log_files;
+        let users = self.users;
         let optional_cache = self
             .optional_cache
             .map(|x| ::einstellung::build_with_context(

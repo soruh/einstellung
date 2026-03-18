@@ -20,6 +20,34 @@ pub struct ConfigStructReceiver {
     pub einstellung: syn::Path,
 }
 
+#[derive(Default, Debug, Clone)]
+pub enum DefaultStrategy {
+    #[default]
+    Required,
+    Inherit,
+    Value(syn::Expr),
+    Call(syn::Expr),
+}
+
+/// Custom parser for the 'default' attribute field
+fn parse_default_expr(meta: &syn::Meta) -> darling::Result<DefaultStrategy> {
+    match meta {
+        syn::Meta::Path(_) => Ok(DefaultStrategy::Inherit),
+        syn::Meta::NameValue(nv) => {
+            let expr = &nv.value;
+
+            match expr {
+                syn::Expr::Closure(_) => Ok(DefaultStrategy::Call(expr.clone())),
+                syn::Expr::Path(_) => Ok(DefaultStrategy::Call(expr.clone())),
+                _ => Ok(DefaultStrategy::Value(expr.clone())),
+            }
+        }
+        _ => Err(darling::Error::unsupported_format(
+            "expected default or default = ...",
+        )),
+    }
+}
+
 #[derive(FromField)]
 #[darling(attributes(config))]
 pub struct ConfigFieldReceiver {
@@ -30,8 +58,9 @@ pub struct ConfigFieldReceiver {
     #[darling(default, multiple)]
     pub serde: Vec<syn::Meta>,
 
-    #[darling(default)]
-    pub default: Option<syn::Expr>,
+    #[darling(default, with = "parse_default_expr")]
+    pub default: DefaultStrategy,
+
     #[darling(default)]
     pub subconfig: bool,
     #[darling(default)]

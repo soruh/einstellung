@@ -45,7 +45,7 @@ pub enum FieldKind {
 pub enum FreezeStrategy {
     NotFreezable,
     Wrapped,
-    Subconfig,
+    IntrinsicallyFreezable,
 }
 
 #[derive(Debug)]
@@ -205,7 +205,7 @@ fn transform_field(
     let freeze = if !freezable {
         FreezeStrategy::NotFreezable
     } else if field.subconfig {
-        FreezeStrategy::Subconfig
+        FreezeStrategy::IntrinsicallyFreezable
     } else {
         FreezeStrategy::Wrapped
     };

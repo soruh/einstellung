@@ -155,7 +155,7 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
                     }
                 }
             },
-            FreezeStrategy::Subconfig => {
+            FreezeStrategy::IntrinsicallyFreezable => {
                 let ident_str = ident.to_string();
                 let merge = generate_field_merge(f, einstellung, &complete_str, quote!(left), quote!(right));
                 
@@ -234,7 +234,7 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
             FreezeStrategy::NotFreezable => quote! {
                 #ident: self.#ident
             },
-            FreezeStrategy::Subconfig | FreezeStrategy::Wrapped => quote! {
+            FreezeStrategy::IntrinsicallyFreezable | FreezeStrategy::Wrapped => quote! {
                 #ident: #einstellung::Freezable::freeze(self.#ident)
             },
         }
@@ -245,7 +245,7 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
 
         match f.freeze {
             FreezeStrategy::NotFreezable => None,
-            FreezeStrategy::Subconfig | FreezeStrategy::Wrapped => Some(quote! {
+            FreezeStrategy::IntrinsicallyFreezable | FreezeStrategy::Wrapped => Some(quote! {
                 #einstellung::Freezable::is_frozen(&self.#ident)
             }),
         }

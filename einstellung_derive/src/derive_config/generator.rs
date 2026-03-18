@@ -116,7 +116,7 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
         if let Some(validate_func) = &f.validate_func {
             quote! {
                 let #ident = #resolve;
-                if let Err(e) = #validate_func(&#ident) {
+                if let Err(e) = (#validate_func)(&#ident) {
                     return Err(#einstellung::ConfigError::Validation {
                         field: #einstellung::FieldPath::new(#complete_str, #ident_str),
                         reason: e.into(),

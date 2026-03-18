@@ -1,0 +1,8 @@
+---
+source: einstellung/src/tests.rs
+expression: print_res(res)
+---
+pass:
+UserConfig {
+    users: {},
+}

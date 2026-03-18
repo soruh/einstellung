@@ -25,7 +25,7 @@ pub struct TransformedField {
     pub is_subconfig: bool,
     pub default_expr: Option<syn::Expr>,
     pub merge_strategy: ResolvedMerge,
-    pub validate_func: Option<syn::Path>,
+    pub validate_func: Option<syn::Expr>,
     pub serde_attrs: Vec<syn::Attribute>,
 }
 

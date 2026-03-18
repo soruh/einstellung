@@ -46,7 +46,7 @@ impl ::einstellung::PartialConfig for TlsConfigPartial {
                     ::einstellung::FieldPath::new("TlsConfig", "cert_path"),
                 ),
             )?;
-        if let Err(e) = validators::validate_cert_path(&cert_path) {
+        if let Err(e) = (validators::validate_cert_path)(&cert_path) {
             return Err(::einstellung::ConfigError::Validation {
                 field: ::einstellung::FieldPath::new("TlsConfig", "cert_path"),
                 reason: e.into(),
@@ -59,7 +59,7 @@ impl ::einstellung::PartialConfig for TlsConfigPartial {
                     ::einstellung::FieldPath::new("TlsConfig", "port"),
                 ),
             )?;
-        if let Err(e) = validators::validate_port(&port) {
+        if let Err(e) = (validators::validate_port)(&port) {
             return Err(::einstellung::ConfigError::Validation {
                 field: ::einstellung::FieldPath::new("TlsConfig", "port"),
                 reason: e.into(),

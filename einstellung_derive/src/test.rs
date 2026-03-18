@@ -255,9 +255,14 @@ assert_macro_test!(PASS, kitchen_sink:
             port: u16,
             #[config(subconfig)]
             database: DatabaseConfig,
+
             #[config(merge = "extend")]
             #[config(serde(alias = "files"))]
-            log_files: Option<Vec<String>>,
+            log_files: Vec<String>,
+
+            #[config(merge = "extend")]
+            users: std::collections::HashSet<String>,
+
             #[config(subconfig)]
             optional_cache: Option<CacheConfig>,
         }

@@ -37,7 +37,7 @@ pub struct ConfigFieldReceiver {
     #[darling(default)]
     pub merge: Option<SpannedValue<MergeStrategy>>,
     #[darling(default)]
-    pub validate: Option<syn::Path>,
+    pub validate: Option<syn::Expr>,
 }
 
 #[derive(Debug, darling::FromMeta)]

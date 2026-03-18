@@ -1,7 +1,11 @@
 #![allow(unused)]
 
 use crate::{Config, ConfigError, JsonFileProvider};
-use std::net::IpAddr;
+use std::{
+    collections::{BTreeSet, HashMap, HashSet},
+    fmt::Debug,
+    net::IpAddr,
+};
 
 fn not_loopback(address: &IpAddr) -> Result<(), Box<dyn std::error::Error>> {
     if address.is_loopback() {
@@ -35,7 +39,7 @@ struct ListenConfig {
     port: u16,
 }
 
-fn print_res(res: Result<AppConfig, ConfigError>) -> String {
+fn print_res<T: Debug>(res: Result<T, ConfigError>) -> String {
     match res {
         Ok(res) => format!("pass:\n{res:#?}"),
         Err(err) => format!("error:\n{err}\n{err:#?}"),
@@ -43,8 +47,11 @@ fn print_res(res: Result<AppConfig, ConfigError>) -> String {
 }
 
 macro_rules! snapshot {
-    ($s:expr) => {{
-        let res = AppConfig::load_complete(&JsonFileProvider::new($s));
+    ($s:expr) => {
+        snapshot!(AppConfig, $s);
+    };
+    ($t: ty, $s:expr) => {{
+        let res = <$t>::load_complete(&JsonFileProvider::new($s));
         insta::assert_snapshot!(print_res(res));
     }};
 }
@@ -67,4 +74,21 @@ fn validation_fail() {
 #[test]
 fn success() {
     snapshot!(r#"{ "app_name": "foo", "network": { "listen": { "address": "192.168.0.1" } } }"#);
+}
+
+#[derive(Config, Debug)]
+#[config(crate = crate)]
+struct UserConfig {
+    #[config(merge = "extend")]
+    users: BTreeSet<String>,
+}
+
+#[test]
+fn user_config() {
+    snapshot!(UserConfig, r#"{ "users": ["root", "bob"] }"#);
+}
+
+#[test]
+fn user_config_allowed_empty() {
+    snapshot!(UserConfig, r#"{ }"#);
 }

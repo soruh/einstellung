@@ -1,9 +1,7 @@
-use crate::derive_config::{
-    parser::DefaultStrategy,
-    transformer::{ResolvedMerge, TransformedStruct},
-};
+use crate::derive_config::transformer::{FallbackStrategy, FieldKind, TransformedStruct};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
+use std::fmt::Write;
 use syn::{parse_quote_spanned, spanned::Spanned};
 
 impl ToTokens for TransformedStruct {
@@ -13,8 +11,6 @@ impl ToTokens for TransformedStruct {
         generate_config_impl(self).to_tokens(tokens);
     }
 }
-
-use std::fmt::Write;
 
 fn path_to_litstr(path: &syn::Path) -> syn::LitStr {
     let mut s = String::new();
@@ -41,18 +37,28 @@ fn generate_partial_struct(model: &TransformedStruct) -> TokenStream {
 
     let fields = model.fields.iter().map(|f| {
         let ident = &f.ident;
-        let ty = &f.partial_type;
         let attrs = &f.serde_attrs;
         let f_vis = &f.vis;
 
-        let default = if f.merge_strategy == ResolvedMerge::Extend && !f.complete_option_wrapped {
+        let (ty, needs_serde_default) = match &f.kind {
+            FieldKind::Extend {
+                partial_type,
+                complete_is_optional,
+                ..
+            } => (partial_type, !complete_is_optional),
+            FieldKind::Subconfig { partial_type, .. }
+            | FieldKind::Replace { partial_type, .. }
+            | FieldKind::CustomMerge { partial_type, .. } => (partial_type, false),
+        };
+
+        let default_attr = if needs_serde_default {
             quote! { #[serde(default)] }
         } else {
             quote! {}
         };
 
         quote! {
-            #default
+            #default_attr
             #(#attrs)*
             #f_vis #ident: #ty
         }
@@ -74,25 +80,26 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
     let partial_ident = &model.partial_ident;
     let complete_ident = &model.complete_ident;
     let einstellung = &model.einstellung;
-
     let complete_str = complete_ident.to_string();
 
     let merge_fields = model.fields.iter().map(|f| {
         let ident = &f.ident;
-        match &f.merge_strategy {
-            ResolvedMerge::Replace => quote! {
-                #ident: next.#ident.or(self.#ident)
-            },
-            ResolvedMerge::Extend => {
-                if f.partial_option_wrapped {
+
+        match &f.kind {
+            FieldKind::Replace { .. } => quote! { #ident: next.#ident.or(self.#ident) },
+            FieldKind::Extend {
+                partial_is_optional,
+                ..
+            } => {
+                if *partial_is_optional {
                     quote! {
                         #ident: match (self.#ident, next.#ident) {
-                        (Some(mut a), Some(b)) => {
-                            ::core::iter::Extend::extend(&mut a, b);
-                            Some(a)
-                        },
-                        (a, b) => a.or(b)
-                    }
+                            (Some(mut a), Some(b)) => {
+                                ::core::iter::Extend::extend(&mut a, b);
+                                Some(a)
+                            },
+                            (a, b) => a.or(b)
+                        }
                     }
                 } else {
                     quote! {
@@ -104,10 +111,10 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
                     }
                 }
             }
-            ResolvedMerge::Function(path) => quote! {
-                #ident: #path(self.#ident, next.#ident)
+            FieldKind::CustomMerge { func_path, .. } => quote! {
+                #ident: #func_path(self.#ident, next.#ident)
             },
-            ResolvedMerge::Subconfig => quote! {
+            FieldKind::Subconfig { .. } => quote! {
                 #ident: match (self.#ident, next.#ident) {
                     (Some(a), Some(b)) => Some(#einstellung::PartialConfig::merge(a, b)),
                     (a, b) => a.or(b)
@@ -120,29 +127,27 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
         let ident = &f.ident;
         let ident_str = ident.to_string();
 
-        let resolve = if f.is_subconfig {
-            if f.complete_option_wrapped {
-                quote! { self.#ident.map(|x| #einstellung::build_with_context(x, #complete_str, #ident_str)).transpose()? }
-            } else {
-                quote! { #einstellung::build_with_context(self.#ident.unwrap_or_default(), #complete_str, #ident_str)? }
+        let resolve = match &f.kind {
+            FieldKind::Subconfig { complete_is_optional, .. } => {
+                if *complete_is_optional {
+                    quote! { self.#ident.map(|x| #einstellung::build_with_context(x, #complete_str, #ident_str)).transpose()? }
+                } else {
+                    quote! { #einstellung::build_with_context(self.#ident.unwrap_or_default(), #complete_str, #ident_str)? }
+                }
             }
-        } else if f.merge_strategy == ResolvedMerge::Extend {
-            if f.partial_option_wrapped && !f.complete_option_wrapped {
-                quote! { self.#ident.ok_or(#einstellung::ConfigError::MissingField(#einstellung::FieldPath::new(#complete_str, #ident_str)))? }
-            } else {
-                quote! { self.#ident }
+            FieldKind::Extend { partial_is_optional, complete_is_optional, .. } => {
+                if *partial_is_optional && !*complete_is_optional {
+                    quote! { self.#ident.ok_or(#einstellung::ConfigError::MissingField(#einstellung::FieldPath::new(#complete_str, #ident_str)))? }
+                } else {
+                    quote! { self.#ident }
+                }
             }
-        } else if let DefaultStrategy::Value(value) = &f.default {
-            quote! { self.#ident.unwrap_or(#value) }
-        } else if let DefaultStrategy::Call(value) = &f.default {
-            quote! { self.#ident.unwrap_or_else(#value) }
-        } else if let DefaultStrategy::Standard = &f.default {
-            quote! { self.#ident.unwrap_or_else(::core::Default::default) }
-        } else {
-            if f.complete_option_wrapped {
-                quote! { self.#ident }
-            } else {
-                quote! { self.#ident.ok_or(#einstellung::ConfigError::MissingField(#einstellung::FieldPath::new(#complete_str, #ident_str)))? }
+            FieldKind::Replace { fallback, .. } | FieldKind::CustomMerge { fallback, .. } => match fallback {
+                FallbackStrategy::Require => quote! { self.#ident.ok_or(#einstellung::ConfigError::MissingField(#einstellung::FieldPath::new(#complete_str, #ident_str)))? },
+                FallbackStrategy::Keep => quote! { self.#ident },
+                FallbackStrategy::Value(value) => quote! { self.#ident.unwrap_or(#value) },
+                FallbackStrategy::Call(value) => quote! { self.#ident.unwrap_or_else(#value) },
+                FallbackStrategy::Standard => quote! { self.#ident.unwrap_or_else(::core::Default::default) },
             }
         };
 

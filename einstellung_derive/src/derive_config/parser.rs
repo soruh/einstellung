@@ -37,8 +37,9 @@ fn parse_default_expr(meta: &syn::Meta) -> darling::Result<DefaultStrategy> {
             let expr = &nv.value;
 
             match expr {
-                syn::Expr::Closure(_) => Ok(DefaultStrategy::Call(expr.clone())),
-                syn::Expr::Path(_) => Ok(DefaultStrategy::Call(expr.clone())),
+                syn::Expr::Closure(_) | syn::Expr::Path(_) => {
+                    Ok(DefaultStrategy::Call(expr.clone()))
+                }
                 _ => Ok(DefaultStrategy::Value(expr.clone())),
             }
         }
@@ -63,8 +64,10 @@ pub struct ConfigFieldReceiver {
 
     #[darling(default)]
     pub subconfig: bool,
+
     #[darling(default)]
     pub merge: Option<SpannedValue<MergeStrategy>>,
+
     #[darling(default)]
     pub validate: Option<syn::Expr>,
 }

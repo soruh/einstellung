@@ -1,6 +1,6 @@
 use super::parser::{ConfigFieldReceiver, ConfigStructReceiver};
 use crate::derive_config::parser::{DefaultStrategy, MergeStrategy};
-use syn::{GenericArgument, Path, PathArguments, Type};
+use syn::{GenericArgument, PathArguments, Type};
 
 #[derive(Debug)]
 pub struct TransformedStruct {
@@ -11,24 +11,42 @@ pub struct TransformedStruct {
     pub einstellung: syn::Path,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum ResolvedMerge {
-    Replace,
-    Extend,
-    Function(Path),
-    Subconfig,
+#[derive(Debug)]
+pub enum FallbackStrategy {
+    Require,
+    Keep, // Used when the complete type is an Option
+    Value(syn::Expr),
+    Call(syn::Expr),
+    Standard, // Default::default()
+}
+
+#[derive(Debug)]
+pub enum FieldKind {
+    Subconfig {
+        partial_type: syn::Type,
+        complete_is_optional: bool,
+    },
+    Extend {
+        partial_type: syn::Type,
+        partial_is_optional: bool,
+        complete_is_optional: bool,
+    },
+    Replace {
+        partial_type: syn::Type,
+        fallback: FallbackStrategy,
+    },
+    CustomMerge {
+        partial_type: syn::Type,
+        func_path: syn::Path,
+        fallback: FallbackStrategy,
+    },
 }
 
 #[derive(Debug)]
 pub struct TransformedField {
     pub ident: syn::Ident,
     pub vis: syn::Visibility,
-    pub partial_type: syn::Type,
-    pub complete_option_wrapped: bool,
-    pub partial_option_wrapped: bool,
-    pub is_subconfig: bool,
-    pub default: DefaultStrategy,
-    pub merge_strategy: ResolvedMerge,
+    pub kind: FieldKind,
     pub validate_func: Option<syn::Expr>,
     pub serde_attrs: Vec<syn::Attribute>,
 }
@@ -81,7 +99,6 @@ fn transform_field(
         syn::Error::new(proc_macro2::Span::call_site(), "Named fields are required")
     })?;
 
-    // Reconstruct attributes by wrapping the Meta directly
     let serde_attrs = field
         .serde
         .into_iter()
@@ -89,61 +106,89 @@ fn transform_field(
         .collect();
 
     let inner_type_if_optional = extract_type_from_option(&field.ty);
-    let complete_option_wrapped = inner_type_if_optional.is_some();
+    let complete_is_optional = inner_type_if_optional.is_some();
     let core_type = inner_type_if_optional.cloned().unwrap_or(field.ty);
 
-    // Resolve Merge Strategy and handle parsing errors
-    let merge_strategy = if let Some(strategy) = field.merge {
-        let span = strategy.span();
-        if field.subconfig {
+    let kind = if field.subconfig {
+        if let Some(strategy) = field.merge {
             return Err(syn::Error::new(
-                span,
+                strategy.span(),
                 "Merge strategy is invalid on a subconfig",
             ));
         }
 
-        match strategy.into_inner() {
-            MergeStrategy::Replace => ResolvedMerge::Replace,
-            MergeStrategy::Extend => ResolvedMerge::Extend,
+        FieldKind::Subconfig {
+            partial_type: syn::parse_quote!(Option<<#core_type as #einstellung::Config>::Partial>),
+            complete_is_optional,
+        }
+    } else {
+        let span = field
+            .merge
+            .as_ref()
+            .map(|s| s.span())
+            .unwrap_or_else(|| ident.span());
+        let merge_strategy = match field.merge {
+            Some(m) => m.into_inner(),
+            None => MergeStrategy::Replace,
+        };
+
+        match merge_strategy {
+            MergeStrategy::Extend => {
+                let partial_is_optional =
+                    complete_is_optional || field.default == DefaultStrategy::Required;
+
+                let partial_type = if partial_is_optional {
+                    syn::parse_quote!(Option<#core_type>)
+                } else {
+                    syn::parse_quote!(#core_type)
+                };
+
+                FieldKind::Extend {
+                    partial_type,
+                    partial_is_optional,
+                    complete_is_optional,
+                }
+            }
+            MergeStrategy::Replace => FieldKind::Replace {
+                partial_type: syn::parse_quote!(Option<#core_type>),
+                fallback: determine_fallback(&field.default, complete_is_optional),
+            },
             MergeStrategy::Function(s) => {
-                let path = syn::parse_str::<Path>(&s).map_err(|_| {
+                let func_path = syn::parse_str::<syn::Path>(&s).map_err(|_| {
                     syn::Error::new(span, format!("Invalid function path: '{}'", s))
                 })?;
-                ResolvedMerge::Function(path)
+
+                FieldKind::CustomMerge {
+                    partial_type: syn::parse_quote!(Option<#core_type>),
+                    func_path,
+                    fallback: determine_fallback(&field.default, complete_is_optional),
+                }
             }
         }
-    } else if field.subconfig {
-        ResolvedMerge::Subconfig
-    } else {
-        ResolvedMerge::Replace
-    };
-
-    let partial_option_wrapped = if merge_strategy == ResolvedMerge::Extend {
-        complete_option_wrapped || field.default == DefaultStrategy::Required
-    } else {
-        true
-    };
-
-    let partial_type = if field.subconfig {
-        syn::parse_quote!(Option<<#core_type as #einstellung::Config>::Partial>)
-    } else if merge_strategy == ResolvedMerge::Extend && !partial_option_wrapped {
-        syn::parse_quote!(#core_type)
-    } else {
-        syn::parse_quote!(Option<#core_type>)
     };
 
     Ok(TransformedField {
         ident,
         vis: field.vis,
-        partial_type,
-        complete_option_wrapped,
-        partial_option_wrapped,
-        is_subconfig: field.subconfig,
-        default: field.default,
-        merge_strategy,
+        kind,
         validate_func: field.validate,
         serde_attrs,
     })
+}
+
+fn determine_fallback(default: &DefaultStrategy, is_optional: bool) -> FallbackStrategy {
+    match default {
+        DefaultStrategy::Required => {
+            if is_optional {
+                FallbackStrategy::Keep
+            } else {
+                FallbackStrategy::Require
+            }
+        }
+        DefaultStrategy::Standard => FallbackStrategy::Standard,
+        DefaultStrategy::Value(e) => FallbackStrategy::Value(e.clone()),
+        DefaultStrategy::Call(e) => FallbackStrategy::Call(e.clone()),
+    }
 }
 
 fn extract_type_from_option(ty: &Type) -> Option<&Type> {

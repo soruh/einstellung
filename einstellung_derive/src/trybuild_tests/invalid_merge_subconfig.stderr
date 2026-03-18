@@ -1,4 +1,4 @@
-error: Unknown value: `subconfig`. Available values: `append`, `function`, `replace`
+error: Unknown value: `subconfig`. Available values: `extend`, `function`, `replace`
  --> src/trybuild_tests/invalid_merge_subconfig.rs
   |
   |     #[config(merge = "subconfig")]

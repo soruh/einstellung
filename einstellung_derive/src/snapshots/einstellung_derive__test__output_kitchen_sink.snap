@@ -19,7 +19,7 @@ struct FullSystemConfig {
     port: u16,
     #[config(subconfig)]
     database: DatabaseConfig,
-    #[config(merge = "append")]
+    #[config(merge = "extend")]
     #[config(serde(alias = "files"))]
     log_files: Option<Vec<String>>,
     #[config(subconfig)]

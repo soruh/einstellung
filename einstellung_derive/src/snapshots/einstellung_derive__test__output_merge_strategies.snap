@@ -6,7 +6,7 @@ expression: formatted
 #[derive(Config)]
 struct LoggerConfig {
     level: String,
-    #[config(merge = "append")]
+    #[config(merge = "extend")]
     log_files: Vec<String>,
     #[config(merge = "replace")]
     output_format: String,

@@ -1,4 +1,4 @@
-error: Unknown value: `foo`. Available values: `append`, `function`, `replace`
+error: Unknown value: `foo`. Available values: `extend`, `function`, `replace`
  --> src/trybuild_tests/invalid_merge_foo.rs
   |
   |     #[config(merge = "foo")]

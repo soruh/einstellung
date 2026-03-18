@@ -13,5 +13,5 @@ struct ServerConfig {
 
 /// --- output ---
 ::core::compile_error! {
-    "Unknown value: `foo`. Available values: `append`, `function`, `replace`"
+    "Unknown value: `foo`. Available values: `extend`, `function`, `replace`"
 }

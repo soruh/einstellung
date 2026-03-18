@@ -245,6 +245,10 @@ pub mod generator {
         let mut s = String::new();
         let mut iter = path.segments.iter();
 
+        if path.leading_colon.is_some() {
+            s += "::";
+        }
+
         if let Some(first) = iter.next() {
             write!(&mut s, "{}", first.ident).unwrap();
             for seg in iter {

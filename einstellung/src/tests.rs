@@ -39,41 +39,58 @@ struct ListenConfig {
     port: u16,
 }
 
-fn print_res<T: Debug>(res: Result<T, ConfigError>) -> String {
-    match res {
+fn print_res<T: Debug>(res: Result<T, ConfigError>, expect_success: bool) -> String {
+    let s = match res {
         Ok(res) => format!("pass:\n{res:#?}"),
         Err(err) => format!("error:\n{err}\n{err:#?}"),
-    }
+    };
+
+    assert!(
+        res.is_ok() == expect_success,
+        "expected {} but got: {s}",
+        if expect_success { "sucess" } else { "failure" }
+    );
+
+    s
 }
 
 macro_rules! snapshot {
-    ($s:expr) => {
-        snapshot!(AppConfig, $s);
+    ($success: literal, $s: expr) => {
+        snapshot!(AppConfig, $success, $s);
     };
-    ($t: ty, $s:expr) => {{
+    ($t: ty, $success: literal, $s: expr) => {{
         let res = <$t>::load_complete(&JsonFileProvider::new($s));
-        insta::assert_snapshot!(print_res(res));
+        insta::assert_snapshot!(print_res(res, $success));
     }};
 }
 
 #[test]
 fn missing_field() {
-    snapshot!(r#"{ "network": { "listen": { "address": "192.168.0.1" } } }"#);
+    snapshot!(
+        false,
+        r#"{ "network": { "listen": { "address": "192.168.0.1" } } }"#
+    );
 }
 
 #[test]
 fn missing_nested_field() {
-    snapshot!(r#"{ "app_name": "foo" }"#);
+    snapshot!(false, r#"{ "app_name": "foo" }"#);
 }
 
 #[test]
 fn validation_fail() {
-    snapshot!(r#"{ "app_name": "foo", "network": { "listen": { "address": "127.0.0.1" } } }"#);
+    snapshot!(
+        false,
+        r#"{ "app_name": "foo", "network": { "listen": { "address": "127.0.0.1" } } }"#
+    );
 }
 
 #[test]
 fn success() {
-    snapshot!(r#"{ "app_name": "foo", "network": { "listen": { "address": "192.168.0.1" } } }"#);
+    snapshot!(
+        true,
+        r#"{ "app_name": "foo", "network": { "listen": { "address": "192.168.0.1" } } }"#
+    );
 }
 
 #[derive(Config, Debug)]
@@ -85,12 +102,12 @@ struct UserConfig {
 
 #[test]
 fn user_config() {
-    snapshot!(UserConfig, r#"{ "users": ["root", "bob"] }"#);
+    snapshot!(UserConfig, true, r#"{ "users": ["root", "bob"] }"#);
 }
 
 #[test]
 fn user_config_allowed_empty() {
-    snapshot!(UserConfig, r#"{ }"#);
+    snapshot!(UserConfig, true, r#"{ }"#);
 }
 
 #[derive(Config, Debug)]
@@ -102,12 +119,12 @@ struct UserConfig2 {
 
 #[test]
 fn user_config_no_default() {
-    snapshot!(UserConfig2, r#"{ "users": ["root", "bob"] }"#);
+    snapshot!(UserConfig2, true, r#"{ "users": ["root", "bob"] }"#);
 }
 
 #[test]
-fn user_config_no_default_not_allowed_empty() {
-    snapshot!(UserConfig2, r#"{ }"#);
+fn user_config_no_default_allowed_empty() {
+    snapshot!(UserConfig2, false, r#"{ }"#);
 }
 
 #[derive(Config, Debug)]
@@ -119,12 +136,12 @@ struct UserConfig3 {
 
 #[test]
 fn user_config_option_no_default() {
-    snapshot!(UserConfig3, r#"{ "users": ["root", "bob"] }"#);
+    snapshot!(UserConfig3, true, r#"{ "users": ["root", "bob"] }"#);
 }
 
 #[test]
-fn user_config_option_no_default_not_allowed_empty() {
-    snapshot!(UserConfig3, r#"{ }"#);
+fn user_config_option_no_default_allowed_empty() {
+    snapshot!(UserConfig3, true, r#"{ }"#);
 }
 
 #[derive(Config, Debug)]
@@ -136,10 +153,10 @@ struct UserConfig4 {
 
 #[test]
 fn user_config_option() {
-    snapshot!(UserConfig4, r#"{ "users": ["root", "bob"] }"#);
+    snapshot!(UserConfig4, true, r#"{ "users": ["root", "bob"] }"#);
 }
 
 #[test]
-fn user_config_option_not_allowed_empty() {
-    snapshot!(UserConfig4, r#"{ }"#);
+fn user_config_option_allowed_empty() {
+    snapshot!(UserConfig4, true, r#"{ }"#);
 }

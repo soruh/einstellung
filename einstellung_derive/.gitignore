@@ -1,2 +1,3 @@
 target/
 src/trybuild_tests/*.rs
+Cargo.lock

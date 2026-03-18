@@ -1,0 +1,22 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- helper ---
+pub fn merge_hosts(a: String, b: String) -> String {
+    b
+}
+
+// ---------------------------------
+
+/// --- input ---
+#[derive(Config)]
+struct ServerConfig {
+    #[config(merge = "function(merge_hosts)")]
+    host: String,
+}
+
+/// --- output ---
+::core::compile_error! {
+    "Unknown value: `function(merge_hosts)`. Did you mean `function`?"
+}

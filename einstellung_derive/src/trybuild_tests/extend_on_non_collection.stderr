@@ -1,0 +1,33 @@
+error[E0277]: the trait bound `u16: Extend<_>` is not satisfied
+ --> src/trybuild_tests/extend_on_non_collection.rs
+  |
+  | #[derive(Config)]
+  |          ^^^^^^ the trait `Extend<_>` is not implemented for `u16`
+  |
+  = help: the following other types implement trait `Extend<A>`:
+            `()` implements `Extend<()>`
+            `(ExA, ExB)` implements `Extend<(A, B)>`
+            `(ExA, ExB, ExC)` implements `Extend<(A, B, C)>`
+            `(ExA, ExB, ExC, ExD)` implements `Extend<(A, B, C, D)>`
+            `(ExA, ExB, ExC, ExD, ExE)` implements `Extend<(A, B, C, D, E)>`
+            `(ExA, ExB, ExC, ExD, ExE, ExF)` implements `Extend<(A, B, C, D, E, F)>`
+            `(ExA, ExB, ExC, ExD, ExE, ExF, ExG)` implements `Extend<(A, B, C, D, E, F, G)>`
+            `(ExA, ExB, ExC, ExD, ExE, ExF, ExG, ExH)` implements `Extend<(A, B, C, D, E, F, G, H)>`
+          and $N others
+  = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `u16` is not an iterator
+ --> src/trybuild_tests/extend_on_non_collection.rs
+  |
+  | #[derive(Config)]
+  |          ^^^^^^ `u16` is not an iterator
+  |
+  = help: the trait `Iterator` is not implemented for `u16`
+  = note: if you want to iterate between `start` until a value `end`, use the exclusive range syntax `start..end` or the inclusive range syntax `start..=end`
+  = note: required for `u16` to implement `IntoIterator`
+note: required by a bound in `extend`
+ --> $RUST/core/src/iter/traits/collect.rs
+  |
+  |     fn extend<T: IntoIterator<Item = A>>(&mut self, iter: T);
+  |                  ^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `Extend::extend`
+  = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)

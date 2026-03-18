@@ -1,0 +1,15 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- input ---
+#[derive(Config)]
+struct ServerConfig {
+    #[config(made_up_flag = true)]
+    host: String,
+}
+
+/// --- output ---
+::core::compile_error! {
+    "Unknown field: `made_up_flag`. Available values: `default`, `merge`, `serde`, `subconfig`, `validate`"
+}

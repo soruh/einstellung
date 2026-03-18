@@ -1,0 +1,23 @@
+error[E0308]: mismatched types
+ --> src/trybuild_tests/default_value_type_mismatch.rs
+  |
+  | #[derive(Config)]
+  |          ------ arguments to this method are incorrect
+  | struct ServerConfig {
+  |     #[config(default = "8080")]
+  |                        ^^^^^^ expected `u16`, found `&str`
+  |
+help: the return type of this call is `&'static str` due to the type of the argument passed
+ --> src/trybuild_tests/default_value_type_mismatch.rs
+  |
+  | #[derive(Config)]
+  |          ^^^^^^
+  | struct ServerConfig {
+  |     #[config(default = "8080")]
+  |                        ------ this argument influences the return type of `unwrap_or`
+note: method defined here
+ --> $RUST/core/src/option.rs
+  |
+  |     pub const fn unwrap_or(self, default: T) -> T
+  |                  ^^^^^^^^^
+  = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -1,0 +1,12 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- input ---
+#[derive(Config)]
+struct ServerConfig;
+
+/// --- output ---
+::core::compile_error! {
+    "Unsupported shape `no fields`. Expected named fields."
+}

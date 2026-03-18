@@ -1,0 +1,19 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- input ---
+#[derive(Config)]
+struct AppConfig {
+    #[config(subconfig, merge = "replace")]
+    db: DatabaseConfig,
+}
+#[derive(Config)]
+struct DatabaseConfig {
+    url: String,
+}
+
+/// --- output ---
+::core::compile_error! {
+    "unexpected token"
+}

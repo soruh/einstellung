@@ -1,0 +1,15 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- input ---
+#[derive(Config)]
+enum ServerConfig {
+    Active,
+    Inactive,
+}
+
+/// --- output ---
+::core::compile_error! {
+    "Unsupported shape `enum`. Expected struct with named fields."
+}

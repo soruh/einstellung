@@ -1,0 +1,39 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- helper ---
+pub fn provide_default_port(env: &str) -> u16 {
+    8080
+}
+
+// ---------------------------------
+
+/// --- input ---
+#[derive(Config)]
+struct ServerConfig {
+    #[config(default = provide_default_port)]
+    port: u16,
+}
+
+/// --- output ---
+#[derive(Default, Debug, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+struct ServerConfigPartial {
+    port: Option<u16>,
+}
+impl ::einstellung::PartialConfig for ServerConfigPartial {
+    type Complete = ServerConfig;
+    fn merge(self, next: Self) -> Self {
+        Self {
+            port: next.port.or(self.port),
+        }
+    }
+    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+        let port = self.port.unwrap_or_else(provide_default_port);
+        Ok(ServerConfig { port })
+    }
+}
+impl ::einstellung::Config for ServerConfig {
+    type Partial = ServerConfigPartial;
+}

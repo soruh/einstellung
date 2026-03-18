@@ -1,0 +1,89 @@
+error[E0277]: the trait bound `UnconfiguredDatabase: Config` is not satisfied
+ --> src/trybuild_tests/missing_subconfig_derive.rs
+  |
+  | #[derive(Config)]
+  |          ^^^^^^ unsatisfied trait bound
+  |
+help: the trait `Config` is not implemented for `UnconfiguredDatabase`
+ --> src/trybuild_tests/missing_subconfig_derive.rs
+  |
+  | struct UnconfiguredDatabase {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: the trait `Config` is implemented for `AppConfig`
+ --> src/trybuild_tests/missing_subconfig_derive.rs
+  |
+  | #[derive(Config)]
+  |          ^^^^^^
+  = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `UnconfiguredDatabase: Config` is not satisfied
+ --> src/trybuild_tests/missing_subconfig_derive.rs
+  |
+  | #[derive(Config)]
+  |          ^^^^^^ unsatisfied trait bound
+  |
+help: the trait `Config` is not implemented for `UnconfiguredDatabase`
+ --> src/trybuild_tests/missing_subconfig_derive.rs
+  |
+  | struct UnconfiguredDatabase {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: the trait `Config` is implemented for `AppConfig`
+ --> src/trybuild_tests/missing_subconfig_derive.rs
+  |
+  | #[derive(Config)]
+  |          ^^^^^^
+  = note: this error originates in the derive macro `Default` which comes from the expansion of the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `UnconfiguredDatabase: Config` is not satisfied
+ --> src/trybuild_tests/missing_subconfig_derive.rs
+  |
+  | #[derive(Config)]
+  |          ^^^^^^ unsatisfied trait bound
+  |
+help: the trait `Config` is not implemented for `UnconfiguredDatabase`
+ --> src/trybuild_tests/missing_subconfig_derive.rs
+  |
+  | struct UnconfiguredDatabase {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: the trait `Config` is implemented for `AppConfig`
+ --> src/trybuild_tests/missing_subconfig_derive.rs
+  |
+  | #[derive(Config)]
+  |          ^^^^^^
+  = note: this error originates in the derive macro `Debug` which comes from the expansion of the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `UnconfiguredDatabase: Config` is not satisfied
+ --> src/trybuild_tests/missing_subconfig_derive.rs
+  |
+  |     db: UnconfiguredDatabase,
+  |         ^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+  |
+help: the trait `Config` is not implemented for `UnconfiguredDatabase`
+ --> src/trybuild_tests/missing_subconfig_derive.rs
+  |
+  | struct UnconfiguredDatabase {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: the trait `Config` is implemented for `AppConfig`
+ --> src/trybuild_tests/missing_subconfig_derive.rs
+  |
+  | #[derive(Config)]
+  |          ^^^^^^
+  = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `UnconfiguredDatabase: Config` is not satisfied
+ --> src/trybuild_tests/missing_subconfig_derive.rs
+  |
+  | #[derive(Config)]
+  |          ^^^^^^ unsatisfied trait bound
+  |
+help: the trait `Config` is not implemented for `UnconfiguredDatabase`
+ --> src/trybuild_tests/missing_subconfig_derive.rs
+  |
+  | struct UnconfiguredDatabase {
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: the trait `Config` is implemented for `AppConfig`
+ --> src/trybuild_tests/missing_subconfig_derive.rs
+  |
+  | #[derive(Config)]
+  |          ^^^^^^
+  = note: this error originates in the derive macro `::einstellung::serde::Deserialize` which comes from the expansion of the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)

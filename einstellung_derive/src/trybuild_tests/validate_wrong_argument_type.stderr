@@ -1,0 +1,17 @@
+error[E0308]: mismatched types
+ --> src/trybuild_tests/validate_wrong_argument_type.rs
+  |
+  | #[derive(Config)]
+  |          ^^^^^^ expected `&String`, found `&u16`
+  | struct ServerConfig {
+  |     #[config(validate = validate_port)]
+  |                         ------------- arguments to this function are incorrect
+  |
+  = note: expected reference `&std::string::String`
+             found reference `&u16`
+note: function defined here
+ --> src/trybuild_tests/validate_wrong_argument_type.rs
+  |
+  | pub fn validate_port(_: &String) -> Result<(), Box<dyn std::error::Error>> {
+  |        ^^^^^^^^^^^^^ ----------
+  = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)

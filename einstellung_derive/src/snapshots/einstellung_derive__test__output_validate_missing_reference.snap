@@ -1,0 +1,51 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- helper ---
+pub fn validate_port(_: u16) -> Result<(), Box<dyn std::error::Error>> {
+    Ok(())
+}
+
+// ---------------------------------
+
+/// --- input ---
+#[derive(Config)]
+struct ServerConfig {
+    #[config(validate = validate_port)]
+    port: u16,
+}
+
+/// --- output ---
+#[derive(Default, Debug, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+struct ServerConfigPartial {
+    port: Option<u16>,
+}
+impl ::einstellung::PartialConfig for ServerConfigPartial {
+    type Complete = ServerConfig;
+    fn merge(self, next: Self) -> Self {
+        Self {
+            port: next.port.or(self.port),
+        }
+    }
+    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+        let port = self
+            .port
+            .ok_or(
+                ::einstellung::ConfigError::MissingField(
+                    ::einstellung::FieldPath::new("ServerConfig", "port"),
+                ),
+            )?;
+        if let Err(e) = (validate_port)(&port) {
+            return Err(::einstellung::ConfigError::Validation {
+                field: ::einstellung::FieldPath::new("ServerConfig", "port"),
+                reason: e.into(),
+            });
+        }
+        Ok(ServerConfig { port })
+    }
+}
+impl ::einstellung::Config for ServerConfig {
+    type Partial = ServerConfigPartial;
+}

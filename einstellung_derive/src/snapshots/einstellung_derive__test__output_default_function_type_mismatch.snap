@@ -1,0 +1,32 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- input ---
+#[derive(Config)]
+struct ServerConfig {
+    #[config(default = ||123)]
+    host: String,
+}
+
+/// --- output ---
+#[derive(Default, Debug, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+struct ServerConfigPartial {
+    host: Option<String>,
+}
+impl ::einstellung::PartialConfig for ServerConfigPartial {
+    type Complete = ServerConfig;
+    fn merge(self, next: Self) -> Self {
+        Self {
+            host: next.host.or(self.host),
+        }
+    }
+    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+        let host = self.host.unwrap_or_else(|| 123);
+        Ok(ServerConfig { host })
+    }
+}
+impl ::einstellung::Config for ServerConfig {
+    type Partial = ServerConfigPartial;
+}

@@ -1,0 +1,15 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- input ---
+#[derive(Config)]
+struct ServerConfig {
+    #[config(merge = "extend", merge = "replace")]
+    tags: Vec<String>,
+}
+
+/// --- output ---
+::core::compile_error! {
+    "Duplicate field `merge`"
+}

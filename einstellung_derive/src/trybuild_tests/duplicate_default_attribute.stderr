@@ -1,0 +1,5 @@
+error: Duplicate field `default`
+ --> src/trybuild_tests/duplicate_default_attribute.rs
+  |
+  |     #[config(default = 8080, default = 9090)]
+  |                              ^^^^^^^

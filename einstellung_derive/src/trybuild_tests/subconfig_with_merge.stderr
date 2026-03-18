@@ -1,0 +1,5 @@
+error: Merge strategy is invalid on a subconfig
+ --> src/trybuild_tests/subconfig_with_merge.rs
+  |
+  |     #[config(subconfig, merge = "replace")]
+  |                                 ^^^^^^^^^

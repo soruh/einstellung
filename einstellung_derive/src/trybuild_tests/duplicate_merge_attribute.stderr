@@ -1,0 +1,5 @@
+error: Duplicate field `merge`
+ --> src/trybuild_tests/duplicate_merge_attribute.rs
+  |
+  |     #[config(merge = "extend", merge = "replace")]
+  |                                ^^^^^

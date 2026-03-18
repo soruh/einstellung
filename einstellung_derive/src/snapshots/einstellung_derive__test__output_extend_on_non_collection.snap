@@ -1,0 +1,45 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- input ---
+#[derive(Config)]
+struct ServerConfig {
+    #[config(merge = "extend")]
+    port: u16,
+}
+
+/// --- output ---
+#[derive(Default, Debug, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+struct ServerConfigPartial {
+    #[serde(default)]
+    port: Option<u16>,
+}
+impl ::einstellung::PartialConfig for ServerConfigPartial {
+    type Complete = ServerConfig;
+    fn merge(self, next: Self) -> Self {
+        Self {
+            port: match (self.port, next.port) {
+                (Some(mut a), Some(b)) => {
+                    ::core::iter::Extend::extend(&mut a, b);
+                    Some(a)
+                }
+                (a, b) => a.or(b),
+            },
+        }
+    }
+    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+        let port = self
+            .port
+            .ok_or(
+                ::einstellung::ConfigError::MissingField(
+                    ::einstellung::FieldPath::new("ServerConfig", "port"),
+                ),
+            )?;
+        Ok(ServerConfig { port })
+    }
+}
+impl ::einstellung::Config for ServerConfig {
+    type Partial = ServerConfigPartial;
+}

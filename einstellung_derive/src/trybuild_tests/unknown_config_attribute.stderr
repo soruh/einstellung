@@ -1,0 +1,5 @@
+error: Unknown field: `made_up_flag`. Available values: `default`, `merge`, `serde`, `subconfig`, `validate`
+ --> src/trybuild_tests/unknown_config_attribute.rs
+  |
+  |     #[config(made_up_flag = true)]
+  |              ^^^^^^^^^^^^

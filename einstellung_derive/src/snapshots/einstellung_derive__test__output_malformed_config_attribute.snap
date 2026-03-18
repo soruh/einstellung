@@ -1,0 +1,15 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- input ---
+#[derive(Config)]
+struct ServerConfig {
+    #[config = "this should be a list"]
+    host: String,
+}
+
+/// --- output ---
+::core::compile_error! {
+    "Name-value arguments are not supported. Use #[config(...)]"
+}

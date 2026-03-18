@@ -1,0 +1,5 @@
+error: Name-value arguments are not supported. Use #[config(...)]
+ --> src/trybuild_tests/malformed_config_attribute.rs
+  |
+  |     #[config = "this should be a list"]
+  |       ^^^^^^

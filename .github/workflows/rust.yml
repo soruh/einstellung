@@ -19,10 +19,13 @@ jobs:
       - name: Cache cargo registry + build
         uses: Swatinem/rust-cache@v2
 
+      - name: Install nextest
+        uses: taiki-e/install-action@nextest
+
       - name: Run integration tests
         working-directory: einstellung/
-        run: cargo test --locked
+        run: cargo nextest run
 
       - name: Run derive tests
         working-directory: einstellung_derive/
-        run: cargo test --locked
+        run: cargo nextest run

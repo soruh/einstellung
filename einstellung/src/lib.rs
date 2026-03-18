@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use serde::de::DeserializeOwned;
 
 use thiserror::Error;
@@ -38,6 +40,56 @@ pub trait ConfigProvider {
     fn load_partial<T: DeserializeOwned>(&self) -> Result<T, ConfigError>;
 }
 
+#[derive(Debug)]
+pub struct FieldPath {
+    base_type: &'static str,
+    field: &'static str,
+    path: Vec<&'static str>,
+}
+
+impl FieldPath {
+    pub fn new(base_type: &'static str, field: &'static str) -> Self {
+        Self {
+            base_type,
+            field,
+            path: Vec::new(),
+        }
+    }
+    pub fn push(mut self, segment: &'static str) -> Self {
+        self.path.push(segment);
+        self
+    }
+}
+
+#[doc(hidden)]
+pub fn build_with_context<P: PartialConfig>(
+    partial: P,
+    segment: &'static str,
+) -> Result<P::Complete, ConfigError> {
+    partial.build().map_err(|err| context(err, segment))
+}
+
+fn context(error: ConfigError, segment: &'static str) -> ConfigError {
+    match error {
+        ConfigError::MissingField(field) => ConfigError::MissingField(field.push(segment)),
+        ConfigError::Validation { field, reason } => ConfigError::Validation {
+            field: field.push(segment),
+            reason,
+        },
+        x => x,
+    }
+}
+
+impl Display for FieldPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}::", self.base_type)?;
+        for item in self.path.iter().rev() {
+            write!(f, "{item}::")?;
+        }
+        write!(f, "{}", self.field)
+    }
+}
+
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum ConfigError {
@@ -57,11 +109,11 @@ pub enum ConfigError {
     Toml(#[from] ::toml::de::Error),
 
     #[error("Missing required configuration field: '{0}'")]
-    MissingField(&'static str),
+    MissingField(FieldPath),
 
     #[error("Validation failed for field '{field}': {reason}")]
     Validation {
-        field: &'static str,
+        field: FieldPath,
         reason: Box<dyn std::error::Error>,
     },
 }

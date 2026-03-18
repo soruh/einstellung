@@ -36,13 +36,27 @@ impl ::einstellung::PartialConfig for LoggerConfigPartial {
         }
     }
     fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
-        let level = self.level.ok_or(::einstellung::ConfigError::MissingField("level"))?;
+        let level = self
+            .level
+            .ok_or(
+                ::einstellung::ConfigError::MissingField(
+                    ::einstellung::FieldPath::new("LoggerConfig", "level"),
+                ),
+            )?;
         let log_files = self
             .log_files
-            .ok_or(::einstellung::ConfigError::MissingField("log_files"))?;
+            .ok_or(
+                ::einstellung::ConfigError::MissingField(
+                    ::einstellung::FieldPath::new("LoggerConfig", "log_files"),
+                ),
+            )?;
         let output_format = self
             .output_format
-            .ok_or(::einstellung::ConfigError::MissingField("output_format"))?;
+            .ok_or(
+                ::einstellung::ConfigError::MissingField(
+                    ::einstellung::FieldPath::new("LoggerConfig", "output_format"),
+                ),
+            )?;
         Ok(LoggerConfig {
             level,
             log_files,

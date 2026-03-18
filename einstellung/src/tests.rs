@@ -16,6 +16,13 @@ struct AppConfig {
     app_name: String,
 
     #[config(subconfig)]
+    network: NetworkConfig,
+}
+
+#[derive(Config, Debug)]
+#[config(crate = crate)]
+struct NetworkConfig {
+    #[config(subconfig)]
     listen: ListenConfig,
 }
 
@@ -44,7 +51,7 @@ macro_rules! snapshot {
 
 #[test]
 fn missing_field() {
-    snapshot!(r#"{ "listen": { "address": "192.168.0.1" } }"#);
+    snapshot!(r#"{ "network": { "listen": { "address": "192.168.0.1" } } }"#);
 }
 
 #[test]
@@ -54,10 +61,10 @@ fn missing_nested_field() {
 
 #[test]
 fn validation_fail() {
-    snapshot!(r#"{ "app_name": "foo", "listen": { "address": "127.0.0.1" } }"#);
+    snapshot!(r#"{ "app_name": "foo", "network": { "listen": { "address": "127.0.0.1" } } }"#);
 }
 
 #[test]
 fn success() {
-    snapshot!(r#"{ "app_name": "foo", "listen": { "address": "192.168.0.1" } }"#);
+    snapshot!(r#"{ "app_name": "foo", "network": { "listen": { "address": "192.168.0.1" } } }"#);
 }

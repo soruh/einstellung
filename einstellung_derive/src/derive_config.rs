@@ -292,6 +292,8 @@ pub mod generator {
         let complete_ident = &model.complete_ident;
         let einstellung = &model.einstellung;
 
+        let complete_str = complete_ident.to_string();
+
         let merge_fields = model.fields.iter().map(|f| {
             let ident = &f.ident;
             match &f.merge_strategy {
@@ -325,9 +327,9 @@ pub mod generator {
 
             let resolve = if f.is_subconfig {
                 if f.is_optional {
-                    quote! { self.#ident.map(#einstellung::PartialConfig::build).transpose()? }
+                    quote! { self.#ident.map(|x| #einstellung::build_with_context(x, #ident_str)).transpose()? }
                 } else {
-                    quote! { self.#ident.unwrap_or_default().build()? }
+                    quote! { #einstellung::build_with_context(self.#ident.unwrap_or_default(), #ident_str)? }
                 }
             } else if let Some(syn::Expr::Lit(default_literal)) = &f.default_expr {
                 quote! { self.#ident.unwrap_or(#default_literal) }
@@ -336,7 +338,7 @@ pub mod generator {
             } else if f.is_optional {
                 quote! { self.#ident }
             } else {
-                quote! { self.#ident.ok_or(#einstellung::ConfigError::MissingField(#ident_str))? }
+                quote! { self.#ident.ok_or(#einstellung::ConfigError::MissingField(#einstellung::FieldPath::new(#complete_str, #ident_str)))? }
             };
 
             if let Some(validate_func) = &f.validate_func {
@@ -344,7 +346,7 @@ pub mod generator {
                     let #ident = #resolve;
                     if let Err(e) = #validate_func(&#ident) {
                         return Err(#einstellung::ConfigError::Validation {
-                            field: #ident_str,
+                            field: #einstellung::FieldPath::new(#complete_str, #ident_str),
                             reason: e.into(),
                         });
                     }

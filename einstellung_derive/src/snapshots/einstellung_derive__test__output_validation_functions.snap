@@ -41,17 +41,27 @@ impl ::einstellung::PartialConfig for TlsConfigPartial {
     fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
         let cert_path = self
             .cert_path
-            .ok_or(::einstellung::ConfigError::MissingField("cert_path"))?;
+            .ok_or(
+                ::einstellung::ConfigError::MissingField(
+                    ::einstellung::FieldPath::new("TlsConfig", "cert_path"),
+                ),
+            )?;
         if let Err(e) = validators::validate_cert_path(&cert_path) {
             return Err(::einstellung::ConfigError::Validation {
-                field: "cert_path",
+                field: ::einstellung::FieldPath::new("TlsConfig", "cert_path"),
                 reason: e.into(),
             });
         }
-        let port = self.port.ok_or(::einstellung::ConfigError::MissingField("port"))?;
+        let port = self
+            .port
+            .ok_or(
+                ::einstellung::ConfigError::MissingField(
+                    ::einstellung::FieldPath::new("TlsConfig", "port"),
+                ),
+            )?;
         if let Err(e) = validators::validate_port(&port) {
             return Err(::einstellung::ConfigError::Validation {
-                field: "port",
+                field: ::einstellung::FieldPath::new("TlsConfig", "port"),
                 reason: e.into(),
             });
         }

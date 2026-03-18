@@ -3,7 +3,14 @@ source: einstellung/src/tests.rs
 expression: print_res(res)
 ---
 error:
-Missing required configuration field: 'address'
+Missing required configuration field: 'ListenConfig::network::listen::address'
 MissingField(
-    "address",
+    FieldPath {
+        base_type: "ListenConfig",
+        field: "address",
+        path: [
+            "listen",
+            "network",
+        ],
+    },
 )

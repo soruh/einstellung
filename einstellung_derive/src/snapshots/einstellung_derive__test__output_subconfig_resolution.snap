@@ -38,9 +38,19 @@ impl ::einstellung::PartialConfig for AppConfigPartial {
     fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
         let app_name = self
             .app_name
-            .ok_or(::einstellung::ConfigError::MissingField("app_name"))?;
-        let database = self.database.unwrap_or_default().build()?;
-        let redis = self.redis.unwrap_or_default().build()?;
+            .ok_or(
+                ::einstellung::ConfigError::MissingField(
+                    ::einstellung::FieldPath::new("AppConfig", "app_name"),
+                ),
+            )?;
+        let database = ::einstellung::build_with_context(
+            self.database.unwrap_or_default(),
+            "database",
+        )?;
+        let redis = ::einstellung::build_with_context(
+            self.redis.unwrap_or_default(),
+            "redis",
+        )?;
         Ok(AppConfig {
             app_name,
             database,
@@ -77,10 +87,20 @@ impl ::einstellung::PartialConfig for DatabaseConfigPartial {
         }
     }
     fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
-        let url = self.url.ok_or(::einstellung::ConfigError::MissingField("url"))?;
+        let url = self
+            .url
+            .ok_or(
+                ::einstellung::ConfigError::MissingField(
+                    ::einstellung::FieldPath::new("DatabaseConfig", "url"),
+                ),
+            )?;
         let pool_size = self
             .pool_size
-            .ok_or(::einstellung::ConfigError::MissingField("pool_size"))?;
+            .ok_or(
+                ::einstellung::ConfigError::MissingField(
+                    ::einstellung::FieldPath::new("DatabaseConfig", "pool_size"),
+                ),
+            )?;
         Ok(DatabaseConfig { url, pool_size })
     }
 }
@@ -112,7 +132,11 @@ impl ::einstellung::PartialConfig for RedisConfigPartial {
     fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
         let cluster_mode = self
             .cluster_mode
-            .ok_or(::einstellung::ConfigError::MissingField("cluster_mode"))?;
+            .ok_or(
+                ::einstellung::ConfigError::MissingField(
+                    ::einstellung::FieldPath::new("RedisConfig", "cluster_mode"),
+                ),
+            )?;
         Ok(RedisConfig { cluster_mode })
     }
 }

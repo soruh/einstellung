@@ -3,7 +3,11 @@ source: einstellung/src/tests.rs
 expression: print_res(res)
 ---
 error:
-Missing required configuration field: 'app_name'
+Missing required configuration field: 'AppConfig::app_name'
 MissingField(
-    "app_name",
+    FieldPath {
+        base_type: "AppConfig",
+        field: "app_name",
+        path: [],
+    },
 )

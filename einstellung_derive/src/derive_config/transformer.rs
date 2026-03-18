@@ -1,14 +1,16 @@
 use super::parser::{ConfigFieldReceiver, ConfigStructReceiver};
 use crate::derive_config::parser::{DefaultStrategy, MergeStrategy};
 use darling::util::SpannedValue;
-use syn::{GenericArgument, PathArguments, Type};
+use syn::{GenericArgument, PathArguments, Type, parse_quote};
 
 #[derive(Debug)]
 pub struct TransformedStruct {
     pub complete_ident: syn::Ident,
     pub partial_ident: syn::Ident,
+    pub any_freezable: bool,
     pub vis: syn::Visibility,
     pub fields: Vec<TransformedField>,
+    pub attrs_partial: Vec<darling::ast::NestedMeta>,
     pub einstellung: syn::Path,
 }
 
@@ -39,6 +41,13 @@ pub enum FieldKind {
     },
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum FreezeStrategy {
+    NotFreezable,
+    Wrapped,
+    Subconfig,
+}
+
 #[derive(Debug)]
 pub struct TransformedField {
     pub ident: syn::Ident,
@@ -46,6 +55,7 @@ pub struct TransformedField {
     pub complete_type: syn::Type,
     pub partial_type: syn::Type,
     pub kind: FieldKind,
+    pub freeze: FreezeStrategy,
     pub validate_func: Option<syn::Expr>,
     pub serde_attrs: Vec<syn::Attribute>,
 }
@@ -64,8 +74,12 @@ pub fn transform(receiver: ConfigStructReceiver) -> syn::Result<TransformedStruc
     let mut fields = Vec::new();
     let mut errors: Option<syn::Error> = None;
 
+    let mut any_freezable = receiver.freezeable;
+
     for field in struct_data {
-        match transform_field(field, &einstellung) {
+        any_freezable |= field.freezeable;
+
+        match transform_field(field, &einstellung, receiver.freezeable) {
             Ok(f) => fields.push(f),
             Err(e) => {
                 if let Some(ref mut errs) = errors {
@@ -83,6 +97,8 @@ pub fn transform(receiver: ConfigStructReceiver) -> syn::Result<TransformedStruc
         Ok(TransformedStruct {
             complete_ident,
             partial_ident,
+            any_freezable,
+            attrs_partial: receiver.partial.into_iter().flat_map(|x| x.0).collect(),
             vis,
             fields,
             einstellung,
@@ -93,6 +109,7 @@ pub fn transform(receiver: ConfigStructReceiver) -> syn::Result<TransformedStruc
 fn transform_field(
     field: ConfigFieldReceiver,
     einstellung: &syn::Path,
+    all_freezeable: bool,
 ) -> syn::Result<TransformedField> {
     let ident = field.ident.clone().ok_or_else(|| {
         syn::Error::new(proc_macro2::Span::call_site(), "Named fields are required")
@@ -183,10 +200,27 @@ fn transform_field(
         }
     };
 
+    let freezeable = field.freezeable || all_freezeable;
+
+    let freeze = if !freezeable {
+        FreezeStrategy::NotFreezable
+    } else if field.subconfig {
+        FreezeStrategy::Subconfig
+    } else {
+        FreezeStrategy::Wrapped
+    };
+
+    let partial_type = if freeze == FreezeStrategy::Wrapped {
+        parse_quote! { #einstellung::Freeze<#partial_type>}
+    } else {
+        partial_type
+    };
+
     Ok(TransformedField {
         ident,
         vis: field.vis,
         kind,
+        freeze,
         partial_type,
         complete_type,
         validate_func: field.validate,

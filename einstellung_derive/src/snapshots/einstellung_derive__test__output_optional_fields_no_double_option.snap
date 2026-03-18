@@ -11,11 +11,7 @@ struct ClientConfig {
 }
 
 /// --- output ---
-#[derive(
-    ::core::default::Default,
-    ::core::fmt::Debug,
-    ::einstellung::serde::Deserialize
-)]
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct ClientConfigPartial {
     name: Option<String>,
@@ -24,14 +20,19 @@ struct ClientConfigPartial {
 }
 impl ::einstellung::PartialConfig for ClientConfigPartial {
     type Complete = ClientConfig;
-    fn merge(self, next: Self) -> Self {
-        Self {
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
             name: next.name.or(self.name),
             timeout_ms: next.timeout_ms.or(self.timeout_ms),
             proxy: next.proxy.or(self.proxy),
-        }
+        })
     }
-    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
         let name = self
             .name
             .ok_or(
@@ -41,7 +42,7 @@ impl ::einstellung::PartialConfig for ClientConfigPartial {
             )?;
         let timeout_ms = self.timeout_ms;
         let proxy = self.proxy;
-        Ok(ClientConfig {
+        ::core::result::Result::Ok(ClientConfig {
             name,
             timeout_ms,
             proxy,

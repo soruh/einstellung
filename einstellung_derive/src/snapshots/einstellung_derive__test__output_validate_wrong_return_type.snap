@@ -17,23 +17,24 @@ struct ServerConfig {
 }
 
 /// --- output ---
-#[derive(
-    ::core::default::Default,
-    ::core::fmt::Debug,
-    ::einstellung::serde::Deserialize
-)]
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct ServerConfigPartial {
     port: Option<u16>,
 }
 impl ::einstellung::PartialConfig for ServerConfigPartial {
     type Complete = ServerConfig;
-    fn merge(self, next: Self) -> Self {
-        Self {
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
             port: next.port.or(self.port),
-        }
+        })
     }
-    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
         let port: u16 = self
             .port
             .ok_or(
@@ -49,7 +50,7 @@ impl ::einstellung::PartialConfig for ServerConfigPartial {
                 reason: e.into(),
             });
         }
-        Ok(ServerConfig { port })
+        ::core::result::Result::Ok(ServerConfig { port })
     }
 }
 impl ::einstellung::Config for ServerConfig {

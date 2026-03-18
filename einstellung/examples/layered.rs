@@ -88,11 +88,14 @@ fn main() {
 
     let config = hard_coded
         .merge(user_config1)
+        .unwrap()
         .merge(user_config2)
+        .unwrap()
         .merge(AppConfigPartial {
             listen: Some(listen_config),
             ..Default::default()
         })
+        .unwrap()
         .build();
 
     dbg!(&config);

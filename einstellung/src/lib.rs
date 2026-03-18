@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use thiserror::Error;
 
@@ -32,8 +32,13 @@ pub trait Config: Sized {
 pub trait PartialConfig: Default + DeserializeOwned {
     type Complete;
 
-    fn merge(self, next: Self) -> Self;
+    fn merge(self, next: Self) -> Result<Self, ConfigError>;
     fn build(self) -> Result<Self::Complete, ConfigError>;
+}
+
+pub trait Freezable {
+    fn freeze(self) -> Self;
+    fn is_frozen(&self) -> bool;
 }
 
 pub trait ConfigProvider {
@@ -82,6 +87,10 @@ fn context(error: ConfigError, complete: &'static str, segment: &'static str) ->
             field: field.context(complete, segment),
             reason,
         },
+        ConfigError::CustomMerge { field, reason } => ConfigError::CustomMerge {
+            field: field.context(complete, segment),
+            reason,
+        },
         x => x,
     }
 }
@@ -117,13 +126,104 @@ pub enum ConfigError {
     #[error("Missing required configuration field: '{0}'")]
     MissingField(FieldPath),
 
+    #[error("Attempted to merge two frozen fields: '{0}'")]
+    FreezeCollision(FieldPath),
+
     #[error("Validation failed for field '{field}': {reason}")]
     Validation {
+        field: FieldPath,
+        reason: Box<dyn std::error::Error>,
+    },
+
+    #[error("Custom Merge failed for field '{field}': {reason}")]
+    CustomMerge {
         field: FieldPath,
         reason: Box<dyn std::error::Error>,
     },
 }
 
 pub type ValidationFunction<T, E> = for<'a> fn(&'a T) -> Result<(), E>;
+pub type MergeFunction<T, E> = fn(T, T) -> Result<T, E>;
 
-pub type MergeFunction<T> = fn(T, T) -> T;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Freeze<T> {
+    Free(T),
+    Frozen(T),
+}
+
+impl<T: Serialize> Serialize for Freeze<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Freeze::Free(x) => T::serialize(x, serializer),
+            Freeze::Frozen(x) => T::serialize(x, serializer),
+        }
+    }
+}
+
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for Freeze<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(Self::Free(T::deserialize(deserializer)?))
+    }
+}
+
+impl<T> Default for Freeze<T>
+where
+    T: Default,
+{
+    fn default() -> Self {
+        Self::Free(T::default())
+    }
+}
+
+pub enum FreezeCombination<T> {
+    BothFree(T, T),
+    OneFrozen(T),
+    BothFrozen,
+}
+
+impl<T: Freezable> FreezeCombination<T> {
+    pub fn of(a: T, b: T) -> FreezeCombination<T> {
+        match (a.is_frozen(), b.is_frozen()) {
+            (false, false) => FreezeCombination::BothFree(a, b),
+            (true, false) => FreezeCombination::OneFrozen(a),
+            (false, true) => FreezeCombination::OneFrozen(b),
+            (true, true) => FreezeCombination::BothFrozen,
+        }
+    }
+}
+
+impl<T> FreezeCombination<T> {
+    pub fn of_freeze(a: Freeze<T>, b: Freeze<T>) -> FreezeCombination<T> {
+        match (a, b) {
+            (Freeze::Free(a), Freeze::Free(b)) => FreezeCombination::BothFree(a, b),
+            (Freeze::Frozen(a), Freeze::Free(_)) => FreezeCombination::OneFrozen(a),
+            (Freeze::Free(_), Freeze::Frozen(b)) => FreezeCombination::OneFrozen(b),
+            (Freeze::Frozen(_), Freeze::Frozen(_)) => FreezeCombination::BothFrozen,
+        }
+    }
+}
+
+impl<T> Freeze<T> {
+    pub fn into_inner(self) -> T {
+        match self {
+            Freeze::Free(x) => x,
+            Freeze::Frozen(x) => x,
+        }
+    }
+}
+
+impl<T> Freezable for Freeze<T> {
+    fn freeze(self) -> Self {
+        let (Freeze::Frozen(value) | Freeze::Free(value)) = self;
+        Freeze::Frozen(value)
+    }
+    fn is_frozen(&self) -> bool {
+        matches!(self, Freeze::Frozen(_))
+    }
+}

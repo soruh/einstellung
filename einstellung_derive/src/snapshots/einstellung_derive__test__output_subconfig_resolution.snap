@@ -13,11 +13,7 @@ struct AppConfig {
 }
 
 /// --- output ---
-#[derive(
-    ::core::default::Default,
-    ::core::fmt::Debug,
-    ::einstellung::serde::Deserialize
-)]
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct AppConfigPartial {
     app_name: Option<String>,
@@ -26,20 +22,25 @@ struct AppConfigPartial {
 }
 impl ::einstellung::PartialConfig for AppConfigPartial {
     type Complete = AppConfig;
-    fn merge(self, next: Self) -> Self {
-        Self {
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
             app_name: next.app_name.or(self.app_name),
             database: match (self.database, next.database) {
-                (Some(a), Some(b)) => Some(::einstellung::PartialConfig::merge(a, b)),
+                (Some(a), Some(b)) => Some(::einstellung::PartialConfig::merge(a, b)?),
                 (a, b) => a.or(b),
             },
             redis: match (self.redis, next.redis) {
-                (Some(a), Some(b)) => Some(::einstellung::PartialConfig::merge(a, b)),
+                (Some(a), Some(b)) => Some(::einstellung::PartialConfig::merge(a, b)?),
                 (a, b) => a.or(b),
             },
-        }
+        })
     }
-    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
         let app_name = self
             .app_name
             .ok_or(
@@ -57,7 +58,7 @@ impl ::einstellung::PartialConfig for AppConfigPartial {
             "AppConfig",
             "redis",
         )?;
-        Ok(AppConfig {
+        ::core::result::Result::Ok(AppConfig {
             app_name,
             database,
             redis,
@@ -78,11 +79,7 @@ struct DatabaseConfig {
 }
 
 /// --- output ---
-#[derive(
-    ::core::default::Default,
-    ::core::fmt::Debug,
-    ::einstellung::serde::Deserialize
-)]
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct DatabaseConfigPartial {
     url: Option<String>,
@@ -90,13 +87,18 @@ struct DatabaseConfigPartial {
 }
 impl ::einstellung::PartialConfig for DatabaseConfigPartial {
     type Complete = DatabaseConfig;
-    fn merge(self, next: Self) -> Self {
-        Self {
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
             url: next.url.or(self.url),
             pool_size: next.pool_size.or(self.pool_size),
-        }
+        })
     }
-    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
         let url = self
             .url
             .ok_or(
@@ -111,7 +113,7 @@ impl ::einstellung::PartialConfig for DatabaseConfigPartial {
                     ::einstellung::FieldPath::new("DatabaseConfig", "pool_size"),
                 ),
             )?;
-        Ok(DatabaseConfig { url, pool_size })
+        ::core::result::Result::Ok(DatabaseConfig { url, pool_size })
     }
 }
 impl ::einstellung::Config for DatabaseConfig {
@@ -127,23 +129,24 @@ struct RedisConfig {
 }
 
 /// --- output ---
-#[derive(
-    ::core::default::Default,
-    ::core::fmt::Debug,
-    ::einstellung::serde::Deserialize
-)]
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct RedisConfigPartial {
     cluster_mode: Option<bool>,
 }
 impl ::einstellung::PartialConfig for RedisConfigPartial {
     type Complete = RedisConfig;
-    fn merge(self, next: Self) -> Self {
-        Self {
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
             cluster_mode: next.cluster_mode.or(self.cluster_mode),
-        }
+        })
     }
-    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
         let cluster_mode = self
             .cluster_mode
             .ok_or(
@@ -151,7 +154,7 @@ impl ::einstellung::PartialConfig for RedisConfigPartial {
                     ::einstellung::FieldPath::new("RedisConfig", "cluster_mode"),
                 ),
             )?;
-        Ok(RedisConfig { cluster_mode })
+        ::core::result::Result::Ok(RedisConfig { cluster_mode })
     }
 }
 impl ::einstellung::Config for RedisConfig {

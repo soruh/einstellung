@@ -24,11 +24,7 @@ struct TlsConfig {
 }
 
 /// --- output ---
-#[derive(
-    ::core::default::Default,
-    ::core::fmt::Debug,
-    ::einstellung::serde::Deserialize
-)]
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct TlsConfigPartial {
     cert_path: Option<String>,
@@ -36,13 +32,18 @@ struct TlsConfigPartial {
 }
 impl ::einstellung::PartialConfig for TlsConfigPartial {
     type Complete = TlsConfig;
-    fn merge(self, next: Self) -> Self {
-        Self {
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
             cert_path: next.cert_path.or(self.cert_path),
             port: next.port.or(self.port),
-        }
+        })
     }
-    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
         let cert_path: String = self
             .cert_path
             .ok_or(
@@ -73,7 +74,7 @@ impl ::einstellung::PartialConfig for TlsConfigPartial {
                 reason: e.into(),
             });
         }
-        Ok(TlsConfig { cert_path, port })
+        ::core::result::Result::Ok(TlsConfig { cert_path, port })
     }
 }
 impl ::einstellung::Config for TlsConfig {

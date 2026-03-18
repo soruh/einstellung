@@ -10,23 +10,24 @@ struct Config {
 }
 
 /// --- output ---
-#[derive(
-    ::core::default::Default,
-    ::core::fmt::Debug,
-    ::einstellung::serde::Deserialize
-)]
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct ConfigPartial {
     x: Option<Vec<u32>>,
 }
 impl ::einstellung::PartialConfig for ConfigPartial {
     type Complete = Config;
-    fn merge(self, next: Self) -> Self {
-        Self { x: next.x.or(self.x) }
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self { x: next.x.or(self.x) })
     }
-    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
         let x = self.x.unwrap_or_else(|| Vec::with_capacity(10));
-        Ok(Config { x })
+        ::core::result::Result::Ok(Config { x })
     }
 }
 impl ::einstellung::Config for Config {

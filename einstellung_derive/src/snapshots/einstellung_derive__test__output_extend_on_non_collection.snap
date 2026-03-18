@@ -10,11 +10,7 @@ struct ServerConfig {
 }
 
 /// --- output ---
-#[derive(
-    ::core::default::Default,
-    ::core::fmt::Debug,
-    ::einstellung::serde::Deserialize
-)]
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct ServerConfigPartial {
     #[serde(default)]
@@ -22,8 +18,11 @@ struct ServerConfigPartial {
 }
 impl ::einstellung::PartialConfig for ServerConfigPartial {
     type Complete = ServerConfig;
-    fn merge(self, next: Self) -> Self {
-        Self {
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
             port: match (self.port, next.port) {
                 (Some(mut a), Some(b)) => {
                     ::core::iter::Extend::extend(&mut a, b);
@@ -31,9 +30,11 @@ impl ::einstellung::PartialConfig for ServerConfigPartial {
                 }
                 (a, b) => a.or(b),
             },
-        }
+        })
     }
-    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
         let port = self
             .port
             .ok_or(
@@ -41,7 +42,7 @@ impl ::einstellung::PartialConfig for ServerConfigPartial {
                     ::einstellung::FieldPath::new("ServerConfig", "port"),
                 ),
             )?;
-        Ok(ServerConfig { port })
+        ::core::result::Result::Ok(ServerConfig { port })
     }
 }
 impl ::einstellung::Config for ServerConfig {

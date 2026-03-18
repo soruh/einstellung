@@ -14,11 +14,7 @@ struct NetworkConfig {
 }
 
 /// --- output ---
-#[derive(
-    ::core::default::Default,
-    ::core::fmt::Debug,
-    ::einstellung::serde::Deserialize
-)]
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct NetworkConfigPartial {
     host: Option<String>,
@@ -27,18 +23,23 @@ struct NetworkConfigPartial {
 }
 impl ::einstellung::PartialConfig for NetworkConfigPartial {
     type Complete = NetworkConfig;
-    fn merge(self, next: Self) -> Self {
-        Self {
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
             host: next.host.or(self.host),
             port: next.port.or(self.port),
             timeout: next.timeout.or(self.timeout),
-        }
+        })
     }
-    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
         let host = self.host.unwrap_or_else(|| "localhost".to_string());
         let port = self.port.unwrap_or(8080);
         let timeout = self.timeout.unwrap_or_else(|| std::time::Duration::from_secs(30));
-        Ok(NetworkConfig {
+        ::core::result::Result::Ok(NetworkConfig {
             host,
             port,
             timeout,

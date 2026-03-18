@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use crate::{Config, ConfigError, JsonFileProvider};
+use crate::{Config, ConfigError, Freezable, JsonFileProvider, PartialConfig};
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
     default,
@@ -190,4 +190,114 @@ fn config_enum_incorrect() {
 #[test]
 fn config_enum_missing() {
     snapshot!(ConfigWithEnum, true, r#"{ }"#);
+}
+
+#[derive(Config, Debug, PartialEq, Eq)]
+#[config(crate = crate)]
+#[config(partial(derive(Clone)))]
+struct ConfigFreezable1 {
+    #[config(default = "Freezable Config 1".to_string())]
+    name: String,
+    pass: u8,
+    #[config(freezeable)]
+    private_key: String,
+}
+
+#[derive(Config, Debug, PartialEq, Eq)]
+#[config(crate = crate)]
+#[config(freezeable)]
+#[config(partial(derive(Clone)))]
+struct ConfigFreezable2 {
+    #[config(default = "Freezable Config 2".to_string())]
+    name: String,
+    pass: u8,
+    private_key: String,
+}
+
+const KEY: &str = "uILfaXH0dj9qUGV71O/Wyg==";
+
+#[test]
+fn config_freeze_partial() {
+    let frozen = ConfigFreezable1::load_partial(&JsonFileProvider::new(format!(
+        "{{ \"private_key\": {KEY:?}, \"pass\": 1 }}"
+    )))
+    .unwrap()
+    .freeze();
+
+    let overwrite = ConfigFreezable1::load_partial(&JsonFileProvider::new(
+        r#"{ "name": "overwritten name", "pass": 2, "private_key": "overwritten key" }"#,
+    ))
+    .unwrap();
+
+    assert_eq!(
+        frozen
+            .clone()
+            .merge(overwrite.clone())
+            .unwrap()
+            .build()
+            .unwrap(),
+        ConfigFreezable1 {
+            name: "overwritten name".to_string(),
+            pass: 2,
+            private_key: KEY.to_string(),
+        }
+    );
+
+    assert_eq!(
+        overwrite.merge(frozen).unwrap().build().unwrap(),
+        ConfigFreezable1 {
+            name: "overwritten name".to_string(),
+            pass: 1,
+            private_key: KEY.to_string(),
+        }
+    );
+}
+
+#[test]
+fn config_freeze_complete() {
+    let frozen = ConfigFreezable2::load_partial(&JsonFileProvider::new(format!(
+        "{{ \"private_key\": {KEY:?}, \"pass\": 1 }}"
+    )))
+    .unwrap()
+    .freeze();
+
+    let overwrite = ConfigFreezable2::load_partial(&JsonFileProvider::new(
+        r#"{ "name": "overwritten name", "pass": 2, "private_key": "overwritten key" }"#,
+    ))
+    .unwrap();
+
+    let expected = ConfigFreezable2 {
+        name: "Freezable Config 2".to_string(),
+        pass: 1,
+        private_key: KEY.to_string(),
+    };
+
+    assert_eq!(
+        frozen
+            .clone()
+            .merge(overwrite.clone())
+            .unwrap()
+            .build()
+            .unwrap(),
+        expected
+    );
+    assert_eq!(overwrite.merge(frozen).unwrap().build().unwrap(), expected);
+}
+
+#[test]
+fn config_freeze_collision() {
+    let frozen1 = ConfigFreezable2::load_partial(&JsonFileProvider::new(format!(
+        "{{ \"private_key\": {KEY:?} }}"
+    )))
+    .unwrap()
+    .freeze();
+
+    let frozen2 = ConfigFreezable2::load_partial(&JsonFileProvider::new(
+        r#"{ "name": "overwritten name", "private_key": "overwritten key" }"#,
+    ))
+    .unwrap()
+    .freeze();
+
+    let res = frozen1.merge(frozen2).and_then(|x| x.build());
+    insta::assert_snapshot!(print_res(res, false));
 }

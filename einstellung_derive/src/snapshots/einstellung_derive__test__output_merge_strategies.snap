@@ -13,11 +13,7 @@ struct LoggerConfig {
 }
 
 /// --- output ---
-#[derive(
-    ::core::default::Default,
-    ::core::fmt::Debug,
-    ::einstellung::serde::Deserialize
-)]
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct LoggerConfigPartial {
     level: Option<String>,
@@ -27,8 +23,11 @@ struct LoggerConfigPartial {
 }
 impl ::einstellung::PartialConfig for LoggerConfigPartial {
     type Complete = LoggerConfig;
-    fn merge(self, next: Self) -> Self {
-        Self {
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
             level: next.level.or(self.level),
             log_files: match (self.log_files, next.log_files) {
                 (Some(mut a), Some(b)) => {
@@ -38,9 +37,11 @@ impl ::einstellung::PartialConfig for LoggerConfigPartial {
                 (a, b) => a.or(b),
             },
             output_format: next.output_format.or(self.output_format),
-        }
+        })
     }
-    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
         let level = self
             .level
             .ok_or(
@@ -62,7 +63,7 @@ impl ::einstellung::PartialConfig for LoggerConfigPartial {
                     ::einstellung::FieldPath::new("LoggerConfig", "output_format"),
                 ),
             )?;
-        Ok(LoggerConfig {
+        ::core::result::Result::Ok(LoggerConfig {
             level,
             log_files,
             output_format,

@@ -10,25 +10,26 @@ struct ServerConfig {
 }
 
 /// --- output ---
-#[derive(
-    ::core::default::Default,
-    ::core::fmt::Debug,
-    ::einstellung::serde::Deserialize
-)]
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct ServerConfigPartial {
     host: Option<String>,
 }
 impl ::einstellung::PartialConfig for ServerConfigPartial {
     type Complete = ServerConfig;
-    fn merge(self, next: Self) -> Self {
-        Self {
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
             host: next.host.or(self.host),
-        }
+        })
     }
-    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
         let host = self.host.unwrap_or_else(|| 123);
-        Ok(ServerConfig { host })
+        ::core::result::Result::Ok(ServerConfig { host })
     }
 }
 impl ::einstellung::Config for ServerConfig {

@@ -29,11 +29,7 @@ struct FullSystemConfig {
 }
 
 /// --- output ---
-#[derive(
-    ::core::default::Default,
-    ::core::fmt::Debug,
-    ::einstellung::serde::Deserialize
-)]
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct FullSystemConfigPartial {
     #[serde(rename = "sys_name")]
@@ -49,12 +45,15 @@ struct FullSystemConfigPartial {
 }
 impl ::einstellung::PartialConfig for FullSystemConfigPartial {
     type Complete = FullSystemConfig;
-    fn merge(self, next: Self) -> Self {
-        Self {
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
             name: next.name.or(self.name),
             port: next.port.or(self.port),
             database: match (self.database, next.database) {
-                (Some(a), Some(b)) => Some(::einstellung::PartialConfig::merge(a, b)),
+                (Some(a), Some(b)) => Some(::einstellung::PartialConfig::merge(a, b)?),
                 (a, b) => a.or(b),
             },
             log_files: match (self.log_files, next.log_files) {
@@ -72,12 +71,14 @@ impl ::einstellung::PartialConfig for FullSystemConfigPartial {
                 (a, b) => a.or(b),
             },
             optional_cache: match (self.optional_cache, next.optional_cache) {
-                (Some(a), Some(b)) => Some(::einstellung::PartialConfig::merge(a, b)),
+                (Some(a), Some(b)) => Some(::einstellung::PartialConfig::merge(a, b)?),
                 (a, b) => a.or(b),
             },
-        }
+        })
     }
-    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
         let name = self.name.unwrap_or_else(|| "production".to_string());
         let port: u16 = self
             .port
@@ -121,7 +122,7 @@ impl ::einstellung::PartialConfig for FullSystemConfigPartial {
                 "optional_cache",
             ))
             .transpose()?;
-        Ok(FullSystemConfig {
+        ::core::result::Result::Ok(FullSystemConfig {
             name,
             port,
             database,
@@ -146,11 +147,7 @@ struct DatabaseConfig {
 }
 
 /// --- output ---
-#[derive(
-    ::core::default::Default,
-    ::core::fmt::Debug,
-    ::einstellung::serde::Deserialize
-)]
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct DatabaseConfigPartial {
     url: Option<String>,
@@ -158,13 +155,18 @@ struct DatabaseConfigPartial {
 }
 impl ::einstellung::PartialConfig for DatabaseConfigPartial {
     type Complete = DatabaseConfig;
-    fn merge(self, next: Self) -> Self {
-        Self {
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
             url: next.url.or(self.url),
             port: next.port.or(self.port),
-        }
+        })
     }
-    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
         let url = self
             .url
             .ok_or(
@@ -173,7 +175,7 @@ impl ::einstellung::PartialConfig for DatabaseConfigPartial {
                 ),
             )?;
         let port = self.port.unwrap_or(5432);
-        Ok(DatabaseConfig { url, port })
+        ::core::result::Result::Ok(DatabaseConfig { url, port })
     }
 }
 impl ::einstellung::Config for DatabaseConfig {
@@ -190,25 +192,26 @@ struct CacheConfig {
 }
 
 /// --- output ---
-#[derive(
-    ::core::default::Default,
-    ::core::fmt::Debug,
-    ::einstellung::serde::Deserialize
-)]
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct CacheConfigPartial {
     size_mb: Option<u32>,
 }
 impl ::einstellung::PartialConfig for CacheConfigPartial {
     type Complete = CacheConfig;
-    fn merge(self, next: Self) -> Self {
-        Self {
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
             size_mb: next.size_mb.or(self.size_mb),
-        }
+        })
     }
-    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
         let size_mb = self.size_mb.unwrap_or(1024);
-        Ok(CacheConfig { size_mb })
+        ::core::result::Result::Ok(CacheConfig { size_mb })
     }
 }
 impl ::einstellung::Config for CacheConfig {

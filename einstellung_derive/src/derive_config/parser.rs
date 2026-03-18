@@ -2,12 +2,27 @@ use darling::{FromDeriveInput, FromField, ast, util::SpannedValue};
 use proc_macro2::Span;
 use syn::{Ident, PathArguments, parse_quote};
 
+#[derive(Debug)]
+pub struct PartialReceiver(pub Vec<darling::ast::NestedMeta>);
+
+impl darling::FromMeta for PartialReceiver {
+    fn from_list(items: &[darling::ast::NestedMeta]) -> darling::Result<Self> {
+        Ok(PartialReceiver(items.to_vec()))
+    }
+}
+
 #[derive(FromDeriveInput)]
 #[darling(attributes(config), supports(struct_named))]
 pub struct ConfigStructReceiver {
     pub ident: syn::Ident,
     pub vis: syn::Visibility,
     pub data: ast::Data<darling::util::Ignored, ConfigFieldReceiver>,
+
+    #[darling(default, multiple)]
+    pub partial: Vec<PartialReceiver>,
+
+    #[darling(default)]
+    pub freezeable: bool,
 
     #[darling(rename = "crate")]
     #[darling(default = || syn::Path {
@@ -61,6 +76,9 @@ pub struct ConfigFieldReceiver {
     pub ident: Option<syn::Ident>,
     pub vis: syn::Visibility,
     pub ty: syn::Type,
+
+    #[darling(default)]
+    pub freezeable: bool,
 
     #[darling(default, multiple)]
     pub serde: Vec<syn::Meta>,

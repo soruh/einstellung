@@ -17,9 +17,21 @@ struct UserConfig2 {
     users: std::collections::BTreeSet<String>,
 }
 
+#[derive(einstellung::serde::Deserialize, Debug)]
+enum LogLevel {
+    Error,
+    Warning,
+    Info,
+    Debug,
+    Trace,
+}
+
 #[derive(einstellung::Config, Debug)]
 struct AppConfig {
     app_name: String,
+
+    #[config(default = || LogLevel::Warning)]
+    log_level: LogLevel,
 
     #[config(subconfig)]
     listen: ListenConfig,

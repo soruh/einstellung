@@ -400,12 +400,12 @@ assert_macro_test!(FAIL, default_function_type_mismatch: {
 // Fixed: Separated helper and struct with a clear comma for the muncher
 assert_macro_test!(FAIL, default_function_signature_mismatch:
     helper {
-        pub fn provide_default_port(env: &str) -> u16 { 8080 }
+        pub fn provide_default_port(_env: &str) -> u16 { 8080 }
     },
     {
         #[derive(Config)]
         struct ServerConfig {
-            #[config(default = provide_default_port)]
+            #[config(default = provide_default_port())]
             port: u16,
         }
     }
@@ -479,6 +479,26 @@ assert_macro_test!(FAIL, custom_merge_type_mismatch:
         struct ServerConfig {
             #[config(merge(function = "merge_hosts"))]
             host: String,
+        }
+    }
+);
+
+assert_macro_test!(PASS, default_value_literal:
+    {
+        #[derive(Config)]
+        struct Config {
+            #[config(default = 10)]
+            x: u32,
+        }
+    }
+);
+
+assert_macro_test!(PASS, default_value_lambda:
+    {
+        #[derive(Config)]
+        struct Config {
+            #[config(default = || Vec::with_capacity(10))]
+            x: Vec<u32>,
         }
     }
 );

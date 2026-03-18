@@ -1,0 +1,34 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- input ---
+#[derive(Config)]
+struct Config {
+    #[config(default = ||Vec::with_capacity(10))]
+    x: Vec<u32>,
+}
+
+/// --- output ---
+#[derive(
+    ::core::default::Default,
+    ::core::fmt::Debug,
+    ::einstellung::serde::Deserialize
+)]
+#[serde(crate = "::einstellung::serde")]
+struct ConfigPartial {
+    x: Option<Vec<u32>>,
+}
+impl ::einstellung::PartialConfig for ConfigPartial {
+    type Complete = Config;
+    fn merge(self, next: Self) -> Self {
+        Self { x: next.x.or(self.x) }
+    }
+    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+        let x = self.x.unwrap_or_else(|| Vec::with_capacity(10));
+        Ok(Config { x })
+    }
+}
+impl ::einstellung::Config for Config {
+    type Partial = ConfigPartial;
+}

@@ -13,7 +13,11 @@ struct AppConfig {
 }
 
 /// --- output ---
-#[derive(Default, Debug, ::einstellung::serde::Deserialize)]
+#[derive(
+    ::core::default::Default,
+    ::core::fmt::Debug,
+    ::einstellung::serde::Deserialize
+)]
 #[serde(crate = "::einstellung::serde")]
 struct AppConfigPartial {
     app_name: Option<String>,
@@ -74,7 +78,11 @@ struct DatabaseConfig {
 }
 
 /// --- output ---
-#[derive(Default, Debug, ::einstellung::serde::Deserialize)]
+#[derive(
+    ::core::default::Default,
+    ::core::fmt::Debug,
+    ::einstellung::serde::Deserialize
+)]
 #[serde(crate = "::einstellung::serde")]
 struct DatabaseConfigPartial {
     url: Option<String>,
@@ -119,7 +127,11 @@ struct RedisConfig {
 }
 
 /// --- output ---
-#[derive(Default, Debug, ::einstellung::serde::Deserialize)]
+#[derive(
+    ::core::default::Default,
+    ::core::fmt::Debug,
+    ::einstellung::serde::Deserialize
+)]
 #[serde(crate = "::einstellung::serde")]
 struct RedisConfigPartial {
     cluster_mode: Option<bool>,

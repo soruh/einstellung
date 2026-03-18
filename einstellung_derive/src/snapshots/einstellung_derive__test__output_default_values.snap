@@ -14,7 +14,11 @@ struct NetworkConfig {
 }
 
 /// --- output ---
-#[derive(Default, Debug, ::einstellung::serde::Deserialize)]
+#[derive(
+    ::core::default::Default,
+    ::core::fmt::Debug,
+    ::einstellung::serde::Deserialize
+)]
 #[serde(crate = "::einstellung::serde")]
 struct NetworkConfigPartial {
     host: Option<String>,

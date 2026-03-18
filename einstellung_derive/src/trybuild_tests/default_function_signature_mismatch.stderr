@@ -1,13 +1,13 @@
 error[E0593]: function is expected to take 0 arguments, but it takes 1 argument
  --> src/trybuild_tests/default_function_signature_mismatch.rs
   |
-  | pub fn provide_default_port(env: &str) -> u16 {
-  | --------------------------------------------- takes 1 argument
+  | pub fn provide_default_port(_env: &str) -> u16 {
+  | ---------------------------------------------- takes 1 argument
 ...
   | #[derive(Config)]
   |          ------ required by a bound introduced by this call
   | struct ServerConfig {
-  |     #[config(default = provide_default_port)]
+  |     #[config(default = provide_default_port())]
   |                        ^^^^^^^^^^^^^^^^^^^^ expected function that takes 0 arguments
   |
 note: required by a bound in `std::option::Option::<T>::unwrap_or_else`
@@ -18,11 +18,3 @@ note: required by a bound in `std::option::Option::<T>::unwrap_or_else`
   |     where
   |         F: [const] FnOnce() -> T + [const] Destruct,
   |            ^^^^^^^^^^^^^^^^^^^^^ required by this bound in `Option::<T>::unwrap_or_else`
-
-warning: unused variable: `env`
- --> src/trybuild_tests/default_function_signature_mismatch.rs
-  |
-  | pub fn provide_default_port(env: &str) -> u16 {
-  |                             ^^^ help: if this is intentional, prefix it with an underscore: `_env`
-  |
-  = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default

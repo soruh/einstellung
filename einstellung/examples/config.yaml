@@ -1,5 +1,6 @@
 app_name: MyCoolApp
 
+log_level: Info
 
 listen:
   address: 0.0.0.0

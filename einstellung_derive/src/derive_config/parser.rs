@@ -1,6 +1,6 @@
 use darling::{FromDeriveInput, FromField, ast, util::SpannedValue};
 use proc_macro2::Span;
-use syn::{Ident, PathArguments};
+use syn::{Ident, PathArguments, parse_quote};
 
 #[derive(FromDeriveInput)]
 #[darling(attributes(config), supports(struct_named))]
@@ -37,9 +37,15 @@ fn parse_default_expr(meta: &syn::Meta) -> darling::Result<DefaultStrategy> {
             let expr = &nv.value;
 
             match expr {
-                syn::Expr::Closure(_) | syn::Expr::Path(_) => {
-                    Ok(DefaultStrategy::Call(expr.clone()))
+                // Match closures: `default = || ...`
+                // OR explicit calls: `default = my_function()`
+                syn::Expr::Closure(_) => Ok(DefaultStrategy::Call(expr.clone())),
+
+                syn::Expr::Call(call) if call.args.is_empty() => {
+                    Ok(DefaultStrategy::Call((*call.func).clone()))
                 }
+                syn::Expr::Call(_) => Ok(DefaultStrategy::Call(parse_quote!(|| #expr))),
+                // Everything else (MyEnum::Variant, "strings", numbers) falls through to Value
                 _ => Ok(DefaultStrategy::Value(expr.clone())),
             }
         }

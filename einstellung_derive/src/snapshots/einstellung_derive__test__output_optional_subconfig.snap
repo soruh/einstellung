@@ -11,7 +11,11 @@ struct TelemetryConfig {
 }
 
 /// --- output ---
-#[derive(Default, Debug, ::einstellung::serde::Deserialize)]
+#[derive(
+    ::core::default::Default,
+    ::core::fmt::Debug,
+    ::einstellung::serde::Deserialize
+)]
 #[serde(crate = "::einstellung::serde")]
 struct TelemetryConfigPartial {
     enabled: Option<bool>,
@@ -59,7 +63,11 @@ struct DatadogConfig {
 }
 
 /// --- output ---
-#[derive(Default, Debug, ::einstellung::serde::Deserialize)]
+#[derive(
+    ::core::default::Default,
+    ::core::fmt::Debug,
+    ::einstellung::serde::Deserialize
+)]
 #[serde(crate = "::einstellung::serde")]
 struct DatadogConfigPartial {
     api_key: Option<String>,

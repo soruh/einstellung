@@ -11,7 +11,11 @@ struct ClientConfig {
 }
 
 /// --- output ---
-#[derive(Default, Debug, ::einstellung::serde::Deserialize)]
+#[derive(
+    ::core::default::Default,
+    ::core::fmt::Debug,
+    ::einstellung::serde::Deserialize
+)]
 #[serde(crate = "::einstellung::serde")]
 struct ClientConfigPartial {
     name: Option<String>,

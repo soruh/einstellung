@@ -30,7 +30,7 @@ enum LogLevel {
 struct AppConfig {
     app_name: String,
 
-    #[config(default = || LogLevel::Warning)]
+    #[config(default = LogLevel::Warning)]
     log_level: LogLevel,
 
     #[config(subconfig)]

@@ -29,7 +29,11 @@ struct FullSystemConfig {
 }
 
 /// --- output ---
-#[derive(Default, Debug, ::einstellung::serde::Deserialize)]
+#[derive(
+    ::core::default::Default,
+    ::core::fmt::Debug,
+    ::einstellung::serde::Deserialize
+)]
 #[serde(crate = "::einstellung::serde")]
 struct FullSystemConfigPartial {
     #[serde(rename = "sys_name")]
@@ -142,7 +146,11 @@ struct DatabaseConfig {
 }
 
 /// --- output ---
-#[derive(Default, Debug, ::einstellung::serde::Deserialize)]
+#[derive(
+    ::core::default::Default,
+    ::core::fmt::Debug,
+    ::einstellung::serde::Deserialize
+)]
 #[serde(crate = "::einstellung::serde")]
 struct DatabaseConfigPartial {
     url: Option<String>,
@@ -182,7 +190,11 @@ struct CacheConfig {
 }
 
 /// --- output ---
-#[derive(Default, Debug, ::einstellung::serde::Deserialize)]
+#[derive(
+    ::core::default::Default,
+    ::core::fmt::Debug,
+    ::einstellung::serde::Deserialize
+)]
 #[serde(crate = "::einstellung::serde")]
 struct CacheConfigPartial {
     size_mb: Option<u32>,

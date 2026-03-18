@@ -23,9 +23,13 @@ jobs:
         uses: taiki-e/install-action@nextest
 
       - name: Run integration tests
+        env:
+          CARGO_TERM_COLOR: always
         working-directory: einstellung/
         run: cargo nextest run
 
       - name: Run derive tests
+        env:
+          CARGO_TERM_COLOR: always
         working-directory: einstellung_derive/
         run: cargo nextest run

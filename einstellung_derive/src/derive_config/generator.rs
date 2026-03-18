@@ -39,16 +39,12 @@ fn generate_partial_struct(model: &TransformedStruct) -> TokenStream {
         let ident = &f.ident;
         let attrs = &f.serde_attrs;
         let f_vis = &f.vis;
+        let partial_type = &f.partial_type;
 
-        let (ty, needs_serde_default) = match &f.kind {
-            FieldKind::Extend {
-                partial_type,
-                complete_is_optional,
-                ..
-            } => (partial_type, !complete_is_optional),
-            FieldKind::Subconfig { partial_type, .. }
-            | FieldKind::Replace { partial_type, .. }
-            | FieldKind::CustomMerge { partial_type, .. } => (partial_type, false),
+        let needs_serde_default = if let FieldKind::Extend { complete_is_optional, .. } = &f.kind {
+            !complete_is_optional
+        } else {
+            false
         };
 
         let default_attr = if needs_serde_default {
@@ -57,10 +53,10 @@ fn generate_partial_struct(model: &TransformedStruct) -> TokenStream {
             quote! {}
         };
 
-        quote! {
+        quote_spanned! { partial_type.span() =>
             #default_attr
             #(#attrs)*
-            #f_vis #ident: #ty
+            #f_vis #ident: #partial_type
         }
     });
 
@@ -84,6 +80,7 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
 
     let merge_fields = model.fields.iter().map(|f| {
         let ident = &f.ident;
+        let partial_type = &f.partial_type;
 
         match &f.kind {
             FieldKind::Replace { .. } => quote! { #ident: next.#ident.or(self.#ident) },
@@ -111,8 +108,17 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
                     }
                 }
             }
-            FieldKind::CustomMerge { func_path, .. } => quote! {
-                #ident: #func_path(self.#ident, next.#ident)
+            FieldKind::CustomMerge { func_path, .. } => {
+
+                let span = func_path.span();
+                let func_path: &syn::Path = func_path;
+
+                quote_spanned! { span =>
+                    #ident: {
+                        let _: #einstellung::MergeFunction<#partial_type> = #func_path;
+                        #func_path(self.#ident, next.#ident)
+                    }
+                }
             },
             FieldKind::Subconfig { .. } => quote! {
                 #ident: match (self.#ident, next.#ident) {

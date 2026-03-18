@@ -1,14 +1,35 @@
+error[E0308]: mismatched types
+ --> src/trybuild_tests/custom_merge_type_mismatch.rs
+  |
+  | #[derive(Config)]
+  |          ^^^^^^ expected fn pointer, found fn item
+  |
+  = note: expected fn pointer `fn(std::option::Option<std::string::String>, std::option::Option<std::string::String>) -> std::option::Option<std::string::String>`
+                found fn item `fn(std::option::Option<u16>, std::option::Option<u16>) -> std::option::Option<u16> {merge_hosts}`
+  = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)
+
 error[E0308]: arguments to this function are incorrect
  --> src/trybuild_tests/custom_merge_type_mismatch.rs
   |
   | #[derive(Config)]
   |          ^^^^^^
-  |          |
-  |          expected `Option<u16>`, found `Option<String>`
-  |          expected `Option<u16>`, found `Option<String>`
   |
+note: expected `Option<u16>`, found `Option<String>`
+ --> src/trybuild_tests/custom_merge_type_mismatch.rs
+  |
+  |       #[config(merge(function = "merge_hosts"))]
+  |  _______________________________^
+  | |     host: String,
+  | |________^
   = note: expected enum `std::option::Option<u16>`
              found enum `std::option::Option<std::string::String>`
+note: expected `Option<u16>`, found `Option<String>`
+ --> src/trybuild_tests/custom_merge_type_mismatch.rs
+  |
+  |       #[config(merge(function = "merge_hosts"))]
+  |  _______________________________^
+  | |     host: String,
+  | |________^
   = note: expected enum `std::option::Option<u16>`
              found enum `std::option::Option<std::string::String>`
 note: function defined here

@@ -26,7 +26,10 @@ impl ::einstellung::PartialConfig for ServerConfigPartial {
     type Complete = ServerConfig;
     fn merge(self, next: Self) -> Self {
         Self {
-            host: merge_hosts(self.host, next.host),
+            host: {
+                let _: ::einstellung::MergeFunction<Option<String>> = merge_hosts;
+                merge_hosts(self.host, next.host)
+            },
         }
     }
     fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {

@@ -1,5 +1,6 @@
 use super::parser::{ConfigFieldReceiver, ConfigStructReceiver};
 use crate::derive_config::parser::{DefaultStrategy, MergeStrategy};
+use darling::util::SpannedValue;
 use syn::{GenericArgument, PathArguments, Type};
 
 #[derive(Debug)]
@@ -23,21 +24,17 @@ pub enum FallbackStrategy {
 #[derive(Debug)]
 pub enum FieldKind {
     Subconfig {
-        partial_type: syn::Type,
         complete_is_optional: bool,
     },
     Extend {
-        partial_type: syn::Type,
         partial_is_optional: bool,
         complete_is_optional: bool,
     },
     Replace {
-        partial_type: syn::Type,
         fallback: FallbackStrategy,
     },
     CustomMerge {
-        partial_type: syn::Type,
-        func_path: syn::Path,
+        func_path: SpannedValue<syn::Path>,
         fallback: FallbackStrategy,
     },
 }
@@ -47,6 +44,7 @@ pub struct TransformedField {
     pub ident: syn::Ident,
     pub vis: syn::Visibility,
     pub complete_type: syn::Type,
+    pub partial_type: syn::Type,
     pub kind: FieldKind,
     pub validate_func: Option<syn::Expr>,
     pub serde_attrs: Vec<syn::Attribute>,
@@ -113,7 +111,7 @@ fn transform_field(
         .cloned()
         .unwrap_or_else(|| complete_type.clone());
 
-    let kind = if field.subconfig {
+    let (partial_type, kind) = if field.subconfig {
         if let Some(strategy) = field.merge {
             return Err(syn::Error::new(
                 strategy.span(),
@@ -121,10 +119,14 @@ fn transform_field(
             ));
         }
 
-        FieldKind::Subconfig {
-            partial_type: syn::parse_quote!(Option<<#core_type as #einstellung::Config>::Partial>),
-            complete_is_optional,
-        }
+        let partial_type = syn::parse_quote!(Option<<#core_type as #einstellung::Config>::Partial>);
+
+        (
+            partial_type,
+            FieldKind::Subconfig {
+                complete_is_optional,
+            },
+        )
     } else {
         let span = field
             .merge
@@ -147,26 +149,36 @@ fn transform_field(
                     syn::parse_quote!(#core_type)
                 };
 
-                FieldKind::Extend {
+                (
                     partial_type,
-                    partial_is_optional,
-                    complete_is_optional,
-                }
+                    FieldKind::Extend {
+                        partial_is_optional,
+                        complete_is_optional,
+                    },
+                )
             }
-            MergeStrategy::Replace => FieldKind::Replace {
-                partial_type: syn::parse_quote!(Option<#core_type>),
-                fallback: determine_fallback(&field.default, complete_is_optional),
-            },
+            MergeStrategy::Replace => (
+                syn::parse_quote!(Option<#core_type>),
+                FieldKind::Replace {
+                    fallback: determine_fallback(&field.default, complete_is_optional),
+                },
+            ),
             MergeStrategy::Function(s) => {
                 let func_path = syn::parse_str::<syn::Path>(&s).map_err(|_| {
-                    syn::Error::new(span, format!("Invalid function path: '{}'", s))
+                    syn::Error::new(span, format!("Invalid function path: '{}'", &*s))
                 })?;
 
-                FieldKind::CustomMerge {
-                    partial_type: syn::parse_quote!(Option<#core_type>),
-                    func_path,
-                    fallback: determine_fallback(&field.default, complete_is_optional),
-                }
+                let func_path = SpannedValue::new(func_path, s.span());
+
+                let partial_type = syn::parse_quote!(Option<#core_type>);
+
+                (
+                    partial_type,
+                    FieldKind::CustomMerge {
+                        func_path,
+                        fallback: determine_fallback(&field.default, complete_is_optional),
+                    },
+                )
             }
         }
     };
@@ -175,6 +187,7 @@ fn transform_field(
         ident,
         vis: field.vis,
         kind,
+        partial_type,
         complete_type,
         validate_func: field.validate,
         serde_attrs,

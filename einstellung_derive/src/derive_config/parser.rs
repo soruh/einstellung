@@ -76,7 +76,7 @@ pub struct ConfigFieldReceiver {
 pub enum MergeStrategy {
     Replace,
     Extend,
-    Function(String),
+    Function(SpannedValue<String>),
 }
 
 pub fn parse(input: syn::DeriveInput) -> Result<ConfigStructReceiver, darling::Error> {

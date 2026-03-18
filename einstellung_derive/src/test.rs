@@ -148,11 +148,11 @@ assert_macro_test!(PASS, optional_fields_no_double_option: {
 assert_macro_test!(PASS, default_values: {
     #[derive(Config)]
     struct NetworkConfig {
-        #[config(default = "\"localhost\".to_string()")]
+        #[config(default = || "localhost".to_string())]
         host: String,
-        #[config(default = "8080")]
+        #[config(default = 8080)]
         port: u16,
-        #[config(default = "std::time::Duration::from_secs(30)")]
+        #[config(default = || std::time::Duration::from_secs(30))]
         timeout: std::time::Duration,
     }
 });
@@ -233,9 +233,9 @@ assert_macro_test!(PASS, validation_functions:
     {
         #[derive(Config)]
         struct TlsConfig {
-            #[config(validate = "validators::validate_cert_path")]
+            #[config(validate = validators::validate_cert_path)]
             cert_path: String,
-            #[config(validate = "validators::validate_port")]
+            #[config(validate = validators::validate_port)]
             port: u16,
         }
     }
@@ -249,7 +249,7 @@ assert_macro_test!(PASS, kitchen_sink:
         #[derive(Config)]
         struct FullSystemConfig {
             #[config(serde(rename = "sys_name"))]
-            #[config(default = "\"production\".to_string()")]
+            #[config(default = || "production".to_string())]
             name: String,
             #[config(validate = "validate_system_port")]
             port: u16,
@@ -271,14 +271,14 @@ assert_macro_test!(PASS, kitchen_sink:
         #[derive(Config)]
         struct DatabaseConfig {
             url: String,
-            #[config(default = "5432")]
+            #[config(default = 5432)]
             port: u16,
         }
     },
     {
         #[derive(Config)]
         struct CacheConfig {
-            #[config(default = "1024")]
+            #[config(default = 1024)]
             size_mb: u32,
         }
     }

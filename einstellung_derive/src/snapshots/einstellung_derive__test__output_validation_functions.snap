@@ -17,9 +17,9 @@ pub mod validators {
 /// --- input ---
 #[derive(Config)]
 struct TlsConfig {
-    #[config(validate = "validators::validate_cert_path")]
+    #[config(validate = validators::validate_cert_path)]
     cert_path: String,
-    #[config(validate = "validators::validate_port")]
+    #[config(validate = validators::validate_port)]
     port: u16,
 }
 

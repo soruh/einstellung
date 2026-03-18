@@ -117,7 +117,7 @@ fn transform_field(
 
     let partial_type = if field.subconfig {
         syn::parse_quote!(Option<<#core_type as #einstellung::Config>::Partial>)
-    } else if merge_strategy == ResolvedMerge::Extend {
+    } else if merge_strategy == ResolvedMerge::Extend && !is_optional {
         syn::parse_quote!(#core_type)
     } else {
         syn::parse_quote!(Option<#core_type>)

@@ -40,7 +40,7 @@ struct ListenConfig {
 }
 
 fn print_res<T: Debug>(res: Result<T, ConfigError>, expect_success: bool) -> String {
-    let s = match res {
+    let s = match &res {
         Ok(res) => format!("pass:\n{res:#?}"),
         Err(err) => format!("error:\n{err}\n{err:#?}"),
     };

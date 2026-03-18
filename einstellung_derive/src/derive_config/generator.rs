@@ -45,7 +45,7 @@ fn generate_partial_struct(model: &TransformedStruct) -> TokenStream {
         let attrs = &f.serde_attrs;
         let f_vis = &f.vis;
 
-        let default = if f.merge_strategy == ResolvedMerge::Extend {
+        let default = if f.merge_strategy == ResolvedMerge::Extend && !f.is_optional {
             quote! { #[serde(default)] }
         } else {
             quote! {}
@@ -83,13 +83,27 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
             ResolvedMerge::Replace => quote! {
                 #ident: next.#ident.or(self.#ident)
             },
-            ResolvedMerge::Extend => quote! {
-                #ident: {
-                    let mut #ident = self.#ident;
-                    #ident.extend(next.#ident);
-                    #ident
+            ResolvedMerge::Extend => {
+                if f.is_optional {
+                    quote! {
+                        #ident: match (self.#ident, next.#ident) {
+                        (Some(mut a), Some(b)) => {
+                            a.extend(b);
+                            Some(a)
+                        },
+                        (a, b) => a.or(b)
+                    }
+                    }
+                } else {
+                    quote! {
+                        #ident: {
+                            let mut #ident = self.#ident;
+                            #ident.extend(next.#ident);
+                            #ident
+                        }
+                    }
                 }
-            },
+            }
             ResolvedMerge::Function(path) => quote! {
                 #ident: #path(self.#ident, next.#ident)
             },

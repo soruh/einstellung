@@ -13,7 +13,7 @@ fn validate_system_port(_: &u16) -> Result<(), Box<dyn std::error::Error>> {
 #[derive(Config)]
 struct FullSystemConfig {
     #[config(serde(rename = "sys_name"))]
-    #[config(default = "\"production\".to_string()")]
+    #[config(default = ||"production".to_string())]
     name: String,
     #[config(validate = "validate_system_port")]
     port: u16,
@@ -119,7 +119,7 @@ impl ::einstellung::Config for FullSystemConfig {
 #[derive(Config)]
 struct DatabaseConfig {
     url: String,
-    #[config(default = "5432")]
+    #[config(default = 5432)]
     port: u16,
 }
 
@@ -159,7 +159,7 @@ impl ::einstellung::Config for DatabaseConfig {
 /// --- input ---
 #[derive(Config)]
 struct CacheConfig {
-    #[config(default = "1024")]
+    #[config(default = 1024)]
     size_mb: u32,
 }
 

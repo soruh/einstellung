@@ -1,6 +1,10 @@
 #![allow(unused)]
 
-use std::{collections::HashSet, net::IpAddr, path::Path};
+use std::{
+    collections::HashSet,
+    net::IpAddr,
+    path::{Path, PathBuf},
+};
 
 use einstellung::{
     Config, ConfigProvider, JsonFileProvider, PartialConfig, TomlFileProvider, YamlFileProvider,
@@ -33,19 +37,32 @@ struct ListenConfig {
     port: u16,
 }
 
+fn config_dir() -> PathBuf {
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let relative = Path::new(file!()).iter().skip(1).collect::<PathBuf>();
+
+    manifest_dir
+        .join(relative)
+        .parent()
+        .unwrap()
+        .canonicalize()
+        .unwrap()
+}
 fn main() {
     const LISTEN_CONFIG: &str = r#"{ "address": "127.0.0.1" }"#;
     const HARD_CODED_CONFIG: &str = r#"{ "users": ["root"] }"#;
+
+    let path = config_dir();
 
     let listen_config = ListenConfig::load_partial(&JsonFileProvider::new(LISTEN_CONFIG)).unwrap();
 
     let hard_coded = AppConfig::load_partial(&JsonFileProvider::new(HARD_CODED_CONFIG)).unwrap();
 
-    let user_config1 = YamlFileProvider::new(Path::new("./config.yaml"))
+    let user_config1 = YamlFileProvider::new(path.join("config.yaml"))
         .load_partial()
         .unwrap();
 
-    let user_config2 = TomlFileProvider::new(Path::new("./config.toml"))
+    let user_config2 = TomlFileProvider::new(path.join("config.toml"))
         .load_partial()
         .unwrap();
 

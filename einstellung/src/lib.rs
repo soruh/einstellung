@@ -124,7 +124,6 @@ pub enum ConfigError {
     },
 }
 
-pub type ValidationFunction<T> =
-    for<'a> fn(&'a T) -> Result<(), Box<dyn ::core::error::Error + 'static>>;
+pub type ValidationFunction<T, E> = for<'a> fn(&'a T) -> Result<(), E>;
 
 pub type MergeFunction<T> = fn(T, T) -> T;

@@ -163,7 +163,7 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
             quote_spanned! { complete_type.span() => 
 
                 let #ident: #complete_type = #resolve;
-                let _: #einstellung::ValidationFunction<#complete_type> = #validate_func;
+                let _: #einstellung::ValidationFunction<#complete_type, _> = #validate_func;
                 if let Err(e) = (#validate_func)(&#ident) {
                     return Err(#einstellung::ConfigError::Validation {
                         field: #einstellung::FieldPath::new(#complete_str, #ident_str),

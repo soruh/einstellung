@@ -7,7 +7,7 @@ error[E0308]: mismatched types
   |     #[config(validate = validate_port)]
   |                         ^^^^^^^^^^^^^ expected fn pointer, found fn item
   |
-  = note: expected fn pointer `for<'a> fn(&'a u16) -> Result<(), Box<(dyn StdError + 'static)>>`
+  = note: expected fn pointer `for<'a> fn(&'a u16) -> Result<(), _>`
                 found fn item `for<'a> fn(&'a std::string::String) -> Result<(), Box<(dyn StdError + 'static)>> {validate_port}`
 
 error[E0308]: mismatched types

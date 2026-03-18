@@ -37,7 +37,7 @@ impl ::einstellung::PartialConfig for ServerConfigPartial {
                     ::einstellung::FieldPath::new("ServerConfig", "port"),
                 ),
             )?;
-        let _: ::einstellung::ValidationFunction<u16> = validate_port;
+        let _: ::einstellung::ValidationFunction<u16, _> = validate_port;
         if let Err(e) = (validate_port)(&port) {
             return Err(::einstellung::ConfigError::Validation {
                 field: ::einstellung::FieldPath::new("ServerConfig", "port"),

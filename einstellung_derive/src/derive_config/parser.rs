@@ -24,7 +24,7 @@ pub struct ConfigStructReceiver {
 pub enum DefaultStrategy {
     #[default]
     Required,
-    Inherit,
+    Standard,
     Value(syn::Expr),
     Call(syn::Expr),
 }
@@ -32,7 +32,7 @@ pub enum DefaultStrategy {
 /// Custom parser for the 'default' attribute field
 fn parse_default_expr(meta: &syn::Meta) -> darling::Result<DefaultStrategy> {
     match meta {
-        syn::Meta::Path(_) => Ok(DefaultStrategy::Inherit),
+        syn::Meta::Path(_) => Ok(DefaultStrategy::Standard),
         syn::Meta::NameValue(nv) => {
             let expr = &nv.value;
 

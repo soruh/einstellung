@@ -136,7 +136,7 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
             quote! { self.#ident.unwrap_or(#value) }
         } else if let DefaultStrategy::Call(value) = &f.default {
             quote! { self.#ident.unwrap_or_else(#value) }
-        } else if let DefaultStrategy::Inherit = &f.default {
+        } else if let DefaultStrategy::Standard = &f.default {
             quote! { self.#ident.unwrap_or_else(::core::Default::default) }
         } else {
             if f.complete_option_wrapped {

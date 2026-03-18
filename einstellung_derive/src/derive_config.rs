@@ -239,13 +239,18 @@ pub mod generator {
         }
     }
 
+    use std::fmt::Write;
+
     fn path_to_litstr(path: &syn::Path) -> syn::LitStr {
-        let s = path
-            .segments
-            .iter()
-            .map(|seg| seg.ident.to_string())
-            .collect::<Vec<_>>()
-            .join("::");
+        let mut s = String::new();
+        let mut iter = path.segments.iter();
+
+        if let Some(first) = iter.next() {
+            write!(&mut s, "{}", first.ident).unwrap();
+            for seg in iter {
+                write!(&mut s, "::{}", seg.ident).unwrap();
+            }
+        }
 
         syn::LitStr::new(&s, path.span())
     }

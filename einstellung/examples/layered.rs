@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use std::{collections::HashSet, net::IpAddr, path::Path};
 
 use einstellung::{

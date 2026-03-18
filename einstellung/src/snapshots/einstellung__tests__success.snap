@@ -1,0 +1,12 @@
+---
+source: einstellung/src/tests.rs
+expression: print_res(res)
+---
+pass:
+AppConfig {
+    app_name: "foo",
+    listen: ListenConfig {
+        address: 192.168.0.1,
+        port: 443,
+    },
+}

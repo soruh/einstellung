@@ -327,9 +327,9 @@ pub mod generator {
 
             let resolve = if f.is_subconfig {
                 if f.is_optional {
-                    quote! { self.#ident.map(|x| #einstellung::build_with_context(x, #ident_str)).transpose()? }
+                    quote! { self.#ident.map(|x| #einstellung::build_with_context(x, #complete_str, #ident_str)).transpose()? }
                 } else {
-                    quote! { #einstellung::build_with_context(self.#ident.unwrap_or_default(), #ident_str)? }
+                    quote! { #einstellung::build_with_context(self.#ident.unwrap_or_default(), #complete_str, #ident_str)? }
                 }
             } else if let Some(syn::Expr::Lit(default_literal)) = &f.default_expr {
                 quote! { self.#ident.unwrap_or(#default_literal) }

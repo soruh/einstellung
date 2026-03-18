@@ -78,12 +78,17 @@ impl ::einstellung::PartialConfig for FullSystemConfigPartial {
         }
         let database = ::einstellung::build_with_context(
             self.database.unwrap_or_default(),
+            "FullSystemConfig",
             "database",
         )?;
         let log_files = self.log_files;
         let optional_cache = self
             .optional_cache
-            .map(|x| ::einstellung::build_with_context(x, "optional_cache"))
+            .map(|x| ::einstellung::build_with_context(
+                x,
+                "FullSystemConfig",
+                "optional_cache",
+            ))
             .transpose()?;
         Ok(FullSystemConfig {
             name,

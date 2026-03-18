@@ -38,7 +38,7 @@ impl ::einstellung::PartialConfig for TelemetryConfigPartial {
             )?;
         let datadog = self
             .datadog
-            .map(|x| ::einstellung::build_with_context(x, "datadog"))
+            .map(|x| ::einstellung::build_with_context(x, "TelemetryConfig", "datadog"))
             .transpose()?;
         Ok(TelemetryConfig {
             enabled,

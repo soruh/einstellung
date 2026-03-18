@@ -3,10 +3,10 @@ source: einstellung/src/tests.rs
 expression: print_res(res)
 ---
 error:
-Missing required configuration field: 'ListenConfig::network::listen::address'
+Missing required configuration field: 'AppConfig::network::listen::address'
 MissingField(
     FieldPath {
-        base_type: "ListenConfig",
+        base_type: "AppConfig",
         field: "address",
         path: [
             "listen",

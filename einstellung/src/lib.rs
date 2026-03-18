@@ -55,7 +55,8 @@ impl FieldPath {
             path: Vec::new(),
         }
     }
-    pub fn push(mut self, segment: &'static str) -> Self {
+    pub fn context(mut self, complete: &'static str, segment: &'static str) -> Self {
+        self.base_type = complete;
         self.path.push(segment);
         self
     }
@@ -64,16 +65,21 @@ impl FieldPath {
 #[doc(hidden)]
 pub fn build_with_context<P: PartialConfig>(
     partial: P,
+    complete: &'static str,
     segment: &'static str,
 ) -> Result<P::Complete, ConfigError> {
-    partial.build().map_err(|err| context(err, segment))
+    partial
+        .build()
+        .map_err(|err| context(err, complete, segment))
 }
 
-fn context(error: ConfigError, segment: &'static str) -> ConfigError {
+fn context(error: ConfigError, complete: &'static str, segment: &'static str) -> ConfigError {
     match error {
-        ConfigError::MissingField(field) => ConfigError::MissingField(field.push(segment)),
+        ConfigError::MissingField(field) => {
+            ConfigError::MissingField(field.context(complete, segment))
+        }
         ConfigError::Validation { field, reason } => ConfigError::Validation {
-            field: field.push(segment),
+            field: field.context(complete, segment),
             reason,
         },
         x => x,

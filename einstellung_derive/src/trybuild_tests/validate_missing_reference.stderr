@@ -2,18 +2,24 @@ error[E0308]: mismatched types
  --> src/trybuild_tests/validate_missing_reference.rs
   |
   | #[derive(Config)]
-  |          ^^^^^^ expected `u16`, found `&u16`
+  |          ------ expected due to this
   | struct ServerConfig {
   |     #[config(validate = validate_port)]
+  |                         ^^^^^^^^^^^^^ expected fn pointer, found fn item
+  |
+  = note: expected fn pointer `for<'a> fn(&'a u16) -> Result<(), Box<(dyn StdError + 'static)>>`
+                found fn item `fn(u16) -> Result<(), Box<(dyn StdError + 'static)>> {validate_port}`
+
+error[E0308]: mismatched types
+ --> src/trybuild_tests/validate_missing_reference.rs
+  |
+  |     #[config(validate = validate_port)]
   |                         ------------- arguments to this function are incorrect
+  |     port: u16,
+  |     ^^^^^^^^^ expected `u16`, found `&u16`
   |
 note: function defined here
  --> src/trybuild_tests/validate_missing_reference.rs
   |
   | pub fn validate_port(_: u16) -> Result<(), Box<dyn std::error::Error>> {
   |        ^^^^^^^^^^^^^ ------
-  = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)
-help: consider using clone here
-  |
-7 | #[derive(Config.clone())]
-  |                ++++++++

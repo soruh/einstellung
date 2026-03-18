@@ -1,6 +1,6 @@
 use crate::derive_config::transformer::{FallbackStrategy, FieldKind, TransformedStruct};
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
+use quote::{ToTokens, quote, quote_spanned};
 use std::fmt::Write;
 use syn::{parse_quote_spanned, spanned::Spanned};
 
@@ -126,6 +126,7 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
     let build_fields = model.fields.iter().map(|f| {
         let ident = &f.ident;
         let ident_str = ident.to_string();
+        let complete_type = &f.complete_type;
 
         let resolve = match &f.kind {
             FieldKind::Subconfig { complete_is_optional, .. } => {
@@ -151,9 +152,12 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
             }
         };
 
+
         if let Some(validate_func) = &f.validate_func {
-            quote! {
-                let #ident = #resolve;
+            quote_spanned! { complete_type.span() => 
+
+                let #ident: #complete_type = #resolve;
+                let _: #einstellung::ValidationFunction<#complete_type> = #validate_func;
                 if let Err(e) = (#validate_func)(&#ident) {
                     return Err(#einstellung::ConfigError::Validation {
                         field: #einstellung::FieldPath::new(#complete_str, #ident_str),
@@ -162,13 +166,13 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
                 }
             }
         } else {
-            quote! { let #ident = #resolve; }
+            quote_spanned! { complete_type.span() => let #ident = #resolve; }
         }
     });
 
     let field_names = model.fields.iter().map(|f| &f.ident);
 
-    quote! {
+    quote_spanned! { partial_ident.span() =>
         impl #einstellung::PartialConfig for #partial_ident {
             type Complete = #complete_ident;
 
@@ -189,7 +193,7 @@ fn generate_config_impl(model: &TransformedStruct) -> TokenStream {
     let partial_ident = &model.partial_ident;
     let einstellung = &model.einstellung;
 
-    quote! {
+    quote_spanned! { complete_ident.span() =>
         impl #einstellung::Config for #complete_ident {
             type Partial = #partial_ident;
         }

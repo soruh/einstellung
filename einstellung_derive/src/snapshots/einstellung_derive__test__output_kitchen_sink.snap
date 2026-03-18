@@ -75,13 +75,14 @@ impl ::einstellung::PartialConfig for FullSystemConfigPartial {
     }
     fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
         let name = self.name.unwrap_or_else(|| "production".to_string());
-        let port = self
+        let port: u16 = self
             .port
             .ok_or(
                 ::einstellung::ConfigError::MissingField(
                     ::einstellung::FieldPath::new("FullSystemConfig", "port"),
                 ),
             )?;
+        let _: ::einstellung::ValidationFunction<u16> = validate_system_port;
         if let Err(e) = (validate_system_port)(&port) {
             return Err(::einstellung::ConfigError::Validation {
                 field: ::einstellung::FieldPath::new("FullSystemConfig", "port"),

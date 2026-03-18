@@ -2,8 +2,19 @@ error[E0308]: mismatched types
  --> src/trybuild_tests/validate_wrong_return_type.rs
   |
   | #[derive(Config)]
-  |          ^^^^^^ expected `bool`, found `Result<_, _>`
+  |          ------ expected due to this
+  | struct ServerConfig {
+  |     #[config(validate = validate_port)]
+  |                         ^^^^^^^^^^^^^ expected fn pointer, found fn item
+  |
+  = note: expected fn pointer `for<'a> fn(&'a u16) -> Result<(), Box<(dyn StdError + 'static)>>`
+                found fn item `for<'a> fn(&'a u16) -> bool {validate_port}`
+
+error[E0308]: mismatched types
+ --> src/trybuild_tests/validate_wrong_return_type.rs
+  |
+  |     port: u16,
+  |           ^^^ expected `bool`, found `Result<_, _>`
   |
   = note: expected type `bool`
              found enum `Result<_, _>`
-  = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)

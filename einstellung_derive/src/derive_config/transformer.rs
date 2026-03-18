@@ -46,6 +46,7 @@ pub enum FieldKind {
 pub struct TransformedField {
     pub ident: syn::Ident,
     pub vis: syn::Visibility,
+    pub complete_type: syn::Type,
     pub kind: FieldKind,
     pub validate_func: Option<syn::Expr>,
     pub serde_attrs: Vec<syn::Attribute>,
@@ -105,9 +106,12 @@ fn transform_field(
         .map(|meta| syn::parse_quote! { #[#meta] })
         .collect();
 
-    let inner_type_if_optional = extract_type_from_option(&field.ty);
+    let complete_type = field.ty;
+    let inner_type_if_optional = extract_type_from_option(&complete_type);
     let complete_is_optional = inner_type_if_optional.is_some();
-    let core_type = inner_type_if_optional.cloned().unwrap_or(field.ty);
+    let core_type = inner_type_if_optional
+        .cloned()
+        .unwrap_or_else(|| complete_type.clone());
 
     let kind = if field.subconfig {
         if let Some(strategy) = field.merge {
@@ -171,6 +175,7 @@ fn transform_field(
         ident,
         vis: field.vis,
         kind,
+        complete_type,
         validate_func: field.validate,
         serde_attrs,
     })

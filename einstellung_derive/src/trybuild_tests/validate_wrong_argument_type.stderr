@@ -2,10 +2,21 @@ error[E0308]: mismatched types
  --> src/trybuild_tests/validate_wrong_argument_type.rs
   |
   | #[derive(Config)]
-  |          ^^^^^^ expected `&String`, found `&u16`
+  |          ------ expected due to this
   | struct ServerConfig {
   |     #[config(validate = validate_port)]
+  |                         ^^^^^^^^^^^^^ expected fn pointer, found fn item
+  |
+  = note: expected fn pointer `for<'a> fn(&'a u16) -> Result<(), Box<(dyn StdError + 'static)>>`
+                found fn item `for<'a> fn(&'a std::string::String) -> Result<(), Box<(dyn StdError + 'static)>> {validate_port}`
+
+error[E0308]: mismatched types
+ --> src/trybuild_tests/validate_wrong_argument_type.rs
+  |
+  |     #[config(validate = validate_port)]
   |                         ------------- arguments to this function are incorrect
+  |     port: u16,
+  |     ^^^^^^^^^ expected `&String`, found `&u16`
   |
   = note: expected reference `&std::string::String`
              found reference `&u16`
@@ -14,4 +25,3 @@ note: function defined here
   |
   | pub fn validate_port(_: &String) -> Result<(), Box<dyn std::error::Error>> {
   |        ^^^^^^^^^^^^^ ----------
-  = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)

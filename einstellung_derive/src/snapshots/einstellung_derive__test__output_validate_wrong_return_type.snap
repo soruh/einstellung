@@ -30,13 +30,14 @@ impl ::einstellung::PartialConfig for ServerConfigPartial {
         }
     }
     fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
-        let port = self
+        let port: u16 = self
             .port
             .ok_or(
                 ::einstellung::ConfigError::MissingField(
                     ::einstellung::FieldPath::new("ServerConfig", "port"),
                 ),
             )?;
+        let _: ::einstellung::ValidationFunction<u16> = validate_port;
         if let Err(e) = (validate_port)(&port) {
             return Err(::einstellung::ConfigError::Validation {
                 field: ::einstellung::FieldPath::new("ServerConfig", "port"),

@@ -123,3 +123,6 @@ pub enum ConfigError {
         reason: Box<dyn std::error::Error>,
     },
 }
+
+pub type ValidationFunction<T> =
+    for<'a> fn(&'a T) -> Result<(), Box<dyn ::core::error::Error + 'static>>;

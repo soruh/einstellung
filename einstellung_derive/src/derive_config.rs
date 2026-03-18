@@ -1,5 +1,9 @@
 use quote::ToTokens;
 
+pub mod generator;
+pub mod parser;
+pub mod transformer;
+
 pub fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let input: syn::DeriveInput = match syn::parse2(input) {
         Ok(val) => val,
@@ -18,7 +22,3 @@ pub fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
 
     model.to_token_stream()
 }
-
-pub mod generator;
-pub mod parser;
-pub mod transformer;

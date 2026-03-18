@@ -1,13 +1,29 @@
-error: Unknown value: `function(merge_hosts)`. Did you mean `function`?
+error[E0308]: arguments to this function are incorrect
  --> src/trybuild_tests/custom_merge_type_mismatch.rs
   |
-  |     #[config(merge = "function(merge_hosts)")]
-  |                      ^^^^^^^^^^^^^^^^^^^^^^^
+  | #[derive(Config)]
+  |          ^^^^^^
+  |          |
+  |          expected `Option<u16>`, found `Option<String>`
+  |          expected `Option<u16>`, found `Option<String>`
+  |
+  = note: expected enum `std::option::Option<u16>`
+             found enum `std::option::Option<std::string::String>`
+  = note: expected enum `std::option::Option<u16>`
+             found enum `std::option::Option<std::string::String>`
+note: function defined here
+ --> src/trybuild_tests/custom_merge_type_mismatch.rs
+  |
+  | pub fn merge_hosts(_: Option<u16>, b: Option<u16>) -> Option<u16> {
+  |        ^^^^^^^^^^^ --------------  --------------
+  = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-warning: unused variable: `a`
+error[E0308]: mismatched types
  --> src/trybuild_tests/custom_merge_type_mismatch.rs
   |
-  | pub fn merge_hosts(a: Option<u16>, b: Option<u16>) -> Option<u16> {
-  |                    ^ help: if this is intentional, prefix it with an underscore: `_a`
+  | #[derive(Config)]
+  |          ^^^^^^ expected `Option<String>`, found `Option<u16>`
   |
-  = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+  = note: expected enum `std::option::Option<std::string::String>`
+             found enum `std::option::Option<u16>`
+  = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -3,7 +3,7 @@ source: einstellung_derive/src/test.rs
 expression: formatted
 ---
 /// --- helper ---
-pub fn merge_hosts(a: String, b: String) -> String {
+pub fn merge_hosts(_: String, b: String) -> String {
     b
 }
 
@@ -12,11 +12,34 @@ pub fn merge_hosts(a: String, b: String) -> String {
 /// --- input ---
 #[derive(Config)]
 struct ServerConfig {
-    #[config(merge = "function(merge_hosts)")]
+    #[config(merge(function = "merge_hosts"))]
     host: String,
 }
 
 /// --- output ---
-::core::compile_error! {
-    "Unknown value: `function(merge_hosts)`. Did you mean `function`?"
+#[derive(Default, Debug, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+struct ServerConfigPartial {
+    host: Option<String>,
+}
+impl ::einstellung::PartialConfig for ServerConfigPartial {
+    type Complete = ServerConfig;
+    fn merge(self, next: Self) -> Self {
+        Self {
+            host: merge_hosts(self.host, next.host),
+        }
+    }
+    fn build(self) -> Result<Self::Complete, ::einstellung::ConfigError> {
+        let host = self
+            .host
+            .ok_or(
+                ::einstellung::ConfigError::MissingField(
+                    ::einstellung::FieldPath::new("ServerConfig", "host"),
+                ),
+            )?;
+        Ok(ServerConfig { host })
+    }
+}
+impl ::einstellung::Config for ServerConfig {
+    type Partial = ServerConfigPartial;
 }

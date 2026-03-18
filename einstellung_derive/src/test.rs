@@ -315,7 +315,7 @@ assert_macro_test!(FAIL, invalid_custom_merge_path: {
     // Fails parsing of `syn::Path` in `MergeStrategy::Function(s)`
     #[derive(Config)]
     struct ServerConfig {
-        #[config(merge = "function(123 invalid path)")]
+        #[config(merge(function = "123 invalid path"))]
         host: String,
     }
 });
@@ -458,12 +458,12 @@ assert_macro_test!(FAIL, custom_merge_wrong_signature:
     helper {
         // Custom merge expects `fn(Option<T>, Option<T>) -> Option<T>`
         // This function takes concrete types instead of Options.
-        pub fn merge_hosts(a: String, b: String) -> String { b }
+        pub fn merge_hosts(_: String, b: String) -> String { b }
     },
     {
         #[derive(Config)]
         struct ServerConfig {
-            #[config(merge = "function(merge_hosts)")]
+            #[config(merge(function = "merge_hosts"))]
             host: String,
         }
     }
@@ -472,12 +472,12 @@ assert_macro_test!(FAIL, custom_merge_wrong_signature:
 assert_macro_test!(FAIL, custom_merge_type_mismatch:
     helper {
         // Takes Option<u16>, but field is String
-        pub fn merge_hosts(a: Option<u16>, b: Option<u16>) -> Option<u16> { b }
+        pub fn merge_hosts(_: Option<u16>, b: Option<u16>) -> Option<u16> { b }
     },
     {
         #[derive(Config)]
         struct ServerConfig {
-            #[config(merge = "function(merge_hosts)")]
+            #[config(merge(function = "merge_hosts"))]
             host: String,
         }
     }

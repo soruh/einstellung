@@ -1,5 +1,5 @@
-error: Unknown value: `function(123 invalid path)`. Did you mean `function`?
+error: Invalid function path: '123 invalid path'
  --> src/trybuild_tests/invalid_custom_merge_path.rs
   |
-  |     #[config(merge = "function(123 invalid path)")]
-  |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |     #[config(merge(function = "123 invalid path"))]
+  |                    ^^^^^^^^

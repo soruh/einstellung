@@ -5,11 +5,11 @@ expression: formatted
 /// --- input ---
 #[derive(Config)]
 struct ServerConfig {
-    #[config(merge = "function(123 invalid path)")]
+    #[config(merge(function = "123 invalid path"))]
     host: String,
 }
 
 /// --- output ---
 ::core::compile_error! {
-    "Unknown value: `function(123 invalid path)`. Did you mean `function`?"
+    "Invalid function path: '123 invalid path'"
 }

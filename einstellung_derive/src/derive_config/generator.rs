@@ -2,7 +2,7 @@ use crate::derive_config::{
     parser::DefaultStrategy,
     transformer::{ResolvedMerge, TransformedStruct},
 };
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{parse_quote_spanned, spanned::Spanned};
 

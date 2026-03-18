@@ -41,6 +41,7 @@ impl ::einstellung::PartialConfig for ServerConfigPartial {
         if let Err(e) = (validate_port)(&port) {
             return Err(::einstellung::ConfigError::Validation {
                 field: ::einstellung::FieldPath::new("ServerConfig", "port"),
+                #[allow(clippy::useless_conversion)]
                 reason: e.into(),
             });
         }

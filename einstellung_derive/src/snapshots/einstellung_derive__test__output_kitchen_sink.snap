@@ -86,6 +86,7 @@ impl ::einstellung::PartialConfig for FullSystemConfigPartial {
         if let Err(e) = (validate_system_port)(&port) {
             return Err(::einstellung::ConfigError::Validation {
                 field: ::einstellung::FieldPath::new("FullSystemConfig", "port"),
+                #[allow(clippy::useless_conversion)]
                 reason: e.into(),
             });
         }

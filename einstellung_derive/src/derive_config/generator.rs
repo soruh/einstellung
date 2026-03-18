@@ -64,7 +64,7 @@ fn generate_partial_struct(model: &TransformedStruct) -> TokenStream {
     let serde_lit = path_to_litstr(&serde);
 
     quote! {
-        #[derive(Default, Debug, #einstellung::serde::Deserialize)]
+        #[derive(::core::default::Default, ::core::fmt::Debug, #einstellung::serde::Deserialize)]
         #[serde(crate = #serde_lit)]
         #vis struct #partial_ident {
             #(#fields,)*
@@ -154,7 +154,7 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
                 FallbackStrategy::Keep => quote! { self.#ident },
                 FallbackStrategy::Value(value) => quote! { self.#ident.unwrap_or(#value) },
                 FallbackStrategy::Call(value) => quote! { self.#ident.unwrap_or_else(#value) },
-                FallbackStrategy::Standard => quote! { self.#ident.unwrap_or_else(::core::Default::default) },
+                FallbackStrategy::Standard => quote! { self.#ident.unwrap_or_else(::core::default::Default::default) },
             }
         };
 

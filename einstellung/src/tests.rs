@@ -3,6 +3,7 @@
 use crate::{Config, ConfigError, JsonFileProvider};
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
+    default,
     fmt::Debug,
     net::IpAddr,
 };
@@ -161,15 +162,18 @@ fn user_config_option_allowed_empty() {
     snapshot!(UserConfig4, true, r#"{ }"#);
 }
 
-#[derive(Debug, ::serde::Deserialize)]
+#[derive(Debug, Default, ::serde::Deserialize)]
 enum ConfigMode {
     ModeA,
     ModeB,
+    #[default]
+    ModeC,
 }
 
 #[derive(Config, Debug)]
 #[config(crate = crate)]
 struct ConfigWithEnum {
+    #[config(default)]
     mode: ConfigMode,
 }
 
@@ -181,4 +185,9 @@ fn config_enum_correct() {
 #[test]
 fn config_enum_incorrect() {
     snapshot!(ConfigWithEnum, false, r#"{ "mode": "ModeZ" }"#);
+}
+
+#[test]
+fn config_enum_missing() {
+    snapshot!(ConfigWithEnum, true, r#"{ }"#);
 }

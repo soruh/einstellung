@@ -3,7 +3,7 @@
 use std::{collections::HashSet, net::IpAddr, path::Path};
 
 use einstellung::{
-    Config, ConfigProvider, PartialConfig, json::JsonFileProvider, yaml::YamlFileProvider,
+    Config, ConfigProvider, JsonFileProvider, PartialConfig, TomlFileProvider, YamlFileProvider,
 };
 
 #[derive(einstellung::Config, Debug)]
@@ -13,8 +13,17 @@ struct AppConfig {
     #[config(subconfig)]
     listen: ListenConfig,
 
+    #[config(subconfig)]
+    colors: ColorConfig,
+
     #[config(merge = "extend")]
     users: HashSet<String>,
+}
+
+#[derive(einstellung::Config, Debug)]
+struct ColorConfig {
+    primary: String,
+    secondary: String,
 }
 
 #[derive(einstellung::Config, Debug)]
@@ -32,12 +41,17 @@ fn main() {
 
     let hard_coded = AppConfig::load_partial(&JsonFileProvider::new(HARD_CODED_CONFIG)).unwrap();
 
-    let user_config = YamlFileProvider::new(Path::new("./config.yaml"))
+    let user_config1 = YamlFileProvider::new(Path::new("./config.yaml"))
+        .load_partial()
+        .unwrap();
+
+    let user_config2 = TomlFileProvider::new(Path::new("./config.toml"))
         .load_partial()
         .unwrap();
 
     let config = hard_coded
-        .merge(user_config)
+        .merge(user_config1)
+        .merge(user_config2)
         .merge(AppConfigPartial {
             listen: Some(listen_config),
             ..Default::default()

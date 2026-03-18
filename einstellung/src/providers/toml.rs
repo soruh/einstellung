@@ -1,5 +1,5 @@
 use super::*;
-use crate::file_provider::{FileContentProvider, IntoFileContentProvider};
+use crate::{ConfigProvider, FileContentProvider, IntoFileContentProvider};
 
 pub struct TomlFileProvider<'i>(pub FileContentProvider<'i>);
 
@@ -13,7 +13,7 @@ impl<'i> TomlFileProvider<'i> {
     }
 }
 
-impl<'i> super::ConfigProvider for TomlFileProvider<'i> {
+impl<'i> ConfigProvider for TomlFileProvider<'i> {
     fn load_partial<T: serde::de::DeserializeOwned>(&self) -> Result<T, ConfigError> {
         self.0.with_reader(|reader| {
             let mut buffer = String::new();

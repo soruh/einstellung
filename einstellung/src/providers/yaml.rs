@@ -1,5 +1,5 @@
 use super::*;
-use crate::file_provider::{FileContentProvider, IntoFileContentProvider};
+use crate::{ConfigProvider, FileContentProvider, IntoFileContentProvider};
 
 pub struct YamlFileProvider<'i>(pub FileContentProvider<'i>);
 
@@ -13,11 +13,9 @@ impl<'i> YamlFileProvider<'i> {
     }
 }
 
-impl<'i> super::ConfigProvider for YamlFileProvider<'i> {
+impl<'i> ConfigProvider for YamlFileProvider<'i> {
     fn load_partial<T: serde::de::DeserializeOwned>(&self) -> Result<T, ConfigError> {
-        self.0.with_reader(|reader| {
-            // serde_yaml handles Readers directly
-            Ok(serde_yaml::from_reader(reader)?)
-        })
+        self.0
+            .with_reader(|reader| Ok(serde_yaml::from_reader(reader)?))
     }
 }

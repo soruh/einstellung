@@ -4,6 +4,20 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[cfg(feature = "json")]
+mod json;
+#[cfg(feature = "toml")]
+mod toml;
+#[cfg(feature = "yaml")]
+mod yaml;
+
+#[cfg(feature = "json")]
+pub use json::JsonFileProvider;
+#[cfg(feature = "toml")]
+pub use toml::TomlFileProvider;
+#[cfg(feature = "yaml")]
+pub use yaml::YamlFileProvider;
+
 use crate::ConfigError;
 
 pub trait ReaderFactory: Send + Sync {

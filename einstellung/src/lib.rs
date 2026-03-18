@@ -11,16 +11,9 @@ pub use serde;
 #[cfg(test)]
 pub mod tests;
 
-mod file_provider;
+mod providers;
 
-#[cfg(feature = "json")]
-pub mod json;
-
-#[cfg(feature = "yaml")]
-pub mod yaml;
-
-#[cfg(feature = "toml")]
-pub mod toml;
+pub use providers::*;
 
 pub trait Config: Sized {
     type Partial: PartialConfig<Complete = Self>;

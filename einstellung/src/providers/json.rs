@@ -1,4 +1,4 @@
-use crate::file_provider::{FileContentProvider, IntoFileContentProvider};
+use crate::{ConfigProvider, FileContentProvider, IntoFileContentProvider};
 
 use super::*;
 
@@ -14,7 +14,7 @@ impl<'i> JsonFileProvider<'i> {
     }
 }
 
-impl<'i> super::ConfigProvider for JsonFileProvider<'i> {
+impl<'i> ConfigProvider for JsonFileProvider<'i> {
     fn load_partial<T: serde::de::DeserializeOwned>(&self) -> Result<T, ConfigError> {
         self.0
             .with_reader(|reader| Ok(serde_json::from_reader(reader)?))

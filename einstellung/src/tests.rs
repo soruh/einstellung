@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use crate::{Config, ConfigError, json::JsonFileProvider};
+use crate::{Config, ConfigError, JsonFileProvider};
 use std::net::IpAddr;
 
 fn not_loopback(address: &IpAddr) -> Result<(), Box<dyn std::error::Error>> {

@@ -46,7 +46,7 @@ struct AppConfig {
 #[derive(einstellung::Config, Debug)]
 struct ColorConfig {
     primary: String,
-    #[config(default = || "#0ff".to_string())]
+    #[config(default = "#0ff".to_string())]
     secondary: String,
 }
 

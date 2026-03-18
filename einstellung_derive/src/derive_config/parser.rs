@@ -22,7 +22,7 @@ pub struct ConfigStructReceiver {
     pub partial: Vec<PartialReceiver>,
 
     #[darling(default)]
-    pub freezeable: bool,
+    pub freezable: bool,
 
     #[darling(rename = "crate")]
     #[darling(default = || syn::Path {
@@ -78,7 +78,7 @@ pub struct ConfigFieldReceiver {
     pub ty: syn::Type,
 
     #[darling(default)]
-    pub freezeable: bool,
+    pub freezable: bool,
 
     #[darling(default, multiple)]
     pub serde: Vec<syn::Meta>,

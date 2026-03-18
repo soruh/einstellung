@@ -199,13 +199,13 @@ struct ConfigFreezable1 {
     #[config(default = "Freezable Config 1".to_string())]
     name: String,
     pass: u8,
-    #[config(freezeable)]
+    #[config(freezable)]
     private_key: String,
 }
 
 #[derive(Config, Debug, PartialEq, Eq)]
 #[config(crate = crate)]
-#[config(freezeable)]
+#[config(freezable)]
 #[config(partial(derive(Clone)))]
 struct ConfigFreezable2 {
     #[config(default = "Freezable Config 2".to_string())]

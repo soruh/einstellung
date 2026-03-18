@@ -74,12 +74,12 @@ pub fn transform(receiver: ConfigStructReceiver) -> syn::Result<TransformedStruc
     let mut fields = Vec::new();
     let mut errors: Option<syn::Error> = None;
 
-    let mut any_freezable = receiver.freezeable;
+    let mut any_freezable = receiver.freezable;
 
     for field in struct_data {
-        any_freezable |= field.freezeable;
+        any_freezable |= field.freezable;
 
-        match transform_field(field, &einstellung, receiver.freezeable) {
+        match transform_field(field, &einstellung, receiver.freezable) {
             Ok(f) => fields.push(f),
             Err(e) => {
                 if let Some(ref mut errs) = errors {
@@ -200,9 +200,9 @@ fn transform_field(
         }
     };
 
-    let freezeable = field.freezeable || all_freezeable;
+    let freezable = field.freezable || all_freezeable;
 
-    let freeze = if !freezeable {
+    let freeze = if !freezable {
         FreezeStrategy::NotFreezable
     } else if field.subconfig {
         FreezeStrategy::Subconfig

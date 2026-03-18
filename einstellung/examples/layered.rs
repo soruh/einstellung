@@ -8,7 +8,8 @@ use std::{
 };
 
 use einstellung::{
-    Config, ConfigProvider, JsonFileProvider, PartialConfig, TomlFileProvider, YamlFileProvider,
+    Config, ConfigError, ConfigProvider, Freezable, JsonFileProvider, PartialConfig,
+    TomlFileProvider, YamlFileProvider,
 };
 
 #[derive(einstellung::Config, Debug)]
@@ -41,6 +42,9 @@ struct AppConfig {
 
     #[config(merge = "extend")]
     users: HashSet<String>,
+
+    #[config(freezable)]
+    max_open_files: usize,
 }
 
 #[derive(einstellung::Config, Debug)]
@@ -68,35 +72,31 @@ fn config_dir() -> PathBuf {
         .canonicalize()
         .unwrap()
 }
-fn main() {
-    const LISTEN_CONFIG: &str = r#"{ "address": "127.0.0.1" }"#;
-    const HARD_CODED_CONFIG: &str = r#"{ "users": ["root"] }"#;
 
-    let path = config_dir();
+fn load_config(dir: &Path) -> Result<AppConfig, ConfigError> {
+    const LISTEN_CONFIG: &str = r#"{ "address": "127.0.0.1" }"#;
+    const HARD_CODED_CONFIG: &str = r#"{ "users": ["root"], "max_open_files": 10 }"#;
 
     let listen_config = ListenConfig::load_partial(&JsonFileProvider::new(LISTEN_CONFIG)).unwrap();
+    let hard_coded = AppConfig::load_partial(&JsonFileProvider::new(HARD_CODED_CONFIG))?.freeze();
+    let user_config1 = YamlFileProvider::new(dir.join("config.yaml")).load_partial()?;
+    let user_config2 = TomlFileProvider::new(dir.join("config.toml")).load_partial()?;
 
-    let hard_coded = AppConfig::load_partial(&JsonFileProvider::new(HARD_CODED_CONFIG)).unwrap();
-
-    let user_config1 = YamlFileProvider::new(path.join("config.yaml"))
-        .load_partial()
-        .unwrap();
-
-    let user_config2 = TomlFileProvider::new(path.join("config.toml"))
-        .load_partial()
-        .unwrap();
-
-    let config = hard_coded
-        .merge(user_config1)
-        .unwrap()
-        .merge(user_config2)
-        .unwrap()
+    hard_coded
+        .merge(user_config1)?
+        .merge(user_config2)?
         .merge(AppConfigPartial {
             listen: Some(listen_config),
             ..Default::default()
-        })
-        .unwrap()
-        .build();
+        })?
+        .build()
+}
 
-    dbg!(&config);
+fn main() {
+    let dir = config_dir();
+
+    match load_config(&dir) {
+        Ok(config) => println!("loaded config: {config:#?}"),
+        Err(err) => eprintln!("failed to load config: {err}"),
+    }
 }

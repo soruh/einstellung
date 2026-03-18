@@ -115,7 +115,7 @@ fn generate_field_merge(f: &TransformedField, einstellung: &syn::Path, complete_
                 {
                     let _: #einstellung::MergeFunction<#partial_type> = #func_path;
                     #func_path(#left, #right).map_err(|reason| #einstellung::ConfigError::CustomMerge {
-                        path: #einstellung::FieldPath::new(#complete_str, #ident_str),
+                        field: #einstellung::FieldPath::new(#complete_str, #ident_str),
                         reason,
                     })
                 }

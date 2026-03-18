@@ -458,7 +458,7 @@ assert_macro_test!(FAIL, custom_merge_wrong_signature:
     helper {
         // Custom merge expects `fn(Option<T>, Option<T>) -> Option<T>`
         // This function takes concrete types instead of Options.
-        pub fn merge_hosts(_: String, b: String) -> String { b }
+        pub fn merge_hosts(_: String, b: String) -> Result<String, einstellung::ConfigError> { Ok(b) }
     },
     {
         #[derive(Config)]
@@ -472,7 +472,7 @@ assert_macro_test!(FAIL, custom_merge_wrong_signature:
 assert_macro_test!(FAIL, custom_merge_type_mismatch:
     helper {
         // Takes Option<u16>, but field is String
-        pub fn merge_hosts(_: Option<u16>, b: Option<u16>) -> Option<u16> { b }
+        pub fn merge_hosts(_: Option<u16>, b: Option<u16>) -> Result<Option<u16>, einstellung::ConfigError> { Ok(b) }
     },
     {
         #[derive(Config)]

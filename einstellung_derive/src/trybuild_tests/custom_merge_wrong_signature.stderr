@@ -1,58 +1,66 @@
-error[E0308]: mismatched types
+error[E0107]: type alias takes 2 generic arguments but 1 generic argument was supplied
  --> src/trybuild_tests/custom_merge_wrong_signature.rs
   |
   | #[derive(Config)]
-  |          ^^^^^^ expected fn pointer, found fn item
+  |          ------ supplied 1 generic argument
+  | struct ServerConfig {
+  |     #[config(merge(function = "merge_hosts"))]
+  |                               ^^^^^^^^^^^^^ expected 2 generic arguments
   |
-  = note: expected fn pointer `fn(std::option::Option<std::string::String>, std::option::Option<std::string::String>) -> std::option::Option<std::string::String>`
-                found fn item `fn(std::string::String, std::string::String) -> std::string::String {merge_hosts}`
-  = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)
+note: type alias defined here, with 2 generic parameters: `T`, `E`
+ --> $WORKSPACE/einstellung/src/lib.rs
+  |
+  | pub type MergeFunction<T, E> = fn(T, T) -> Result<T, E>;
+  |          ^^^^^^^^^^^^^ -  -
 
 error[E0308]: arguments to this function are incorrect
-  --> src/trybuild_tests/custom_merge_wrong_signature.rs
-   |
-   | #[derive(Config)]
-   |          ^^^^^^
-   |
-note: expected `String`, found `Option<String>`
-  --> src/trybuild_tests/custom_merge_wrong_signature.rs
-   |
-   |       #[config(merge(function = "merge_hosts"))]
-   |  _______________________________^
-   | |     host: String,
-   | |________^
-   = note: expected struct `std::string::String`
-                found enum `std::option::Option<std::string::String>`
-note: expected `String`, found `Option<String>`
-  --> src/trybuild_tests/custom_merge_wrong_signature.rs
-   |
-   |       #[config(merge(function = "merge_hosts"))]
-   |  _______________________________^
-   | |     host: String,
-   | |________^
-   = note: expected struct `std::string::String`
-                found enum `std::option::Option<std::string::String>`
+ --> src/trybuild_tests/custom_merge_wrong_signature.rs
+  |
+  | #[derive(Config)]
+  |          ^^^^^^
+  |          |
+  |          expected `String`, found `Option<String>`
+  |          expected `String`, found `Option<String>`
+  |
+  = note: expected struct `std::string::String`
+               found enum `std::option::Option<std::string::String>`
+  = note: expected struct `std::string::String`
+               found enum `std::option::Option<std::string::String>`
 note: function defined here
-  --> src/trybuild_tests/custom_merge_wrong_signature.rs
-   |
-   | pub fn merge_hosts(_: String, b: String) -> String {
-   |        ^^^^^^^^^^^ ---------  ---------
-   = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)
+ --> src/trybuild_tests/custom_merge_wrong_signature.rs
+  |
+  | pub fn merge_hosts(_: String, b: String) -> Result<String, einstellung::ConfigError> {
+  |        ^^^^^^^^^^^ ---------  ---------
+  = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)
 help: consider using `Option::expect` to unwrap the `std::option::Option<std::string::String>` value, panicking if the value is an `Option::None`
-   |
-10 |     host.expect("REASON"): String,
-   |         +++++++++++++++++
+  |
+7 | #[derive(Config.expect("REASON"))]
+  |                +++++++++++++++++
 help: consider using `Option::expect` to unwrap the `std::option::Option<std::string::String>` value, panicking if the value is an `Option::None`
-   |
-10 |     host.expect("REASON"): String,
-   |         +++++++++++++++++
+  |
+7 | #[derive(Config.expect("REASON"))]
+  |                +++++++++++++++++
+
+error[E0308]: mismatched types
+ --> src/trybuild_tests/custom_merge_wrong_signature.rs
+  |
+  |     #[config(merge(function = "merge_hosts"))]
+  |                               ^^^^^^^^^^^^^ expected `Box<dyn Error>`, found `ConfigError`
+  |
+  = note: expected struct `Box<(dyn StdError + 'static)>`
+               found enum `ConfigError`
+  = note: for more on the distinction between the stack and the heap, read https://doc.rust-lang.org/book/ch15-01-box.html, https://doc.rust-lang.org/rust-by-example/std/box.html, and https://doc.rust-lang.org/std/boxed/index.html
+help: store this in the heap by calling `Box::new`
+  |
+9 |     #[config(merge(function = reason: Box::new("merge_hosts")))]
+  |                               +++++++++++++++++             +
 
 error[E0308]: mismatched types
  --> src/trybuild_tests/custom_merge_wrong_signature.rs
   |
   | #[derive(Config)]
-  |          ^^^^^^ expected `Option<String>`, found `String`
+  |          ^^^^^^ expected `Option<String>`, found `Result<String, ConfigError>`
   |
   = note: expected enum `std::option::Option<std::string::String>`
-           found struct `std::string::String`
+             found enum `Result<std::string::String, ConfigError>`
   = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)

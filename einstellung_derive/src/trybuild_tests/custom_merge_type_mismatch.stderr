@@ -1,50 +1,62 @@
-error[E0308]: mismatched types
+error[E0107]: type alias takes 2 generic arguments but 1 generic argument was supplied
  --> src/trybuild_tests/custom_merge_type_mismatch.rs
   |
   | #[derive(Config)]
-  |          ^^^^^^ expected fn pointer, found fn item
+  |          ------ supplied 1 generic argument
+  | struct ServerConfig {
+  |     #[config(merge(function = "merge_hosts"))]
+  |                               ^^^^^^^^^^^^^ expected 2 generic arguments
   |
-  = note: expected fn pointer `fn(std::option::Option<std::string::String>, std::option::Option<std::string::String>) -> std::option::Option<std::string::String>`
-                found fn item `fn(std::option::Option<u16>, std::option::Option<u16>) -> std::option::Option<u16> {merge_hosts}`
-  = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)
+note: type alias defined here, with 2 generic parameters: `T`, `E`
+ --> $WORKSPACE/einstellung/src/lib.rs
+  |
+  | pub type MergeFunction<T, E> = fn(T, T) -> Result<T, E>;
+  |          ^^^^^^^^^^^^^ -  -
 
 error[E0308]: arguments to this function are incorrect
  --> src/trybuild_tests/custom_merge_type_mismatch.rs
   |
   | #[derive(Config)]
   |          ^^^^^^
+  |          |
+  |          expected `Option<u16>`, found `Option<String>`
+  |          expected `Option<u16>`, found `Option<String>`
   |
-note: expected `Option<u16>`, found `Option<String>`
- --> src/trybuild_tests/custom_merge_type_mismatch.rs
-  |
-  |       #[config(merge(function = "merge_hosts"))]
-  |  _______________________________^
-  | |     host: String,
-  | |________^
   = note: expected enum `std::option::Option<u16>`
              found enum `std::option::Option<std::string::String>`
-note: expected `Option<u16>`, found `Option<String>`
- --> src/trybuild_tests/custom_merge_type_mismatch.rs
-  |
-  |       #[config(merge(function = "merge_hosts"))]
-  |  _______________________________^
-  | |     host: String,
-  | |________^
   = note: expected enum `std::option::Option<u16>`
              found enum `std::option::Option<std::string::String>`
 note: function defined here
  --> src/trybuild_tests/custom_merge_type_mismatch.rs
   |
-  | pub fn merge_hosts(_: Option<u16>, b: Option<u16>) -> Option<u16> {
-  |        ^^^^^^^^^^^ --------------  --------------
+  | pub fn merge_hosts(
+  |        ^^^^^^^^^^^
+  |     _: Option<u16>,
+  |     --------------
+  |     b: Option<u16>,
+  |     --------------
   = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0308]: mismatched types
+  --> src/trybuild_tests/custom_merge_type_mismatch.rs
+   |
+   |     #[config(merge(function = "merge_hosts"))]
+   |                               ^^^^^^^^^^^^^ expected `Box<dyn Error>`, found `ConfigError`
+   |
+   = note: expected struct `Box<(dyn StdError + 'static)>`
+                found enum `ConfigError`
+   = note: for more on the distinction between the stack and the heap, read https://doc.rust-lang.org/book/ch15-01-box.html, https://doc.rust-lang.org/rust-by-example/std/box.html, and https://doc.rust-lang.org/std/boxed/index.html
+help: store this in the heap by calling `Box::new`
+   |
+12 |     #[config(merge(function = reason: Box::new("merge_hosts")))]
+   |                               +++++++++++++++++             +
 
 error[E0308]: mismatched types
  --> src/trybuild_tests/custom_merge_type_mismatch.rs
   |
   | #[derive(Config)]
-  |          ^^^^^^ expected `Option<String>`, found `Option<u16>`
+  |          ^^^^^^ expected `Option<String>`, found `Result<Option<u16>, ConfigError>`
   |
   = note: expected enum `std::option::Option<std::string::String>`
-             found enum `std::option::Option<u16>`
+             found enum `Result<std::option::Option<u16>, ConfigError>`
   = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)

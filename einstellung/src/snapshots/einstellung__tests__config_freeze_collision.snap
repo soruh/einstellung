@@ -1,0 +1,13 @@
+---
+source: einstellung/src/tests.rs
+expression: "print_res(res, false)"
+---
+error:
+Attempted to merge two frozen fields: 'ConfigFreezable2::name'
+FreezeCollision(
+    FieldPath {
+        base_type: "ConfigFreezable2",
+        field: "name",
+        path: [],
+    },
+)

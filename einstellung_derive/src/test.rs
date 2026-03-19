@@ -502,3 +502,23 @@ assert_macro_test!(PASS, default_value_lambda:
         }
     }
 );
+
+assert_macro_test!(PASS, serde_forward:
+    {
+        #[derive(Config)]
+        struct Config {
+            #[config(partial(serde(rename = "field")))]
+            x: Vec<u32>,
+        }
+    }
+);
+
+assert_macro_test!(PASS, serde_forward_shorthand:
+    {
+        #[derive(Config)]
+        struct Config {
+            #[config(serde(rename = "field"))]
+            x: Vec<u32>,
+        }
+    }
+);

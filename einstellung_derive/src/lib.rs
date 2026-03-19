@@ -98,12 +98,9 @@ mod derive_config;
 ///   will reject overwrite attempts from subsequent layers always keeping the frozen value.
 ///   If two frozen configs are attempted to be merged, a `ConfigError::FreezeCollision` will be returned instead
 ///
-/// ### Serde Forwarding (`serde`)
-/// * `#[config(serde(...))]`
-///   Because the `Partial` struct drives the actual parsing of files (JSON, TOML, YAML),
-///   standard `#[serde(...)]` tags on the main struct won't work out of the box. Use
-///   this attribute to forward serde rules to the underlying partial field.
-///   *Example:* `#[config(serde(rename = "server_port", alias = "port"))]`
+/// ### Attribute Forwarding
+/// * `#[config(partial(...))]` attributes are forwarded to the fields of the partial struct as `#[...]`
+/// * `#[config(serde(...))]` is available as a shorthand for `#[config(partial(serde(...)))]`
 ///
 /// # Example
 ///

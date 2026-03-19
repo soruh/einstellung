@@ -11,5 +11,5 @@ struct ServerConfig {
 
 /// --- output ---
 ::core::compile_error! {
-    "Unknown field: `made_up_flag`. Available values: `default`, `freezable`, `merge`, `serde`, `subconfig`, `validate`"
+    "Unknown field: `made_up_flag`. Available values: `default`, `freezable`, `merge`, `partial`, `serde`, `subconfig`, `validate`"
 }

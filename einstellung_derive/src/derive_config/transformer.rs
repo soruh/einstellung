@@ -57,7 +57,7 @@ pub struct TransformedField {
     pub kind: FieldKind,
     pub freeze: FreezeStrategy,
     pub validate_func: Option<syn::Expr>,
-    pub serde_attrs: Vec<syn::Attribute>,
+    pub attrs: Vec<syn::Attribute>,
 }
 
 pub fn transform(receiver: ConfigStructReceiver) -> syn::Result<TransformedStruct> {
@@ -115,11 +115,18 @@ fn transform_field(
         syn::Error::new(proc_macro2::Span::call_site(), "Named fields are required")
     })?;
 
+    let partial_attrs = field
+        .partial
+        .into_iter()
+        .flat_map(|attr| attr.0)
+        .map(|attr| syn::parse_quote! { #[#attr] });
+
     let serde_attrs = field
         .serde
         .into_iter()
-        .map(|meta| syn::parse_quote! { #[#meta] })
-        .collect();
+        .map(|meta| syn::parse_quote! { #[#meta] });
+
+    let attrs = partial_attrs.chain(serde_attrs).collect();
 
     let complete_type = field.ty;
     let inner_type_if_optional = extract_type_from_option(&complete_type);
@@ -224,7 +231,7 @@ fn transform_field(
         partial_type,
         complete_type,
         validate_func: field.validate,
-        serde_attrs,
+        attrs,
     })
 }
 

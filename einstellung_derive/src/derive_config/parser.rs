@@ -78,6 +78,9 @@ pub struct ConfigFieldReceiver {
     #[darling(default, multiple)]
     pub serde: Vec<syn::Meta>,
 
+    #[darling(default, multiple)]
+    pub partial: Vec<PartialReceiver>,
+
     #[darling(default, with = "parse_default_expr")]
     pub default: DefaultStrategy,
 

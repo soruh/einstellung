@@ -38,18 +38,18 @@ Add **einstellung** to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-einstellung = "0.1.1"
+einstellung = "0.1.2"
 ```
 
 ### Feature Flags
 
 You can customize enabled features to reduce compilation time or binary size:
 
-- **`derive`** (default): Enables the `#[derive(Config)]` macro.
-- **`json`** (default): Enables `JsonFileProvider`.
-- **`toml`** (default): Enables `TomlFileProvider`.
-- **`yaml`** (default): Enables `YamlFileProvider`.
-- **`full`** (default): Enables all format providers and the derive macro.
+- `derive` (default): Enables the `#[derive(Config)]` macro.
+- `json` (default): Enables `JsonFileProvider`.
+- `toml` (default): Enables `TomlFileProvider`.
+- `yaml` (default): Enables `YamlFileProvider`.
+- `full` (default): Enables all format providers and the derive macro.
 
 ---
 
@@ -136,12 +136,12 @@ The core power of **einstellung** lies in its partial configuration system. When
 you derive `Config`, the macro generates a companion "Partial" struct where all
 fields are optional.
 
-- **`.merge()`**: Combines two partial configurations. By default, values in the
+- `.merge()`: Combines two partial configurations. By default, values in the
   "newer" layer overwrite the "older" layer.
-- **`merge = "extend"`**: Instead of overwriting, this strategy uses the
-  `Extend` trait to combine collections like `Vec` or `BTreeSet`.
-- **`.freeze()`**: Marks a partial configuration as frozen. Any fields tagged
-  with `#[config(freezable)]` in a frozen layer cannot be modified by subsequent
+- `merge = "extend"`: Instead of overwriting, this strategy uses the `Extend`
+  trait to combine collections like `Vec` or `BTreeSet`.
+- `.freeze()`: Marks a partial configuration as frozen. Any fields tagged with
+  `#[config(freezable)]` in a frozen layer cannot be modified by subsequent
   merges.
 
 ---

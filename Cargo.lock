@@ -68,7 +68,7 @@ dependencies = [
 
 [[package]]
 name = "einstellung"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "einstellung_derive",
  "insta",
@@ -81,7 +81,7 @@ dependencies = [
 
 [[package]]
 name = "einstellung_derive"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "darling",
  "einstellung",

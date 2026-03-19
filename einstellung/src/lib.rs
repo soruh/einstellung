@@ -17,42 +17,73 @@ mod providers;
 
 pub use providers::*;
 
+/// Describes a Configuration which can be built from its associated `::Partial` configuration.
+/// The Partial type contains optional variants of all fields of the Config.
 pub trait Config: Sized {
+    /// The Partial Configuration for this type. Contains all fields of this type, made optional.
+    /// See the documentation for [`PartialConfig`] for merging / building partial configs.
     type Partial: PartialConfig<Complete = Self>;
 
+    /// Load this config as a [`PartialConfig`] for merging with other partial configs.
     fn load_partial(provider: &impl ConfigProvider) -> Result<Self::Partial, ConfigError> {
         provider.load_partial::<Self::Partial>()
     }
 
+    /// Load this config in its complete form.
     fn load_complete(provider: &impl ConfigProvider) -> Result<Self, ConfigError> {
         Self::load_partial(provider)?.build()
     }
 }
 
+/// A Partial variant of a [`trait@Config`]. This means that every field is optional
+/// allowing incremental merging of configs.
 pub trait PartialConfig: Default + DeserializeOwned {
-    type Complete;
+    /// The associated Complete Config
+    type Complete: Config;
 
+    /// Merge two partial configs.
+    /// See the derive macro for [`derive@Config`] for how to define merging stategies
     fn merge(self, next: Self) -> Result<Self, ConfigError>;
+
+    /// Build this partial config into its complete form. All required fields need to be present for this to succeed.
+    /// See the derive macro for [`derive@Config`] for how to define validation stategies and field contents.
     fn build(self) -> Result<Self::Complete, ConfigError>;
 }
 
+/// Indicates that parts of this type can be "frozen".
+/// This means that these parts can not be overwriten by merges in any way.
+/// See the derive macro for [`derive@Config`] for how to mark fields as [`trait@Freezable`]
 pub trait Freezable {
+    /// Freeze the freezable parts of this type
     fn freeze(self) -> Self;
+
+    /// Check if any parts of this type are frozen
     fn is_frozen(&self) -> bool;
 }
 
+/// Generic provider for loading a partial configuration.
+/// This can be any type which can produce a `T: DeserializeOwned`
+/// See the `json`, `yaml` and `toml` features and the associated
+/// [`JsonFileProvider`], [`YamlFileProvider`] and [`TomlFileProvider`] types for the built-in implementations.
+/// The [`FileContentProvider`] provides an ergonomic interface to specifiy the location/data of an input file.
 pub trait ConfigProvider {
+    /// Load a [`PartialConfig`] (or really an deserializeable type) from this provider
     fn load_partial<T: DeserializeOwned>(&self) -> Result<T, ConfigError>;
 }
 
+/// This types indicates the location an error occured.
 #[derive(Debug)]
 pub struct FieldPath {
-    base_type: &'static str,
-    field: &'static str,
-    path: Vec<&'static str>,
+    /// Name of the [`PartialConfig`] type on which failing method was called.
+    pub base_type: &'static str,
+    /// Field which produced the error
+    pub field: &'static str,
+    /// Subconfig fields leading from the `base_type` to `field`
+    pub path: Vec<&'static str>,
 }
 
 impl FieldPath {
+    /// Produce a path pointing to the error location without any outer context
     pub fn new(base_type: &'static str, field: &'static str) -> Self {
         Self {
             base_type,
@@ -60,9 +91,10 @@ impl FieldPath {
             path: Vec::new(),
         }
     }
-    pub fn context(mut self, complete: &'static str, segment: &'static str) -> Self {
+    /// Push a field as context for this path. This means that the error passed through `complete::field`
+    pub fn context(mut self, complete: &'static str, field: &'static str) -> Self {
         self.base_type = complete;
-        self.path.push(segment);
+        self.path.push(field);
         self
     }
 }
@@ -105,6 +137,7 @@ impl Display for FieldPath {
     }
 }
 
+/// Possible errors which can be produces when loading a config
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum ConfigError {
@@ -142,9 +175,13 @@ pub enum ConfigError {
     },
 }
 
+/// A function passed to `#[config(validate ... )]` needs to match this signature. See the derive macro for [`derive@Config`] for more details on `validate`.
 pub type ValidationFunction<T, E> = for<'a> fn(&'a T) -> Result<(), E>;
+
+/// A function passed to `#[config(merge ... )]` needs to match this signature. See the derive macro for [`derive@Config`] for more details on `merge`.
 pub type MergeFunction<T, E> = fn(T, T) -> Result<T, E>;
 
+/// Wraps a type to make it [`trait@Freezable`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Freeze<T> {
     Free(T),
@@ -181,6 +218,7 @@ where
     }
 }
 
+/// Interaction of two [`Freezable`] types
 pub enum FreezeCombination<T> {
     BothFree(T, T),
     OneFrozen(T),

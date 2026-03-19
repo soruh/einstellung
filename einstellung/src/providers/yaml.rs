@@ -1,6 +1,7 @@
 use super::*;
 use crate::{ConfigProvider, FileContentProvider, IntoFileContentProvider};
 
+/// [`ConfigProvider`] which interperts the file contents as YAML
 pub struct YamlFileProvider<'i>(pub FileContentProvider<'i>);
 
 impl<'i> YamlFileProvider<'i> {

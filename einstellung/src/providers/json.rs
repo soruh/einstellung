@@ -2,6 +2,7 @@ use crate::{ConfigProvider, FileContentProvider, IntoFileContentProvider};
 
 use super::*;
 
+/// [`ConfigProvider`] which interperts the file contents as JSON
 pub struct JsonFileProvider<'i>(pub FileContentProvider<'i>);
 
 impl<'i> JsonFileProvider<'i> {

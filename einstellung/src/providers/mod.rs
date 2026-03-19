@@ -20,12 +20,15 @@ pub use yaml::YamlFileProvider;
 
 use crate::ConfigError;
 
+/// Helper trait to read from type-erased file sources
 pub trait ReaderFactory: Send + Sync {
+    /// Produce a reader from this source
     fn get_reader(&self) -> Result<Box<dyn Read + '_>, ConfigError>;
 
+    /// Clone this source in a dyn-compatible way
     fn clone_dyn(&self) -> Box<dyn ReaderFactory + 'static> {
         panic!(
-            "this reader factory is cloneable. Implement your own `ReaderFactory` for a custom cloneable FileProvider"
+            "this reader factory is not cloneable. Implement your own `ReaderFactory` for a custom cloneable FileProvider"
         )
     }
 }
@@ -40,6 +43,8 @@ where
     }
 }
 
+/// A generic source for file contents which can be used as a reference or an owned type.
+/// See [`FileContentProvider::into_owned`] and [`FileContentProvider::as_borrowed`] for conversion method.
 #[non_exhaustive]
 pub enum FileContentProvider<'i> {
     InlineBorrowed(&'i str),
@@ -55,7 +60,7 @@ pub enum FileContentProvider<'i> {
 }
 
 impl<'i> FileContentProvider<'i> {
-    /// Internal: call the provider to produce a reader
+    /// call the provider to produce a reader
     pub fn with_reader<R>(
         &self,
         f: impl FnOnce(&mut dyn Read) -> Result<R, ConfigError>,
@@ -74,7 +79,6 @@ impl<'i> FileContentProvider<'i> {
     }
 
     /// Convert to `'static` owned data.
-    /// Only valid for Inline/Path variants.
     pub fn into_owned(self) -> FileContentProvider<'static> {
         use FileContentProvider::*;
         match self {
@@ -88,6 +92,7 @@ impl<'i> FileContentProvider<'i> {
         }
     }
 
+    /// Get a reference to the provider
     pub fn as_borrowed<'s>(&'s self) -> FileContentProvider<'s> {
         use FileContentProvider::*;
         match self {
@@ -102,9 +107,12 @@ impl<'i> FileContentProvider<'i> {
     }
 }
 
+/// Any type from which file contents can be read (see [`FileContentProvider`])
 pub trait IntoFileContentProvider<'i> {
+    /// Open this provider
     fn into_provider(self) -> FileContentProvider<'i>;
 
+    /// Open this provider and immediately make it static
     fn into_owned_provider(self) -> FileContentProvider<'static>
     where
         Self: Sized,

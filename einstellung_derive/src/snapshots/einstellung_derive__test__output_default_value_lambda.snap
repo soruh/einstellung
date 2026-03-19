@@ -15,6 +15,7 @@ struct Config {
 struct ConfigPartial {
     x: Option<Vec<u32>>,
 }
+#[automatically_derived]
 impl ::einstellung::PartialConfig for ConfigPartial {
     type Complete = Config;
     fn merge(
@@ -30,6 +31,7 @@ impl ::einstellung::PartialConfig for ConfigPartial {
         ::core::result::Result::Ok(Config { x })
     }
 }
+#[automatically_derived]
 impl ::einstellung::Config for Config {
     type Partial = ConfigPartial;
 }

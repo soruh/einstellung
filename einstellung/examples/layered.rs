@@ -11,6 +11,7 @@ use einstellung::{
     Config, ConfigError, ConfigProvider, Freezable, JsonFileProvider, PartialConfig,
     TomlFileProvider, YamlFileProvider,
 };
+use serde::{Deserialize, Serialize};
 
 #[derive(einstellung::Config, Debug)]
 struct UserConfig2 {

@@ -15,6 +15,7 @@ struct ServerConfig {
 struct ServerConfigPartial {
     host: Option<String>,
 }
+#[automatically_derived]
 impl ::einstellung::PartialConfig for ServerConfigPartial {
     type Complete = ServerConfig;
     fn merge(
@@ -32,6 +33,7 @@ impl ::einstellung::PartialConfig for ServerConfigPartial {
         ::core::result::Result::Ok(ServerConfig { host })
     }
 }
+#[automatically_derived]
 impl ::einstellung::Config for ServerConfig {
     type Partial = ServerConfigPartial;
 }

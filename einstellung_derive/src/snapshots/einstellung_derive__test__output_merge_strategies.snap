@@ -21,6 +21,7 @@ struct LoggerConfigPartial {
     log_files: Option<Vec<String>>,
     output_format: Option<String>,
 }
+#[automatically_derived]
 impl ::einstellung::PartialConfig for LoggerConfigPartial {
     type Complete = LoggerConfig;
     fn merge(
@@ -70,6 +71,7 @@ impl ::einstellung::PartialConfig for LoggerConfigPartial {
         })
     }
 }
+#[automatically_derived]
 impl ::einstellung::Config for LoggerConfig {
     type Partial = LoggerConfigPartial;
 }

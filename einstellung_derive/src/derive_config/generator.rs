@@ -253,6 +253,7 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
 
     let freezable_impl = if model.any_freezable {
         quote! {
+            #[automatically_derived]
             impl #einstellung::Freezable for #partial_ident {
                 fn freeze(self) -> Self {
                     Self { #(#freeze_fields,)* }
@@ -269,6 +270,7 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
     let field_names = model.fields.iter().map(|f| &f.ident);
 
     quote_spanned! { partial_ident.span() =>
+        #[automatically_derived]
         impl #einstellung::PartialConfig for #partial_ident {
             type Complete = #complete_ident;
 
@@ -292,6 +294,7 @@ fn generate_config_impl(model: &TransformedStruct) -> TokenStream {
     let einstellung = &model.einstellung;
 
     quote_spanned! { complete_ident.span() =>
+        #[automatically_derived]
         impl #einstellung::Config for #complete_ident {
             type Partial = #partial_ident;
         }

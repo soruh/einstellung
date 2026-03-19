@@ -20,6 +20,7 @@ struct AppConfigPartial {
     database: Option<<DatabaseConfig as ::einstellung::Config>::Partial>,
     redis: Option<<RedisConfig as ::einstellung::Config>::Partial>,
 }
+#[automatically_derived]
 impl ::einstellung::PartialConfig for AppConfigPartial {
     type Complete = AppConfig;
     fn merge(
@@ -65,6 +66,7 @@ impl ::einstellung::PartialConfig for AppConfigPartial {
         })
     }
 }
+#[automatically_derived]
 impl ::einstellung::Config for AppConfig {
     type Partial = AppConfigPartial;
 }
@@ -85,6 +87,7 @@ struct DatabaseConfigPartial {
     url: Option<String>,
     pool_size: Option<u32>,
 }
+#[automatically_derived]
 impl ::einstellung::PartialConfig for DatabaseConfigPartial {
     type Complete = DatabaseConfig;
     fn merge(
@@ -116,6 +119,7 @@ impl ::einstellung::PartialConfig for DatabaseConfigPartial {
         ::core::result::Result::Ok(DatabaseConfig { url, pool_size })
     }
 }
+#[automatically_derived]
 impl ::einstellung::Config for DatabaseConfig {
     type Partial = DatabaseConfigPartial;
 }
@@ -134,6 +138,7 @@ struct RedisConfig {
 struct RedisConfigPartial {
     cluster_mode: Option<bool>,
 }
+#[automatically_derived]
 impl ::einstellung::PartialConfig for RedisConfigPartial {
     type Complete = RedisConfig;
     fn merge(
@@ -157,6 +162,7 @@ impl ::einstellung::PartialConfig for RedisConfigPartial {
         ::core::result::Result::Ok(RedisConfig { cluster_mode })
     }
 }
+#[automatically_derived]
 impl ::einstellung::Config for RedisConfig {
     type Partial = RedisConfigPartial;
 }

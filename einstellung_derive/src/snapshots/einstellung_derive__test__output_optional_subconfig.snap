@@ -17,6 +17,7 @@ struct TelemetryConfigPartial {
     enabled: Option<bool>,
     datadog: Option<<DatadogConfig as ::einstellung::Config>::Partial>,
 }
+#[automatically_derived]
 impl ::einstellung::PartialConfig for TelemetryConfigPartial {
     type Complete = TelemetryConfig;
     fn merge(
@@ -51,6 +52,7 @@ impl ::einstellung::PartialConfig for TelemetryConfigPartial {
         })
     }
 }
+#[automatically_derived]
 impl ::einstellung::Config for TelemetryConfig {
     type Partial = TelemetryConfigPartial;
 }
@@ -69,6 +71,7 @@ struct DatadogConfig {
 struct DatadogConfigPartial {
     api_key: Option<String>,
 }
+#[automatically_derived]
 impl ::einstellung::PartialConfig for DatadogConfigPartial {
     type Complete = DatadogConfig;
     fn merge(
@@ -92,6 +95,7 @@ impl ::einstellung::PartialConfig for DatadogConfigPartial {
         ::core::result::Result::Ok(DatadogConfig { api_key })
     }
 }
+#[automatically_derived]
 impl ::einstellung::Config for DatadogConfig {
     type Partial = DatadogConfigPartial;
 }

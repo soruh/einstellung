@@ -21,6 +21,7 @@ struct NetworkConfigPartial {
     port: Option<u16>,
     timeout: Option<std::time::Duration>,
 }
+#[automatically_derived]
 impl ::einstellung::PartialConfig for NetworkConfigPartial {
     type Complete = NetworkConfig;
     fn merge(
@@ -46,6 +47,7 @@ impl ::einstellung::PartialConfig for NetworkConfigPartial {
         })
     }
 }
+#[automatically_derived]
 impl ::einstellung::Config for NetworkConfig {
     type Partial = NetworkConfigPartial;
 }

@@ -30,6 +30,7 @@ struct TlsConfigPartial {
     cert_path: Option<String>,
     port: Option<u16>,
 }
+#[automatically_derived]
 impl ::einstellung::PartialConfig for TlsConfigPartial {
     type Complete = TlsConfig;
     fn merge(
@@ -77,6 +78,7 @@ impl ::einstellung::PartialConfig for TlsConfigPartial {
         ::core::result::Result::Ok(TlsConfig { cert_path, port })
     }
 }
+#[automatically_derived]
 impl ::einstellung::Config for TlsConfig {
     type Partial = TlsConfigPartial;
 }

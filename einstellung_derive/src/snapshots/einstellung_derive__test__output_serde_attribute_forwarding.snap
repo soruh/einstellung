@@ -24,6 +24,7 @@ struct ApiConfigPartial {
     #[serde(skip_serializing_if = "Option::is_none")]
     endpoint: Option<String>,
 }
+#[automatically_derived]
 impl ::einstellung::PartialConfig for ApiConfigPartial {
     type Complete = ApiConfig;
     fn merge(
@@ -61,6 +62,7 @@ impl ::einstellung::PartialConfig for ApiConfigPartial {
         })
     }
 }
+#[automatically_derived]
 impl ::einstellung::Config for ApiConfig {
     type Partial = ApiConfigPartial;
 }

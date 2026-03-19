@@ -18,6 +18,7 @@ struct ServerConfigPartial {
     port: Option<u16>,
     is_active: Option<bool>,
 }
+#[automatically_derived]
 impl ::einstellung::PartialConfig for ServerConfigPartial {
     type Complete = ServerConfig;
     fn merge(
@@ -61,6 +62,7 @@ impl ::einstellung::PartialConfig for ServerConfigPartial {
         })
     }
 }
+#[automatically_derived]
 impl ::einstellung::Config for ServerConfig {
     type Partial = ServerConfigPartial;
 }

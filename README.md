@@ -38,7 +38,7 @@ Add **einstellung** to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-einstellung = "0.1.3"
+einstellung = "0.1.4"
 ```
 
 ### Feature Flags

@@ -4,27 +4,27 @@
 [![Docs.rs](https://docs.rs/einstellung/badge.svg)](https://docs.rs/einstellung)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 
-**Einstellung** is a flexible configuration parser for Rust based on `serde`.
-[cite_start]It allows you to define your application's configuration securely
-and ergonomically using strongly-typed structs[cite: 1].
+**Einstellung** is a flexible configuration parser for Rust based on `serde`. It
+allows you to define your application's configuration securely and ergonomically
+using strongly-typed structs.
 
-[cite_start]By providing a `#[derive(Config)]` macro, **einstellung**
-automatically generates the necessary boilerplate to parse, validate, and merge
-configurations from multiple sources—including JSON, TOML, YAML, and hardcoded
-defaults—into a single, cohesive application state[cite: 1].
+By providing a `#[derive(Config)]` macro, **einstellung** automatically
+generates the necessary boilerplate to parse, validate, and merge configurations
+from multiple sources—including JSON, TOML, YAML, and hardcoded defaults—into a
+single, cohesive application state.
 
 ---
 
 ## Overview
 
-- [cite_start]**Strongly Typed**: Define your configuration using standard Rust
-  structs and enums[cite: 1].
+- **Strongly Typed**: Define your configuration using standard Rust structs and
+  enums.
 - **Layered Configurations**: Merge configurations from multiple layers, such as
   hardcoded defaults, global files, and user-specific overrides.
 - **Format Agnostic**: Flexible storage providers backed by `serde`. Built in
   support for JSON, TOML, and YAML.
-- [cite_start]**Granular Merging**: Choose to extend collections (like `HashSet`
-  or `Vec`), replace fields entirely, or write custom merge logic[cite: 1].
+- **Granular Merging**: Choose to extend collections (like `HashSet` or `Vec`),
+  replace fields entirely, or write custom merge logic.
 - **Freezable Fields**: Lock specific configuration layers to prevent downstream
   overrides.
 - **Validation**: Run custom validation logic on fields during the build process
@@ -57,7 +57,7 @@ You can customize enabled features to reduce compilation time or binary size:
 
 ### Simple Configuration
 
-[cite_start]Loading a complete configuration from a single YAML file[cite: 1].
+Loading a complete configuration from a single YAML file.
 
 ```rust
 use std::net::IpAddr;
@@ -138,8 +138,8 @@ fields are optional.
 
 - **`.merge()`**: Combines two partial configurations. By default, values in the
   "newer" layer overwrite the "older" layer.
-- [cite_start]**`merge = "extend"`**: Instead of overwriting, this strategy uses
-  the `Extend` trait to combine collections like `Vec` or `BTreeSet`[cite: 1].
+- **`merge = "extend"`**: Instead of overwriting, this strategy uses the
+  `Extend` trait to combine collections like `Vec` or `BTreeSet`.
 - **`.freeze()`**: Marks a partial configuration as frozen. Any fields tagged
   with `#[config(freezable)]` in a frozen layer cannot be modified by subsequent
   merges.
@@ -155,8 +155,8 @@ fields are optional.
 - **Serde Forwarding**: Attributes like `#[config(serde(rename = "..."))]` or
   `alias` are forwarded to the generated partial structs to maintain consistent
   naming across formats.
-- [cite_start]**Subconfigs**: Nest `Config` structs using the
-  `#[config(subconfig)]` attribute to keep your data organized[cite: 1].
+- **Subconfigs**: Nest `Config` structs using the `#[config(subconfig)]`
+  attribute to keep your data organized.
 
 ---
 

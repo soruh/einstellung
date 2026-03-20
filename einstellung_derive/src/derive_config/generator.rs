@@ -196,17 +196,14 @@ fn generate_merge_for_field(
 ) -> TokenStream {
     let ident = &f.ident;
 
-    match f.freeze {
-        FreezeStrategy::NotFreezable => {
-            let merged = generate_field_merge(
-                f,
-                einstellung,
-                complete_type_name,
-                quote!(self.#ident),
-                quote!(next.#ident),
-            );
-            quote! { #ident: #merged }
-        }
+    let merged = match f.freeze {
+        FreezeStrategy::NotFreezable => generate_field_merge(
+            f,
+            einstellung,
+            complete_type_name,
+            quote!(self.#ident),
+            quote!(next.#ident),
+        ),
         FreezeStrategy::Wrapped => {
             let ident_str = ident.to_string();
             let merge = generate_field_merge(
@@ -218,7 +215,7 @@ fn generate_merge_for_field(
             );
 
             quote! {
-                #ident: match #einstellung::FreezeCombination::of_freeze(self.#ident, next.#ident) {
+                match #einstellung::FreezeCombination::of_freeze(self.#ident, next.#ident) {
                     #einstellung::FreezeCombination::BothFree(left, right) => #einstellung::Freeze::Free(#merge),
                     #einstellung::FreezeCombination::OneFrozen(x) => #einstellung::Freeze::Frozen(x),
                     #einstellung::FreezeCombination::BothFrozen => return ::core::result::Result::Err(#einstellung::ConfigError::FreezeCollision(#einstellung::FieldPath::new(#complete_type_name, #ident_str))),
@@ -236,14 +233,16 @@ fn generate_merge_for_field(
             );
 
             quote! {
-                #ident: match #einstellung::FreezeCombination::of(self.#ident, next.#ident) {
+                match #einstellung::FreezeCombination::of(self.#ident, next.#ident) {
                     #einstellung::FreezeCombination::BothFree(left, right) => #merge,
                     #einstellung::FreezeCombination::OneFrozen(x) => x,
                     #einstellung::FreezeCombination::BothFrozen => return ::core::result::Result::Err(#einstellung::ConfigError::FreezeCollision(#einstellung::FieldPath::new(#complete_type_name, #ident_str))),
                 }
             }
         }
-    }
+    };
+
+    quote_spanned!(ident.span() => #ident: #merged)
 }
 
 /// Generate the impl of `PartialConfig` for the associated partial struct
@@ -274,7 +273,6 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
             fn merge(self, next: Self) -> ::core::result::Result<Self, #einstellung::ConfigError> {
                 ::core::result::Result::Ok(Self { #(#merge_fields,)* })
             }
-
             fn build(self) -> ::core::result::Result<Self::Complete, #einstellung::ConfigError> {
                 ::core::result::Result::Ok(#complete_ident { #(#build_fields),* })
             }
@@ -314,7 +312,6 @@ fn generate_freezable_impl(model: &TransformedStruct) -> TokenStream {
     });
 
     quote_spanned! {partial_ident.span() =>
-
         #[automatically_derived]
         impl #einstellung::Freezable for #partial_ident {
             fn freeze(self) -> Self { Self { #(#freeze_fields,)* } }

@@ -41,8 +41,8 @@ pub struct ConfigStructReceiver {
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub enum DefaultStrategyReceiver {
     #[default]
-    Required,
-    Standard,
+    None,
+    DefaultTrait,
     Value(syn::Expr),
     Call(syn::Expr),
 }
@@ -84,7 +84,7 @@ impl ConfigStructReceiver {
 
         let serde_attrs = std::mem::take(&mut self.serde)
             .into_iter()
-            .map(|meta| darling::ast::NestedMeta::Meta(meta));
+            .map(darling::ast::NestedMeta::Meta);
 
         partial_attrs
             .chain(serde_attrs)
@@ -101,7 +101,7 @@ impl ConfigFieldReceiver {
 
         let serde_attrs = std::mem::take(&mut self.serde)
             .into_iter()
-            .map(|meta| darling::ast::NestedMeta::Meta(meta));
+            .map(darling::ast::NestedMeta::Meta);
 
         partial_attrs
             .chain(serde_attrs)
@@ -120,7 +120,7 @@ pub enum MergeStrategyReceiver {
 /// Custom parser for the 'default' attribute field
 fn parse_default_expr(meta: &syn::Meta) -> darling::Result<DefaultStrategyReceiver> {
     match meta {
-        syn::Meta::Path(_) => Ok(DefaultStrategyReceiver::Standard),
+        syn::Meta::Path(_) => Ok(DefaultStrategyReceiver::DefaultTrait),
         syn::Meta::NameValue(nv) => {
             let expr = &nv.value;
 

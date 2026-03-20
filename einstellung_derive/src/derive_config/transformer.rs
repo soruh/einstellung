@@ -1,7 +1,6 @@
 use super::parser::{ConfigFieldReceiver, ConfigStructReceiver};
 use crate::derive_config::parser::{DefaultStrategyReceiver, MergeStrategyReceiver};
-use darling::util::SpannedValue;
-use syn::{GenericArgument, PathArguments, Type, parse_quote};
+use syn::{GenericArgument, PathArguments, Type};
 
 #[derive(Debug)]
 pub struct TransformedStruct {
@@ -55,7 +54,7 @@ pub enum MergeStrategy {
     MergeSubconfig,
     Replace,
     Extend,
-    Custom(SpannedValue<String>),
+    Custom(syn::Path),
 }
 
 #[derive(Debug)]
@@ -98,7 +97,7 @@ pub fn transform(mut receiver: ConfigStructReceiver) -> syn::Result<TransformedS
     let mut errors: Option<syn::Error> = None;
 
     for field in struct_data {
-        match transform_field(field, &einstellung, receiver.freezable) {
+        match transform_field(field, receiver.freezable) {
             Ok(f) => fields.push(f),
             Err(e) => {
                 if let Some(ref mut errs) = errors {
@@ -127,7 +126,6 @@ pub fn transform(mut receiver: ConfigStructReceiver) -> syn::Result<TransformedS
 
 fn transform_field(
     mut field: ConfigFieldReceiver,
-    einstellung: &syn::Path,
     all_freezeable: bool,
 ) -> syn::Result<TransformedField> {
     let attrs = field.take_partial_attrs();
@@ -141,70 +139,60 @@ fn transform_field(
         .cloned()
         .unwrap_or_else(|| complete_type.clone());
 
-    if field.subconfig {
-        if let Some(strategy) = field.merge {
-            return Err(syn::Error::new(
-                strategy.span(),
-                "Merge strategy is invalid on a subconfig",
-            ));
-        }
+    if field.subconfig
+        && let Some(strategy) = field.merge
+    {
+        return Err(syn::Error::new(
+            strategy.span(),
+            "Merge strategy is invalid on a subconfig",
+        ));
     }
 
-    let mut partial_type = if field.subconfig {
-        PartialType {
-            core_type,
-            access_partial: true,
-            wrap_option: true,
-            wrap_freeze: false,
-        }
+    // Determine the merge strategy
+    let merge = if field.subconfig {
+        MergeStrategy::MergeSubconfig
     } else {
-        PartialType {
-            core_type,
-            access_partial: false,
-            wrap_option: true,
-            wrap_freeze: false,
+        // Extract the inner strategy from SpannedValue, defaulting to Replace
+        let merge_strategy = match field.merge {
+            Some(m) => m.into_inner(),
+            None => MergeStrategyReceiver::Replace,
+        };
+
+        match merge_strategy {
+            MergeStrategyReceiver::Extend => MergeStrategy::Extend,
+            MergeStrategyReceiver::Replace => MergeStrategy::Replace,
+            MergeStrategyReceiver::Function(s) => match syn::parse_str(&s) {
+                Ok(path) => MergeStrategy::Custom(path),
+                Err(err) => {
+                    return Err(syn::Error::new(
+                        s.span(),
+                        format!("Invalid merge function path: {err}"),
+                    ));
+                }
+            },
         }
     };
 
-    // {
-    //     let span = field
-    //         .merge
-    //         .as_ref()
-    //         .map(|s| s.span())
-    //         .unwrap_or_else(|| ident.span());
-    //     let merge_strategy = match field.merge {
-    //         Some(m) => m.into_inner(),
-    //         None => MergeStrategy::Replace,
-    //     };
+    // Determine the build strategy
+    #[rustfmt::skip]
+    let build = if field.subconfig {
+        if complete_is_optional {
+            BuildStategy::SubconfigOptional
+        } else {
+            BuildStategy::SubconfigRequired
+        }
+    } else {
+        match (complete_is_optional, field.default) {
+            (_, DefaultStrategyReceiver::Value(e)) => BuildStategy::Default(DefaultInitializer::Value(e)),
+            (_, DefaultStrategyReceiver::Call(e)) => BuildStategy::Default(DefaultInitializer::Call(e)),
 
-    //     let partial_type = syn::parse_quote!(Option<#core_type>);
-
-    //     let kind = match merge_strategy {
-    //         MergeStrategyReceiver::Extend => FieldKind::Extend {
-    //             fallback: determine_fallback(&field.default, complete_is_optional),
-    //         },
-    //         MergeStrategyReceiver::Replace => FieldKind::Replace {
-    //             fallback: determine_fallback(&field.default, complete_is_optional),
-    //         },
-    //         MergeStrategyReceiver::Function(s) => {
-    //             let func_path = syn::parse_str::<syn::Path>(&s).map_err(|_| {
-    //                 syn::Error::new(span, format!("Invalid function path: '{}'", &*s))
-    //             })?;
-
-    //             let func_path = SpannedValue::new(func_path, s.span());
-
-    //             FieldKind::CustomMerge {
-    //                 func_path,
-    //                 fallback: determine_fallback(&field.default, complete_is_optional),
-    //             }
-    //         }
-    //     };
-
-    //     (partial_type, kind)
-    // }
-
-    let build = todo!();
-    let merge = todo!();
+            (true, DefaultStrategyReceiver::DefaultTrait) => BuildStategy::Optional,
+            (true, DefaultStrategyReceiver::None) => BuildStategy::Optional,
+            
+            (false, DefaultStrategyReceiver::DefaultTrait) => BuildStategy::Default(DefaultInitializer::DefaultTrait),
+            (false, DefaultStrategyReceiver::None) => BuildStategy::Required,
+        }
+    };
 
     let freezable = field.freezable || all_freezeable;
     let freeze = if !freezable {
@@ -215,9 +203,12 @@ fn transform_field(
         FreezeStrategy::Wrapped
     };
 
-    if freeze == FreezeStrategy::Wrapped {
-        partial_type.wrap_freeze = true;
-    }
+    let partial_type = PartialType {
+        core_type,
+        access_partial: field.subconfig,
+        wrap_option: true,
+        wrap_freeze: freeze == FreezeStrategy::Wrapped,
+    };
 
     Ok(TransformedField {
         ident,
@@ -230,25 +221,4 @@ fn transform_field(
         build,
         merge,
     })
-}
-
-fn determine_fallback(default: &DefaultStrategyReceiver, is_optional: bool) -> FallbackStrategy {
-    match default {
-        DefaultStrategyReceiver::Required => {
-            if is_optional {
-                FallbackStrategy::Keep
-            } else {
-                FallbackStrategy::Require
-            }
-        }
-        DefaultStrategyReceiver::Standard => {
-            if is_optional {
-                FallbackStrategy::Keep
-            } else {
-                FallbackStrategy::Standard
-            }
-        }
-        DefaultStrategyReceiver::Value(e) => FallbackStrategy::Value(e.clone()),
-        DefaultStrategyReceiver::Call(e) => FallbackStrategy::Call(e.clone()),
-    }
 }

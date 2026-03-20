@@ -3,7 +3,7 @@ source: einstellung_derive/src/test.rs
 expression: formatted
 ---
 /// --- helper ---
-pub fn merge_hosts(_: String, b: String) -> Result<String, einstellung::ConfigError> {
+pub fn merge_hosts(_: String, b: String) -> Result<String, Box<dyn core::error::Error>> {
     Ok(b)
 }
 
@@ -31,7 +31,7 @@ impl ::einstellung::PartialConfig for ServerConfigPartial {
     ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
         ::core::result::Result::Ok(Self {
             host: {
-                let _: ::einstellung::MergeFunction<Option<String>> = merge_hosts;
+                let _: ::einstellung::MergeFunction<Option<String>, _> = merge_hosts;
                 merge_hosts(self.host, next.host)
                     .map_err(|reason| ::einstellung::ConfigError::CustomMerge {
                         field: ::einstellung::FieldPath::new("ServerConfig", "host"),

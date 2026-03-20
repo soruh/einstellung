@@ -285,7 +285,6 @@ assert_macro_test!(PASS, kitchen_sink:
 );
 
 assert_macro_test!(FAIL, invalid_item_enum: {
-    // Fails darling's `supports(struct_named)`
     #[derive(Config)]
     enum ServerConfig {
         Active,
@@ -294,13 +293,11 @@ assert_macro_test!(FAIL, invalid_item_enum: {
 });
 
 assert_macro_test!(FAIL, invalid_item_unit_struct: {
-    // Fails darling's `supports(struct_named)`
     #[derive(Config)]
     struct ServerConfig;
 });
 
 assert_macro_test!(FAIL, subconfig_with_merge: {
-    // Fails your custom rule in `transformer.rs`: "Merge strategy is invalid on a subconfig"
     #[derive(Config)]
     struct AppConfig {
         #[config(subconfig, merge = "replace")]
@@ -312,7 +309,6 @@ assert_macro_test!(FAIL, subconfig_with_merge: {
 });
 
 assert_macro_test!(FAIL, invalid_custom_merge_path: {
-    // Fails parsing of `syn::Path` in `MergeStrategy::Function(s)`
     #[derive(Config)]
     struct ServerConfig {
         #[config(merge(function = "123 invalid path"))]
@@ -321,7 +317,6 @@ assert_macro_test!(FAIL, invalid_custom_merge_path: {
 });
 
 assert_macro_test!(FAIL, duplicate_merge_attribute: {
-    // Fails darling: Duplicate field `merge`
     #[derive(Config)]
     struct ServerConfig {
         #[config(merge = "extend", merge = "replace")]
@@ -330,7 +325,6 @@ assert_macro_test!(FAIL, duplicate_merge_attribute: {
 });
 
 assert_macro_test!(FAIL, duplicate_default_attribute: {
-    // Fails darling: Duplicate field `default`
     #[derive(Config)]
     struct ServerConfig {
         #[config(default = 8080, default = 9090)]
@@ -339,7 +333,6 @@ assert_macro_test!(FAIL, duplicate_default_attribute: {
 });
 
 assert_macro_test!(FAIL, unknown_config_attribute: {
-    // Fails darling: Unknown field `made_up_flag`
     #[derive(Config)]
     struct ServerConfig {
         #[config(made_up_flag = true)]
@@ -348,7 +341,6 @@ assert_macro_test!(FAIL, unknown_config_attribute: {
 });
 
 assert_macro_test!(FAIL, malformed_config_attribute: {
-    // Fails darling parsing
     #[derive(Config)]
     struct ServerConfig {
         #[config = "this should be a list"]
@@ -357,7 +349,6 @@ assert_macro_test!(FAIL, malformed_config_attribute: {
 });
 
 assert_macro_test!(FAIL, extend_on_non_collection: {
-    // `u16` does not implement `Extend`, so the generated `a.extend(b)` will fail to compile.
     #[derive(Config)]
     struct ServerConfig {
         #[config(merge = "extend")]
@@ -366,21 +357,18 @@ assert_macro_test!(FAIL, extend_on_non_collection: {
 });
 
 assert_macro_test!(FAIL, missing_subconfig_derive: {
-    // The nested struct does not implement `Config`, so `PartialConfig::merge` is missing.
     #[derive(Config)]
     struct AppConfig {
         #[config(subconfig)]
         db: UnconfiguredDatabase,
     }
 
-    // Notice we omitted #[derive(Config)] here
     struct UnconfiguredDatabase {
         url: String,
     }
 });
 
 assert_macro_test!(FAIL, default_value_type_mismatch: {
-    // Expects a `u16`, given a `&str`
     #[derive(Config)]
     struct ServerConfig {
         #[config(default = "8080")]
@@ -389,7 +377,6 @@ assert_macro_test!(FAIL, default_value_type_mismatch: {
 });
 
 assert_macro_test!(FAIL, default_function_type_mismatch: {
-    // The closure returns an integer, but the field is a String.
     #[derive(Config)]
     struct ServerConfig {
         #[config(default = || 123)]
@@ -397,7 +384,6 @@ assert_macro_test!(FAIL, default_function_type_mismatch: {
     }
 });
 
-// Fixed: Separated helper and struct with a clear comma for the muncher
 assert_macro_test!(FAIL, default_function_signature_mismatch:
     helper {
         pub fn provide_default_port(_env: &str) -> u16 { 8080 }
@@ -426,8 +412,6 @@ assert_macro_test!(FAIL, validate_wrong_argument_type:
 
 assert_macro_test!(FAIL, validate_missing_reference:
     helper {
-        // Takes ownership instead of a reference (`&u16`).
-        // Your generated code passes `(&#ident)`.
         pub fn validate_port(_: u16) -> Result<(), Box<dyn std::error::Error>> { Ok(()) }
     },
     {
@@ -441,8 +425,6 @@ assert_macro_test!(FAIL, validate_missing_reference:
 
 assert_macro_test!(FAIL, validate_wrong_return_type:
     helper {
-        // Returns a bool instead of a Result
-        // Your generated code expects `if let Err(e) = ...`
         pub fn validate_port(_: &u16) -> bool { true }
     },
     {
@@ -456,9 +438,7 @@ assert_macro_test!(FAIL, validate_wrong_return_type:
 
 assert_macro_test!(FAIL, custom_merge_wrong_signature:
     helper {
-        // Custom merge expects `fn(Option<T>, Option<T>) -> Option<T>`
-        // This function takes concrete types instead of Options.
-        pub fn merge_hosts(_: String, b: String) -> Result<String, einstellung::ConfigError> { Ok(b) }
+        pub fn merge_hosts(_: String, b: String) -> Result<String, Box<dyn core::error::Error>> { Ok(b) }
     },
     {
         #[derive(Config)]
@@ -471,8 +451,7 @@ assert_macro_test!(FAIL, custom_merge_wrong_signature:
 
 assert_macro_test!(FAIL, custom_merge_type_mismatch:
     helper {
-        // Takes Option<u16>, but field is String
-        pub fn merge_hosts(_: Option<u16>, b: Option<u16>) -> Result<Option<u16>, einstellung::ConfigError> { Ok(b) }
+        pub fn merge_hosts(_: Option<u16>, b: Option<u16>) -> Result<Option<u16>, Box<dyn core::error::Error>> { Ok(b) }
     },
     {
         #[derive(Config)]
@@ -537,28 +516,28 @@ assert_macro_test!(PASS, default_extend_interactions:
     {
         #[derive(Config)]
         struct Config1 {
-            #[config(merge="extend")]
+            #[config(merge = "extend")]
             x: ::std::collections::HashSet<String>,
         }
     }
     {
         #[derive(Config)]
         struct Config2 {
-            #[config(merge="extend", default)]
+            #[config(merge = "extend", default)]
             x: ::std::collections::HashSet<String>,
         }
     }
     {
         #[derive(Config)]
         struct Config3 {
-            #[config(merge="extend")]
+            #[config(merge = "extend")]
             x: Option<::std::collections::HashSet<String>>,
         }
     }
     {
         #[derive(Config)]
         struct Config4 {
-            #[config(merge="extend", default)]
+            #[config(merge = "extend", default)]
             x: Option<::std::collections::HashSet<String>>,
         }
     }

@@ -1,17 +1,12 @@
-error[E0107]: type alias takes 2 generic arguments but 1 generic argument was supplied
+error[E0308]: mismatched types
  --> src/trybuild_tests/custom_merge_type_mismatch.rs
   |
   | #[derive(Config)]
-  |          ------ supplied 1 generic argument
-  | struct ServerConfig {
-  |     #[config(merge(function = "merge_hosts"))]
-  |                               ^^^^^^^^^^^^^ expected 2 generic arguments
+  |          ^^^^^^ expected fn pointer, found fn item
   |
-note: type alias defined here, with 2 generic parameters: `T`, `E`
- --> $WORKSPACE/einstellung/src/lib.rs
-  |
-  | pub type MergeFunction<T, E> = fn(T, T) -> Result<T, E>;
-  |          ^^^^^^^^^^^^^ -  -
+  = note: expected fn pointer `fn(std::option::Option<std::string::String>, std::option::Option<std::string::String>) -> Result<std::option::Option<std::string::String>, _>`
+                found fn item `fn(std::option::Option<u16>, std::option::Option<u16>) -> Result<std::option::Option<u16>, Box<(dyn StdError + 'static)>> {merge_hosts}`
+  = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0308]: arguments to this function are incorrect
  --> src/trybuild_tests/custom_merge_type_mismatch.rs
@@ -36,20 +31,6 @@ note: function defined here
   |     b: Option<u16>,
   |     --------------
   = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error[E0308]: mismatched types
-  --> src/trybuild_tests/custom_merge_type_mismatch.rs
-   |
-   |     #[config(merge(function = "merge_hosts"))]
-   |                               ^^^^^^^^^^^^^ expected `Box<dyn Error>`, found `ConfigError`
-   |
-   = note: expected struct `Box<(dyn StdError + 'static)>`
-                found enum `ConfigError`
-   = note: for more on the distinction between the stack and the heap, read https://doc.rust-lang.org/book/ch15-01-box.html, https://doc.rust-lang.org/rust-by-example/std/box.html, and https://doc.rust-lang.org/std/boxed/index.html
-help: store this in the heap by calling `Box::new`
-   |
-12 |     #[config(merge(function = reason: Box::new("merge_hosts")))]
-   |                               +++++++++++++++++             +
 
 error[E0308]: mismatched types
  --> src/trybuild_tests/custom_merge_type_mismatch.rs

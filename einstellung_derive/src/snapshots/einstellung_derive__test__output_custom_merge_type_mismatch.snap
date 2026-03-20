@@ -6,7 +6,7 @@ expression: formatted
 pub fn merge_hosts(
     _: Option<u16>,
     b: Option<u16>,
-) -> Result<Option<u16>, einstellung::ConfigError> {
+) -> Result<Option<u16>, Box<dyn core::error::Error>> {
     Ok(b)
 }
 
@@ -34,7 +34,7 @@ impl ::einstellung::PartialConfig for ServerConfigPartial {
     ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
         ::core::result::Result::Ok(Self {
             host: {
-                let _: ::einstellung::MergeFunction<Option<String>> = merge_hosts;
+                let _: ::einstellung::MergeFunction<Option<String>, _> = merge_hosts;
                 merge_hosts(self.host, next.host)
                     .map_err(|reason| ::einstellung::ConfigError::CustomMerge {
                         field: ::einstellung::FieldPath::new("ServerConfig", "host"),

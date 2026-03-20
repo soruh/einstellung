@@ -11,5 +11,5 @@ struct ServerConfig {
 
 /// --- output ---
 ::core::compile_error! {
-    "Invalid function path: '123 invalid path'"
+    "Invalid merge function path: expected identifier"
 }

@@ -44,7 +44,7 @@ where
 }
 
 /// A generic source for file contents which can be used as a reference or an owned type.
-/// See [`FileContentProvider::into_owned`] and [`FileContentProvider::as_borrowed`] for conversion method.
+/// See [`FileContentProvider::into_owned`] and [`FileContentProvider::as_borrowed`] for conversion methods.
 #[non_exhaustive]
 pub enum FileContentProvider<'i> {
     InlineBorrowed(&'i str),

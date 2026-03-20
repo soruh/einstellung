@@ -14,7 +14,7 @@ struct Config {
 #[serde(crate = "::einstellung::serde")]
 struct ConfigPartial {
     #[serde(rename = "field")]
-    x: Option<Vec<u32>>,
+    x: ::core::option::Option<Vec<u32>>,
 }
 #[automatically_derived]
 impl ::einstellung::PartialConfig for ConfigPartial {

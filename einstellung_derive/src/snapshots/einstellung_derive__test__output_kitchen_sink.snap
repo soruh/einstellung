@@ -33,13 +33,15 @@ struct FullSystemConfig {
 #[serde(crate = "::einstellung::serde")]
 struct FullSystemConfigPartial {
     #[serde(rename = "sys_name")]
-    name: Option<String>,
-    port: Option<u16>,
-    database: Option<<DatabaseConfig as ::einstellung::Config>::Partial>,
+    name: ::core::option::Option<String>,
+    port: ::core::option::Option<u16>,
+    database: ::core::option::Option<<DatabaseConfig as ::einstellung::Config>::Partial>,
     #[serde(alias = "files")]
-    log_files: Option<Vec<String>>,
-    users: Option<std::collections::HashSet<String>>,
-    optional_cache: Option<<CacheConfig as ::einstellung::Config>::Partial>,
+    log_files: ::core::option::Option<Vec<String>>,
+    users: ::core::option::Option<std::collections::HashSet<String>>,
+    optional_cache: ::core::option::Option<
+        <CacheConfig as ::einstellung::Config>::Partial,
+    >,
 }
 #[automatically_derived]
 impl ::einstellung::PartialConfig for FullSystemConfigPartial {
@@ -94,11 +96,19 @@ impl ::einstellung::PartialConfig for FullSystemConfigPartial {
                 reason: e.into(),
             });
         }
-        let database = ::einstellung::build_with_context(
-            self.database.unwrap_or_default(),
-            "FullSystemConfig",
-            "database",
-        )?;
+        let database = self
+            .database
+            .map(|x| ::einstellung::build_with_context(
+                x,
+                "FullSystemConfig",
+                "database",
+            ))
+            .transpose()?
+            .ok_or(
+                ::einstellung::ConfigError::MissingField(
+                    ::einstellung::FieldPath::new("FullSystemConfig", "database"),
+                ),
+            )?;
         let log_files = self
             .log_files
             .ok_or(
@@ -150,8 +160,8 @@ struct DatabaseConfig {
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct DatabaseConfigPartial {
-    url: Option<String>,
-    port: Option<u16>,
+    url: ::core::option::Option<String>,
+    port: ::core::option::Option<u16>,
 }
 #[automatically_derived]
 impl ::einstellung::PartialConfig for DatabaseConfigPartial {
@@ -197,7 +207,7 @@ struct CacheConfig {
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct CacheConfigPartial {
-    size_mb: Option<u32>,
+    size_mb: ::core::option::Option<u32>,
 }
 #[automatically_derived]
 impl ::einstellung::PartialConfig for CacheConfigPartial {

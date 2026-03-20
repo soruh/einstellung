@@ -76,7 +76,10 @@ fn missing_field() {
 
 #[test]
 fn missing_nested_field() {
-    snapshot!(false, r#"{ "app_name": "foo" }"#);
+    snapshot!(
+        false,
+        r#"{ "app_name": "foo", "network": { "listen": { "port": 443 } } }"#
+    );
 }
 
 #[test]
@@ -149,7 +152,7 @@ fn user_config_option_no_default_allowed_empty() {
 #[derive(Config, Debug)]
 #[config(crate = crate)]
 struct UserConfig4 {
-    #[config(merge = "extend", default)]
+    #[config(merge = "extend")]
     users: Option<BTreeSet<String>>,
 }
 

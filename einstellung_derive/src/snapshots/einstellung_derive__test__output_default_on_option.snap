@@ -4,9 +4,9 @@ expression: formatted
 ---
 /// --- input ---
 #[derive(Config)]
-struct Config {
-    #[config(default)]
-    x: Option<u8>,
+struct Config4 {
+    #[config(merge = "extend", default)]
+    x: Option<::std::collections::HashSet<String>>,
 }
 
 /// --- output ---

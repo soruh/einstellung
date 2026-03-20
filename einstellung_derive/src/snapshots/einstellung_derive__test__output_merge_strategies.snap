@@ -16,9 +16,9 @@ struct LoggerConfig {
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct LoggerConfigPartial {
-    level: Option<String>,
-    log_files: Option<Vec<String>>,
-    output_format: Option<String>,
+    level: ::core::option::Option<String>,
+    log_files: ::core::option::Option<Vec<String>>,
+    output_format: ::core::option::Option<String>,
 }
 #[automatically_derived]
 impl ::einstellung::PartialConfig for LoggerConfigPartial {

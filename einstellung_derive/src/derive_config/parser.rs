@@ -64,7 +64,7 @@ pub struct ConfigFieldReceiver {
     pub partial: Vec<PartialReceiver>,
 
     #[darling(default, with = "parse_default_expr")]
-    pub default: DefaultStrategyReceiver,
+    pub default: SpannedValue<DefaultStrategyReceiver>,
 
     #[darling(default)]
     pub subconfig: bool,
@@ -117,15 +117,14 @@ pub enum MergeStrategyReceiver {
     Function(SpannedValue<String>),
 }
 
-/// Custom parser for the 'default' attribute field
-fn parse_default_expr(meta: &syn::Meta) -> darling::Result<DefaultStrategyReceiver> {
-    match meta {
-        syn::Meta::Path(_) => Ok(DefaultStrategyReceiver::DefaultTrait),
+fn parse_default_expr(meta: &syn::Meta) -> darling::Result<SpannedValue<DefaultStrategyReceiver>> {
+    let res = match meta {
+        syn::Meta::Path(_) => DefaultStrategyReceiver::DefaultTrait,
         syn::Meta::NameValue(nv) => {
             let expr = &nv.value;
 
             use syn::Expr::*;
-            Ok(match expr {
+            match expr {
                 Closure(_) => DefaultStrategyReceiver::Call(expr.clone()),
                 Call(call) if call.args.is_empty() => {
                     DefaultStrategyReceiver::Call((*call.func).clone())
@@ -134,12 +133,17 @@ fn parse_default_expr(meta: &syn::Meta) -> darling::Result<DefaultStrategyReceiv
                     DefaultStrategyReceiver::Call(parse_quote_spanned!(expr.span() => || #expr))
                 }
                 _ => DefaultStrategyReceiver::Value(expr.clone()),
-            })
+            }
         }
-        _ => Err(darling::Error::unsupported_format(
-            "expected default or default = ...",
-        )),
-    }
+        _ => {
+            return Err(
+                darling::Error::unsupported_format("expected default or default = ...")
+                    .with_span(&meta.span()),
+            );
+        }
+    };
+
+    Ok(SpannedValue::new(res, meta.span()))
 }
 
 pub fn parse(input: syn::DeriveInput) -> Result<ConfigStructReceiver, darling::Error> {

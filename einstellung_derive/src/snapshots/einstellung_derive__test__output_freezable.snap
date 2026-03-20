@@ -1,0 +1,108 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- input ---
+#[derive(Config, Debug, PartialEq, Eq)]
+#[config(partial(derive(Clone)))]
+struct ConfigFreezable1 {
+    #[config(default = ||"Freezable Config 1".to_string())]
+    name: String,
+    pass: u8,
+    #[config(freezable)]
+    private_key: String,
+}
+
+/// --- output ---
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
+#[derive(Clone)]
+#[serde(crate = "::einstellung::serde")]
+struct ConfigFreezable1Partial {
+    name: ::core::option::Option<String>,
+    pass: ::core::option::Option<u8>,
+    private_key: ::einstellung::Freeze<::core::option::Option<String>>,
+}
+#[automatically_derived]
+impl ::einstellung::PartialConfig for ConfigFreezable1Partial {
+    type Complete = ConfigFreezable1;
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
+            name: next.name.or(self.name),
+            pass: next.pass.or(self.pass),
+            private_key: match ::einstellung::FreezeCombination::of_freeze(
+                self.private_key,
+                next.private_key,
+            ) {
+                ::einstellung::FreezeCombination::BothFree(left, right) => {
+                    ::einstellung::Freeze::Free(right.or(left))
+                }
+                ::einstellung::FreezeCombination::OneFrozen(x) => {
+                    ::einstellung::Freeze::Frozen(x)
+                }
+                ::einstellung::FreezeCombination::BothFrozen => {
+                    return ::core::result::Result::Err(
+                        ::einstellung::ConfigError::FreezeCollision(
+                            ::einstellung::FieldPath::new(
+                                "ConfigFreezable1",
+                                "private_key",
+                            ),
+                        ),
+                    );
+                }
+            },
+        })
+    }
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
+        let name = self.name.unwrap_or_else(|| "Freezable Config 1".to_string());
+        let pass = self
+            .pass
+            .ok_or(
+                ::einstellung::ConfigError::MissingField(
+                    ::einstellung::FieldPath::new("ConfigFreezable1", "pass"),
+                ),
+            )?;
+        let private_key = ::einstellung::Freeze::into_inner(self.private_key)
+            .ok_or(
+                ::einstellung::ConfigError::MissingField(
+                    ::einstellung::FieldPath::new("ConfigFreezable1", "private_key"),
+                ),
+            )?;
+        ::core::result::Result::Ok(ConfigFreezable1 {
+            name,
+            pass,
+            private_key,
+        })
+    }
+}
+#[automatically_derived]
+impl ::einstellung::Freezable for ConfigFreezable1Partial {
+    fn freeze(self) -> Self {
+        Self {
+            name: self.name,
+            pass: self.pass,
+            private_key: ::einstellung::Freezable::freeze(self.private_key),
+        }
+    }
+    fn is_frozen(&self) -> bool {
+        ::einstellung::Freezable::is_frozen(&self.private_key)
+    }
+}
+#[automatically_derived]
+impl ::einstellung::Config for ConfigFreezable1 {
+    type Partial = ConfigFreezable1Partial;
+}
+
+// ---------------------------------
+
+/// --- helper ---
+fn assert_clone<T: Clone>() -> Option<T> {
+    None
+}
+fn is_clone() {
+    assert_clone::<<ConfigFreezable1 as einstellung::Config>::Partial>();
+}

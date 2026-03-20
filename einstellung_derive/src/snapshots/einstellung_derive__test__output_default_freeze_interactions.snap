@@ -1,0 +1,202 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- input ---
+#[derive(Config)]
+struct Config1 {
+    #[config(freezable)]
+    x: ::std::collections::HashSet<String>,
+}
+
+/// --- output ---
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+struct Config1Partial {
+    x: ::einstellung::Freeze<
+        ::core::option::Option<::std::collections::HashSet<String>>,
+    >,
+}
+#[automatically_derived]
+impl ::einstellung::PartialConfig for Config1Partial {
+    type Complete = Config1;
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
+            x: match ::einstellung::FreezeCombination::of_freeze(self.x, next.x) {
+                ::einstellung::FreezeCombination::BothFree(left, right) => {
+                    ::einstellung::Freeze::Free(right.or(left))
+                }
+                ::einstellung::FreezeCombination::OneFrozen(x) => {
+                    ::einstellung::Freeze::Frozen(x)
+                }
+                ::einstellung::FreezeCombination::BothFrozen => {
+                    return ::core::result::Result::Err(
+                        ::einstellung::ConfigError::FreezeCollision(
+                            ::einstellung::FieldPath::new("Config1", "x"),
+                        ),
+                    );
+                }
+            },
+        })
+    }
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
+        let x = ::einstellung::Freeze::into_inner(self.x)
+            .ok_or(
+                ::einstellung::ConfigError::MissingField(
+                    ::einstellung::FieldPath::new("Config1", "x"),
+                ),
+            )?;
+        ::core::result::Result::Ok(Config1 { x })
+    }
+}
+#[automatically_derived]
+impl ::einstellung::Freezable for Config1Partial {
+    fn freeze(self) -> Self {
+        Self {
+            x: ::einstellung::Freezable::freeze(self.x),
+        }
+    }
+    fn is_frozen(&self) -> bool {
+        ::einstellung::Freezable::is_frozen(&self.x)
+    }
+}
+#[automatically_derived]
+impl ::einstellung::Config for Config1 {
+    type Partial = Config1Partial;
+}
+
+// ---------------------------------
+
+/// --- input ---
+#[derive(Config)]
+struct Config2 {
+    #[config(freezable, default)]
+    x: ::std::collections::HashSet<String>,
+}
+
+/// --- output ---
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+struct Config2Partial {
+    x: ::einstellung::Freeze<
+        ::core::option::Option<::std::collections::HashSet<String>>,
+    >,
+}
+#[automatically_derived]
+impl ::einstellung::PartialConfig for Config2Partial {
+    type Complete = Config2;
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
+            x: match ::einstellung::FreezeCombination::of_freeze(self.x, next.x) {
+                ::einstellung::FreezeCombination::BothFree(left, right) => {
+                    ::einstellung::Freeze::Free(right.or(left))
+                }
+                ::einstellung::FreezeCombination::OneFrozen(x) => {
+                    ::einstellung::Freeze::Frozen(x)
+                }
+                ::einstellung::FreezeCombination::BothFrozen => {
+                    return ::core::result::Result::Err(
+                        ::einstellung::ConfigError::FreezeCollision(
+                            ::einstellung::FieldPath::new("Config2", "x"),
+                        ),
+                    );
+                }
+            },
+        })
+    }
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
+        let x = ::einstellung::Freeze::into_inner(self.x)
+            .unwrap_or_else(::core::default::Default::default);
+        ::core::result::Result::Ok(Config2 { x })
+    }
+}
+#[automatically_derived]
+impl ::einstellung::Freezable for Config2Partial {
+    fn freeze(self) -> Self {
+        Self {
+            x: ::einstellung::Freezable::freeze(self.x),
+        }
+    }
+    fn is_frozen(&self) -> bool {
+        ::einstellung::Freezable::is_frozen(&self.x)
+    }
+}
+#[automatically_derived]
+impl ::einstellung::Config for Config2 {
+    type Partial = Config2Partial;
+}
+
+// ---------------------------------
+
+/// --- input ---
+#[derive(Config)]
+struct Config3 {
+    #[config(freezable)]
+    x: Option<::std::collections::HashSet<String>>,
+}
+
+/// --- output ---
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+struct Config3Partial {
+    x: ::einstellung::Freeze<
+        ::core::option::Option<::std::collections::HashSet<String>>,
+    >,
+}
+#[automatically_derived]
+impl ::einstellung::PartialConfig for Config3Partial {
+    type Complete = Config3;
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
+            x: match ::einstellung::FreezeCombination::of_freeze(self.x, next.x) {
+                ::einstellung::FreezeCombination::BothFree(left, right) => {
+                    ::einstellung::Freeze::Free(right.or(left))
+                }
+                ::einstellung::FreezeCombination::OneFrozen(x) => {
+                    ::einstellung::Freeze::Frozen(x)
+                }
+                ::einstellung::FreezeCombination::BothFrozen => {
+                    return ::core::result::Result::Err(
+                        ::einstellung::ConfigError::FreezeCollision(
+                            ::einstellung::FieldPath::new("Config3", "x"),
+                        ),
+                    );
+                }
+            },
+        })
+    }
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
+        let x = ::einstellung::Freeze::into_inner(self.x);
+        ::core::result::Result::Ok(Config3 { x })
+    }
+}
+#[automatically_derived]
+impl ::einstellung::Freezable for Config3Partial {
+    fn freeze(self) -> Self {
+        Self {
+            x: ::einstellung::Freezable::freeze(self.x),
+        }
+    }
+    fn is_frozen(&self) -> bool {
+        ::einstellung::Freezable::is_frozen(&self.x)
+    }
+}
+#[automatically_derived]
+impl ::einstellung::Config for Config3 {
+    type Partial = Config3Partial;
+}

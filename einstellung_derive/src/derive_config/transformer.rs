@@ -41,12 +41,16 @@ pub enum DefaultInitializer {
 }
 
 #[derive(Debug)]
-pub enum BuildStategy {
-    SubconfigRequired,
-    SubconfigOptional,
-    Required,
-    Optional,
-    Default(DefaultInitializer),
+pub enum UnwrapStrategy {
+    DontUnwrap,
+    Unwrap,
+    UnwrapWithDefault(DefaultInitializer),
+}
+
+#[derive(Debug)]
+pub struct BuildStategy {
+    pub build: bool,
+    pub unwrap: UnwrapStrategy,
 }
 
 #[derive(Debug)]
@@ -76,6 +80,15 @@ fn extract_type_from_option(ty: &Type) -> Option<&Type> {
         return Some(inner_ty);
     }
     None
+}
+
+fn transform_default_strategy(strategy: DefaultStrategyReceiver) -> Option<DefaultInitializer> {
+    Some(match strategy {
+        DefaultStrategyReceiver::Value(e) => DefaultInitializer::Value(e),
+        DefaultStrategyReceiver::Call(e) => DefaultInitializer::Call(e),
+        DefaultStrategyReceiver::DefaultTrait => DefaultInitializer::DefaultTrait,
+        DefaultStrategyReceiver::None => return None,
+    })
 }
 
 pub fn transform(mut receiver: ConfigStructReceiver) -> syn::Result<TransformedStruct> {
@@ -148,11 +161,9 @@ fn transform_field(
         ));
     }
 
-    // Determine the merge strategy
     let merge = if field.subconfig {
         MergeStrategy::MergeSubconfig
     } else {
-        // Extract the inner strategy from SpannedValue, defaulting to Replace
         let merge_strategy = match field.merge {
             Some(m) => m.into_inner(),
             None => MergeStrategyReceiver::Replace,
@@ -173,25 +184,26 @@ fn transform_field(
         }
     };
 
-    // Determine the build strategy
-    #[rustfmt::skip]
-    let build = if field.subconfig {
-        if complete_is_optional {
-            BuildStategy::SubconfigOptional
-        } else {
-            BuildStategy::SubconfigRequired
-        }
-    } else {
-        match (complete_is_optional, field.default) {
-            (_, DefaultStrategyReceiver::Value(e)) => BuildStategy::Default(DefaultInitializer::Value(e)),
-            (_, DefaultStrategyReceiver::Call(e)) => BuildStategy::Default(DefaultInitializer::Call(e)),
+    let unwrap = if complete_is_optional {
+        let span = field.default.span();
 
-            (true, DefaultStrategyReceiver::DefaultTrait) => BuildStategy::Optional,
-            (true, DefaultStrategyReceiver::None) => BuildStategy::Optional,
-            
-            (false, DefaultStrategyReceiver::DefaultTrait) => BuildStategy::Default(DefaultInitializer::DefaultTrait),
-            (false, DefaultStrategyReceiver::None) => BuildStategy::Required,
+        if field.default.into_inner() != DefaultStrategyReceiver::None {
+            return Err(syn::Error::new(
+                span,
+                "#[config[default(..)] is meaningless on an `Option` type",
+            ));
         }
+
+        UnwrapStrategy::DontUnwrap
+    } else if let Some(default) = transform_default_strategy(field.default.into_inner()) {
+        UnwrapStrategy::UnwrapWithDefault(default)
+    } else {
+        UnwrapStrategy::Unwrap
+    };
+
+    let build = BuildStategy {
+        build: field.subconfig,
+        unwrap,
     };
 
     let freezable = field.freezable || all_freezeable;

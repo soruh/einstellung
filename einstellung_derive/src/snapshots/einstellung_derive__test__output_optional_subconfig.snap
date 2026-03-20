@@ -14,8 +14,8 @@ struct TelemetryConfig {
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct TelemetryConfigPartial {
-    enabled: Option<bool>,
-    datadog: Option<<DatadogConfig as ::einstellung::Config>::Partial>,
+    enabled: ::core::option::Option<bool>,
+    datadog: ::core::option::Option<<DatadogConfig as ::einstellung::Config>::Partial>,
 }
 #[automatically_derived]
 impl ::einstellung::PartialConfig for TelemetryConfigPartial {
@@ -69,7 +69,7 @@ struct DatadogConfig {
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct DatadogConfigPartial {
-    api_key: Option<String>,
+    api_key: ::core::option::Option<String>,
 }
 #[automatically_derived]
 impl ::einstellung::PartialConfig for DatadogConfigPartial {

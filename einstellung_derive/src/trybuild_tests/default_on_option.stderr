@@ -1,0 +1,5 @@
+error: #[config[default(..)] is meaningless on an `Option` type
+ --> src/trybuild_tests/default_on_option.rs
+  |
+  |     #[config(merge = "extend", default)]
+  |                                ^^^^^^^

@@ -14,9 +14,9 @@ struct ClientConfig {
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct ClientConfigPartial {
-    name: Option<String>,
-    timeout_ms: Option<u32>,
-    proxy: Option<String>,
+    name: ::core::option::Option<String>,
+    timeout_ms: ::core::option::Option<u32>,
+    proxy: ::core::option::Option<String>,
 }
 #[automatically_derived]
 impl ::einstellung::PartialConfig for ClientConfigPartial {

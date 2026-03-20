@@ -502,7 +502,7 @@ assert_macro_test!(PASS, serde_forward_shorthand:
     }
 );
 
-assert_macro_test!(PASS, default_on_optional_field:
+assert_macro_test!(FAIL, default_on_optional_field:
     {
         #[derive(Config)]
         struct Config {
@@ -534,11 +534,58 @@ assert_macro_test!(PASS, default_extend_interactions:
             x: Option<::std::collections::HashSet<String>>,
         }
     }
+);
+
+assert_macro_test!(FAIL, default_on_option:
     {
         #[derive(Config)]
         struct Config4 {
             #[config(merge = "extend", default)]
             x: Option<::std::collections::HashSet<String>>,
+        }
+    }
+);
+
+assert_macro_test!(PASS, default_freeze_interactions:
+    {
+        #[derive(Config)]
+        struct Config1 {
+            #[config(freezable)]
+            x: ::std::collections::HashSet<String>,
+        }
+    }
+    {
+        #[derive(Config)]
+        struct Config2 {
+            #[config(freezable, default)]
+            x: ::std::collections::HashSet<String>,
+        }
+    }
+    {
+        #[derive(Config)]
+        struct Config3 {
+            #[config(freezable)]
+            x: Option<::std::collections::HashSet<String>>,
+        }
+    }
+);
+
+assert_macro_test!(PASS, freezable:
+    {
+        #[derive(Config, Debug, PartialEq, Eq)]
+        #[config(partial(derive(Clone)))]
+        struct ConfigFreezable1 {
+            #[config(default = || "Freezable Config 1".to_string())]
+            name: String,
+            pass: u8,
+            #[config(freezable)]
+            private_key: String,
+        }
+    }
+    helper {
+        fn assert_clone<T: Clone>() -> Option<T> { None }
+        fn is_clone() {
+            assert_clone::<<ConfigFreezable1 as einstellung::Config>::Partial>();
         }
     }
 );

@@ -23,7 +23,7 @@ struct ServerConfig {
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct ServerConfigPartial {
-    host: Option<String>,
+    host: ::core::option::Option<String>,
 }
 #[automatically_derived]
 impl ::einstellung::PartialConfig for ServerConfigPartial {
@@ -34,7 +34,7 @@ impl ::einstellung::PartialConfig for ServerConfigPartial {
     ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
         ::core::result::Result::Ok(Self {
             host: {
-                let _: ::einstellung::MergeFunction<Option<String>, _> = merge_hosts;
+                let _: ::einstellung::MergeFunction<::core::option::Option<String>, _> = merge_hosts;
                 merge_hosts(self.host, next.host)
                     .map_err(|reason| ::einstellung::ConfigError::CustomMerge {
                         field: ::einstellung::FieldPath::new("ServerConfig", "host"),

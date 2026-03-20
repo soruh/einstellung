@@ -13,7 +13,7 @@ struct ServerConfig {
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct ServerConfigPartial {
-    host: Option<String>,
+    host: ::core::option::Option<String>,
 }
 #[automatically_derived]
 impl ::einstellung::PartialConfig for ServerConfigPartial {

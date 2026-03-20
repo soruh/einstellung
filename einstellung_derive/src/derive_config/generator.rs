@@ -1,5 +1,7 @@
+use crate::derive_config::transformer::UnwrapStrategy;
+
 use super::transformer::{
-    BuildStategy, DefaultInitializer, FreezeStrategy, MergeStrategy, PartialType, TransformedField,
+     DefaultInitializer, FreezeStrategy, MergeStrategy, PartialType, TransformedField,
     TransformedStruct,
 };
 use proc_macro2::TokenStream;
@@ -45,16 +47,14 @@ fn render_partial_type(pt: &PartialType, einstellung: &syn::Path) -> TokenStream
         quote!(#core)
     };
 
+    // Wrap in Option as partial fields are technically always optional during merging
+    if pt.wrap_option {
+        tokens = quote!(::core::option::Option<#tokens>);
+    }
+
     // Apply Freeze wrapping if the strategy requires it
     if pt.wrap_freeze {
         tokens = quote!(#einstellung::Freeze<#tokens>);
-    }
-
-    // Wrap in Option as partial fields are technically always optional during merging
-    if pt.wrap_option {
-        // todo
-        // tokens = quote!(::core::option::Option<#tokens>);
-        tokens = quote!(Option<#tokens>);
     }
 
     tokens
@@ -83,7 +83,7 @@ fn generate_partial_struct(model: &TransformedStruct) -> TokenStream {
 
     quote! {
         #[derive(::core::default::Default, #einstellung::serde::Deserialize)]
-        #(#[#attrs])*
+        #(#attrs)*
         #[serde(crate = #serde_lit)]
         #vis struct #partial_ident {
             #(#fields,)*
@@ -182,15 +182,19 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
             quote! { self.#ident }
         };
 
-        let resolve = match &f.build {
-            BuildStategy::SubconfigOptional => quote! { #unfreeze.map(|x| #einstellung::build_with_context(x, #complete_str, #ident_str)).transpose()? },
-            BuildStategy::SubconfigRequired => quote! { #einstellung::build_with_context(#unfreeze.unwrap_or_default(), #complete_str, #ident_str)? },
-            BuildStategy::Required => quote! { #unfreeze.ok_or(#einstellung::ConfigError::MissingField(#einstellung::FieldPath::new(#complete_str, #ident_str)))? },
-            BuildStategy::Optional => quote! { #unfreeze },
-            BuildStategy::Default(init) => match init {
-                DefaultInitializer::Value(val) => quote! { #unfreeze.unwrap_or(#val) },
-                DefaultInitializer::Call(func) => quote! { #unfreeze.unwrap_or_else(#func) },
-                DefaultInitializer::DefaultTrait => quote! { #unfreeze.unwrap_or_else(::core::default::Default::default) },
+        let built = if f.build.build {
+            quote! { #unfreeze.map(|x| #einstellung::build_with_context(x, #complete_str, #ident_str)).transpose()? }
+        } else {
+            quote! { #unfreeze }
+        };
+
+        let resolve = match &f.build.unwrap {
+            UnwrapStrategy::DontUnwrap => quote! { #built },
+            UnwrapStrategy::Unwrap  => quote! { #built.ok_or(#einstellung::ConfigError::MissingField(#einstellung::FieldPath::new(#complete_str, #ident_str)))? }, 
+            UnwrapStrategy::UnwrapWithDefault(default) => match default {
+                DefaultInitializer::Value(val) => quote! { #built.unwrap_or(#val) },
+                DefaultInitializer::Call(func) => quote! { #built.unwrap_or_else(#func) },
+                DefaultInitializer::DefaultTrait => quote! { #built.unwrap_or_else(::core::default::Default::default) },
             },
         };
 

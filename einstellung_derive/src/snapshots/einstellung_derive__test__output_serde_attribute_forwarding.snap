@@ -18,11 +18,11 @@ struct ApiConfig {
 #[serde(crate = "::einstellung::serde")]
 struct ApiConfigPartial {
     #[serde(rename = "API_KEY")]
-    key: Option<String>,
+    key: ::core::option::Option<String>,
     #[serde(alias = "max_retries", default)]
-    retries: Option<u8>,
+    retries: ::core::option::Option<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    endpoint: Option<String>,
+    endpoint: ::core::option::Option<String>,
 }
 #[automatically_derived]
 impl ::einstellung::PartialConfig for ApiConfigPartial {

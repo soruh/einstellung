@@ -13,7 +13,7 @@ struct Config {
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct ConfigPartial {
-    x: Option<u32>,
+    x: ::core::option::Option<u32>,
 }
 #[automatically_derived]
 impl ::einstellung::PartialConfig for ConfigPartial {

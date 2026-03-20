@@ -16,9 +16,9 @@ struct AppConfig {
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct AppConfigPartial {
-    app_name: Option<String>,
-    database: Option<<DatabaseConfig as ::einstellung::Config>::Partial>,
-    redis: Option<<RedisConfig as ::einstellung::Config>::Partial>,
+    app_name: ::core::option::Option<String>,
+    database: ::core::option::Option<<DatabaseConfig as ::einstellung::Config>::Partial>,
+    redis: ::core::option::Option<<RedisConfig as ::einstellung::Config>::Partial>,
 }
 #[automatically_derived]
 impl ::einstellung::PartialConfig for AppConfigPartial {
@@ -49,16 +49,24 @@ impl ::einstellung::PartialConfig for AppConfigPartial {
                     ::einstellung::FieldPath::new("AppConfig", "app_name"),
                 ),
             )?;
-        let database = ::einstellung::build_with_context(
-            self.database.unwrap_or_default(),
-            "AppConfig",
-            "database",
-        )?;
-        let redis = ::einstellung::build_with_context(
-            self.redis.unwrap_or_default(),
-            "AppConfig",
-            "redis",
-        )?;
+        let database = self
+            .database
+            .map(|x| ::einstellung::build_with_context(x, "AppConfig", "database"))
+            .transpose()?
+            .ok_or(
+                ::einstellung::ConfigError::MissingField(
+                    ::einstellung::FieldPath::new("AppConfig", "database"),
+                ),
+            )?;
+        let redis = self
+            .redis
+            .map(|x| ::einstellung::build_with_context(x, "AppConfig", "redis"))
+            .transpose()?
+            .ok_or(
+                ::einstellung::ConfigError::MissingField(
+                    ::einstellung::FieldPath::new("AppConfig", "redis"),
+                ),
+            )?;
         ::core::result::Result::Ok(AppConfig {
             app_name,
             database,
@@ -84,8 +92,8 @@ struct DatabaseConfig {
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct DatabaseConfigPartial {
-    url: Option<String>,
-    pool_size: Option<u32>,
+    url: ::core::option::Option<String>,
+    pool_size: ::core::option::Option<u32>,
 }
 #[automatically_derived]
 impl ::einstellung::PartialConfig for DatabaseConfigPartial {
@@ -136,7 +144,7 @@ struct RedisConfig {
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct RedisConfigPartial {
-    cluster_mode: Option<bool>,
+    cluster_mode: ::core::option::Option<bool>,
 }
 #[automatically_derived]
 impl ::einstellung::PartialConfig for RedisConfigPartial {

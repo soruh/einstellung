@@ -27,8 +27,8 @@ struct TlsConfig {
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct TlsConfigPartial {
-    cert_path: Option<String>,
-    port: Option<u16>,
+    cert_path: ::core::option::Option<String>,
+    port: ::core::option::Option<u16>,
 }
 #[automatically_derived]
 impl ::einstellung::PartialConfig for TlsConfigPartial {

@@ -17,9 +17,9 @@ struct NetworkConfig {
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct NetworkConfigPartial {
-    host: Option<String>,
-    port: Option<u16>,
-    timeout: Option<std::time::Duration>,
+    host: ::core::option::Option<String>,
+    port: ::core::option::Option<u16>,
+    timeout: ::core::option::Option<std::time::Duration>,
 }
 #[automatically_derived]
 impl ::einstellung::PartialConfig for NetworkConfigPartial {

@@ -4,21 +4,19 @@
 [![Docs.rs](https://docs.rs/einstellung/badge.svg)](https://docs.rs/einstellung)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 
-**Einstellung** is a flexible configuration parser for Rust based on `serde`. It
-allows you to define your application's configuration securely and ergonomically
-using strongly-typed structs.
+`einstellung` is a configuration parser for Rust based on `serde`. It
+allows you to define your application's configuration in a flexible but ergonomic way using strongly-typed structs.
 
-By providing a `#[derive(Config)]` macro, **einstellung** automatically
+By providing a `#[derive(Config)]` macro, `einstellung` automatically
 generates the necessary boilerplate to parse, validate, and merge configurations
-from multiple sources—including JSON, TOML, YAML, and hardcoded defaults—into a
-single, cohesive application state.
+from multiple sources, including JSON, TOML, YAML, and hardcoded defaults, into a
+single final config.
 
 ---
 
 ## Overview
 
-- **Strongly Typed**: Define your configuration using standard Rust structs and
-  enums.
+- **Strongly Typed**: Define your configuration using standard Rust types.
 - **Layered Configurations**: Merge configurations from multiple layers, such as
   hardcoded defaults, global files, and user-specific overrides.
 - **Format Agnostic**: Flexible storage providers backed by `serde`. Built in
@@ -27,14 +25,14 @@ single, cohesive application state.
   replace fields entirely, or write custom merge logic.
 - **Freezable Fields**: Lock specific configuration layers to prevent downstream
   overrides.
-- **Validation**: Run custom validation logic on fields during the build process
+- **Validation**: Run custom validation logic on fields during the loading process
   to ensure data integrity.
 
 ---
 
 ## Installation
 
-Add **einstellung** to your `Cargo.toml`:
+Add `einstellung` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
@@ -132,7 +130,7 @@ fn load_config() -> Result<AppConfig, ConfigError> {
 
 ## Layering Features
 
-The core power of **einstellung** lies in its partial configuration system. When
+The flexibility of `einstellung` comes from its partial configuration system. When
 you derive `Config`, the macro generates a companion "Partial" struct where all
 fields are optional.
 
@@ -152,9 +150,8 @@ fields are optional.
   meet specific criteria before the final config is built.
 - **Custom Merging**: Implement custom merge logic via
   `#[config(merge(function = "path"))]`.
-- **Serde Forwarding**: Attributes like `#[config(serde(rename = "..."))]` or
-  `alias` are forwarded to the generated partial structs to maintain consistent
-  naming across formats.
+- **Attribute Forwarding**: Attributes like `#[config(partial(...))]` are forwarded to the generated partial struct.
+  There is a shorthand syntax `#[config(serde(...))]` which is interpreted as `#[config(partial(serde(...)))]`
 - **Subconfigs**: Nest `Config` structs using the `#[config(subconfig)]`
   attribute to keep your data organized.
 
@@ -165,9 +162,7 @@ fields are optional.
 - **Main Crate Documentation**: Visit the
   [einstellung docs](https://docs.rs/einstellung) for detailed information on
   the `Config`, `PartialConfig`, and `ConfigProvider` traits.
-- **Derive Macro Reference**: See the
-  [einstellung_derive docs](https://docs.rs/einstellung_derive) for a full list
-  of supported `#[config(...)]` attributes.
+  See the documentation of the `Config` derive macro for full documentation on supported attributes.
 
 ---
 

@@ -34,31 +34,28 @@ impl ::einstellung::PartialConfig for ServerConfigPartial {
     fn build(
         self,
     ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
-        let host = self
-            .host
-            .ok_or(
-                ::einstellung::ConfigError::MissingField(
-                    ::einstellung::FieldPath::new("ServerConfig", "host"),
-                ),
-            )?;
-        let port = self
-            .port
-            .ok_or(
-                ::einstellung::ConfigError::MissingField(
-                    ::einstellung::FieldPath::new("ServerConfig", "port"),
-                ),
-            )?;
-        let is_active = self
-            .is_active
-            .ok_or(
-                ::einstellung::ConfigError::MissingField(
-                    ::einstellung::FieldPath::new("ServerConfig", "is_active"),
-                ),
-            )?;
         ::core::result::Result::Ok(ServerConfig {
-            host,
-            port,
-            is_active,
+            host: self
+                .host
+                .ok_or(
+                    ::einstellung::ConfigError::MissingField(
+                        ::einstellung::FieldPath::new("ServerConfig", "host"),
+                    ),
+                )?,
+            port: self
+                .port
+                .ok_or(
+                    ::einstellung::ConfigError::MissingField(
+                        ::einstellung::FieldPath::new("ServerConfig", "port"),
+                    ),
+                )?,
+            is_active: self
+                .is_active
+                .ok_or(
+                    ::einstellung::ConfigError::MissingField(
+                        ::einstellung::FieldPath::new("ServerConfig", "is_active"),
+                    ),
+                )?,
         })
     }
 }

@@ -29,8 +29,9 @@ impl ::einstellung::PartialConfig for ServerConfigPartial {
     fn build(
         self,
     ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
-        let host = self.host.unwrap_or_else(|| 123);
-        ::core::result::Result::Ok(ServerConfig { host })
+        ::core::result::Result::Ok(ServerConfig {
+            host: self.host.unwrap_or_else(|| 123),
+        })
     }
 }
 #[automatically_derived]

@@ -34,19 +34,16 @@ impl ::einstellung::PartialConfig for ClientConfigPartial {
     fn build(
         self,
     ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
-        let name = self
-            .name
-            .ok_or(
-                ::einstellung::ConfigError::MissingField(
-                    ::einstellung::FieldPath::new("ClientConfig", "name"),
-                ),
-            )?;
-        let timeout_ms = self.timeout_ms;
-        let proxy = self.proxy;
         ::core::result::Result::Ok(ClientConfig {
-            name,
-            timeout_ms,
-            proxy,
+            name: self
+                .name
+                .ok_or(
+                    ::einstellung::ConfigError::MissingField(
+                        ::einstellung::FieldPath::new("ClientConfig", "name"),
+                    ),
+                )?,
+            timeout_ms: self.timeout_ms,
+            proxy: self.proxy,
         })
     }
 }

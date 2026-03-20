@@ -15,7 +15,7 @@ pub fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
         Err(e) => return e.write_errors(),
     };
 
-    let model = match transformer::transform(parsed) {
+    let model = match transformer::transform_struct(parsed) {
         Ok(m) => m,
         Err(e) => return e.to_compile_error(),
     };

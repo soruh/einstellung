@@ -13,10 +13,13 @@ error[E0308]: mismatched types
 error[E0308]: mismatched types
  --> src/trybuild_tests/validate_wrong_argument_type.rs
   |
-  |     #[config(validate = validate_port)]
-  |                         ------------- arguments to this function are incorrect
-  |     port: u16,
-  |     ^^^^^^^^^ expected `&String`, found `&u16`
+  |       #[config(validate = validate_port)]
+  |                           ^------------
+  |                           |
+  |  _________________________arguments to this function are incorrect
+  | |
+  | |     port: u16,
+  | |________^ expected `&String`, found `&u16`
   |
   = note: expected reference `&std::string::String`
              found reference `&u16`

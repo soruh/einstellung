@@ -43,14 +43,15 @@ impl ::einstellung::PartialConfig for ServerConfigPartial {
     fn build(
         self,
     ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
-        let host = self
-            .host
-            .ok_or(
-                ::einstellung::ConfigError::MissingField(
-                    ::einstellung::FieldPath::new("ServerConfig", "host"),
-                ),
-            )?;
-        ::core::result::Result::Ok(ServerConfig { host })
+        ::core::result::Result::Ok(ServerConfig {
+            host: self
+                .host
+                .ok_or(
+                    ::einstellung::ConfigError::MissingField(
+                        ::einstellung::FieldPath::new("ServerConfig", "host"),
+                    ),
+                )?,
+        })
     }
 }
 #[automatically_derived]

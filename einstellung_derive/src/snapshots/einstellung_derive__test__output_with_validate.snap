@@ -1,0 +1,72 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- helper ---
+fn not_loopback(address: &std::net::IpAddr) -> Result<(), Box<dyn std::error::Error>> {
+    if address.is_loopback() {
+        return Err("Address must not be a multicast address".into());
+    }
+    Ok(())
+}
+
+// ---------------------------------
+
+/// --- input ---
+#[derive(Config, Debug)]
+struct ListenConfig {
+    #[config(validate = not_loopback)]
+    address: std::net::IpAddr,
+    #[config(default = 443)]
+    port: u16,
+}
+
+/// --- output ---
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+struct ListenConfigPartial {
+    address: ::core::option::Option<std::net::IpAddr>,
+    port: ::core::option::Option<u16>,
+}
+#[automatically_derived]
+impl ::einstellung::PartialConfig for ListenConfigPartial {
+    type Complete = ListenConfig;
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
+            address: next.address.or(self.address),
+            port: next.port.or(self.port),
+        })
+    }
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(ListenConfig {
+            address: {
+                let address: std::net::IpAddr = self
+                    .address
+                    .ok_or(
+                        ::einstellung::ConfigError::MissingField(
+                            ::einstellung::FieldPath::new("ListenConfig", "address"),
+                        ),
+                    )?;
+                let _: ::einstellung::ValidationFunction<std::net::IpAddr, _> = not_loopback;
+                if let Err(e) = (not_loopback)(&address) {
+                    return Err(::einstellung::ConfigError::Validation {
+                        field: ::einstellung::FieldPath::new("ListenConfig", "address"),
+                        #[allow(clippy::useless_conversion)]
+                        reason: e.into(),
+                    });
+                }
+                address
+            },
+            port: self.port.unwrap_or(443),
+        })
+    }
+}
+#[automatically_derived]
+impl ::einstellung::Config for ListenConfig {
+    type Partial = ListenConfigPartial;
+}

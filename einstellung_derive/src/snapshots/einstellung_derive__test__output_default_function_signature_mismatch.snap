@@ -36,8 +36,9 @@ impl ::einstellung::PartialConfig for ServerConfigPartial {
     fn build(
         self,
     ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
-        let port = self.port.unwrap_or_else(provide_default_port);
-        ::core::result::Result::Ok(ServerConfig { port })
+        ::core::result::Result::Ok(ServerConfig {
+            port: self.port.unwrap_or_else(provide_default_port),
+        })
     }
 }
 #[automatically_derived]

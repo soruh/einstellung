@@ -33,7 +33,9 @@ macro_rules! assert_macro_test {
 
                     // Parse input and output separately (both are valid Rust code individually)
                     let in_tree: syn::File = syn::parse2(input).expect("Input parse fail");
-                    let out_tree: syn::File = syn::parse2(output).expect("Output parse fail");
+                    let out_tree: syn::File = syn::parse2(output.clone()).unwrap_or_else(|err| {
+                        panic!("Output parse fail: {err}\n{output}")
+                    });
 
                     // Stitch them together using standard string formatting
                     format!(
@@ -586,6 +588,26 @@ assert_macro_test!(PASS, freezable:
         fn assert_clone<T: Clone>() -> Option<T> { None }
         fn is_clone() {
             assert_clone::<<ConfigFreezable1 as einstellung::Config>::Partial>();
+        }
+    }
+);
+
+assert_macro_test!(PASS, with_validate:
+    helper {
+        fn not_loopback(address: &std::net::IpAddr) -> Result<(), Box<dyn std::error::Error>> {
+            if address.is_loopback() {
+                return Err("Address must not be a multicast address".into());
+            }
+            Ok(())
+        }
+    }
+    {
+        #[derive(Config, Debug)]
+        struct ListenConfig {
+            #[config(validate = not_loopback)]
+            address: std::net::IpAddr,
+            #[config(default = 443)]
+            port: u16,
         }
     }
 );

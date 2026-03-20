@@ -35,20 +35,22 @@ impl ::einstellung::PartialConfig for TelemetryConfigPartial {
     fn build(
         self,
     ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
-        let enabled = self
-            .enabled
-            .ok_or(
-                ::einstellung::ConfigError::MissingField(
-                    ::einstellung::FieldPath::new("TelemetryConfig", "enabled"),
-                ),
-            )?;
-        let datadog = self
-            .datadog
-            .map(|x| ::einstellung::build_with_context(x, "TelemetryConfig", "datadog"))
-            .transpose()?;
         ::core::result::Result::Ok(TelemetryConfig {
-            enabled,
-            datadog,
+            enabled: self
+                .enabled
+                .ok_or(
+                    ::einstellung::ConfigError::MissingField(
+                        ::einstellung::FieldPath::new("TelemetryConfig", "enabled"),
+                    ),
+                )?,
+            datadog: self
+                .datadog
+                .map(|x| ::einstellung::build_with_context(
+                    x,
+                    "TelemetryConfig",
+                    "datadog",
+                ))
+                .transpose()?,
         })
     }
 }
@@ -85,14 +87,15 @@ impl ::einstellung::PartialConfig for DatadogConfigPartial {
     fn build(
         self,
     ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
-        let api_key = self
-            .api_key
-            .ok_or(
-                ::einstellung::ConfigError::MissingField(
-                    ::einstellung::FieldPath::new("DatadogConfig", "api_key"),
-                ),
-            )?;
-        ::core::result::Result::Ok(DatadogConfig { api_key })
+        ::core::result::Result::Ok(DatadogConfig {
+            api_key: self
+                .api_key
+                .ok_or(
+                    ::einstellung::ConfigError::MissingField(
+                        ::einstellung::FieldPath::new("DatadogConfig", "api_key"),
+                    ),
+                )?,
+        })
     }
 }
 #[automatically_derived]

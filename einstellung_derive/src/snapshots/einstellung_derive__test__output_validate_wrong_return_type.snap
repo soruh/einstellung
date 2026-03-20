@@ -36,22 +36,26 @@ impl ::einstellung::PartialConfig for ServerConfigPartial {
     fn build(
         self,
     ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
-        let port: u16 = self
-            .port
-            .ok_or(
-                ::einstellung::ConfigError::MissingField(
-                    ::einstellung::FieldPath::new("ServerConfig", "port"),
-                ),
-            )?;
-        let _: ::einstellung::ValidationFunction<u16, _> = validate_port;
-        if let Err(e) = (validate_port)(&port) {
-            return Err(::einstellung::ConfigError::Validation {
-                field: ::einstellung::FieldPath::new("ServerConfig", "port"),
-                #[allow(clippy::useless_conversion)]
-                reason: e.into(),
-            });
-        }
-        ::core::result::Result::Ok(ServerConfig { port })
+        ::core::result::Result::Ok(ServerConfig {
+            port: {
+                let port: u16 = self
+                    .port
+                    .ok_or(
+                        ::einstellung::ConfigError::MissingField(
+                            ::einstellung::FieldPath::new("ServerConfig", "port"),
+                        ),
+                    )?;
+                let _: ::einstellung::ValidationFunction<u16, _> = validate_port;
+                if let Err(e) = (validate_port)(&port) {
+                    return Err(::einstellung::ConfigError::Validation {
+                        field: ::einstellung::FieldPath::new("ServerConfig", "port"),
+                        #[allow(clippy::useless_conversion)]
+                        reason: e.into(),
+                    });
+                }
+                port
+            },
+        })
     }
 }
 #[automatically_derived]

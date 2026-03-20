@@ -1,5 +1,5 @@
 use super::parser::{ConfigFieldReceiver, ConfigStructReceiver};
-use crate::derive_config::parser::{DefaultStrategyReceiver, MergeStrategyReceiver};
+use crate::derive_config::parser::{DefaultStrategy, MergeStrategyReceiver};
 use syn::{GenericArgument, PathArguments, Type};
 
 #[derive(Debug)]
@@ -34,17 +34,10 @@ pub enum FreezeStrategy {
 }
 
 #[derive(Debug)]
-pub enum DefaultInitializer {
-    Value(syn::Expr),
-    Call(syn::Expr),
-    DefaultTrait,
-}
-
-#[derive(Debug)]
 pub enum UnwrapStrategy {
     DontUnwrap,
     Unwrap,
-    UnwrapWithDefault(DefaultInitializer),
+    UnwrapWithDefault(DefaultStrategy),
 }
 
 #[derive(Debug)]
@@ -69,6 +62,9 @@ pub struct PartialType {
     pub wrap_freeze: bool,
 }
 
+/// Helper to extact inner type of an `Option``.
+/// For `Option<T>` return `Some(T)`
+/// For anything else return `None`
 fn extract_type_from_option(ty: &Type) -> Option<&Type> {
     if let Type::Path(type_path) = ty
         && type_path.qself.is_none()
@@ -82,16 +78,8 @@ fn extract_type_from_option(ty: &Type) -> Option<&Type> {
     None
 }
 
-fn transform_default_strategy(strategy: DefaultStrategyReceiver) -> Option<DefaultInitializer> {
-    Some(match strategy {
-        DefaultStrategyReceiver::Value(e) => DefaultInitializer::Value(e),
-        DefaultStrategyReceiver::Call(e) => DefaultInitializer::Call(e),
-        DefaultStrategyReceiver::DefaultTrait => DefaultInitializer::DefaultTrait,
-        DefaultStrategyReceiver::None => return None,
-    })
-}
-
-pub fn transform(mut receiver: ConfigStructReceiver) -> syn::Result<TransformedStruct> {
+/// Transform the parsed struct into a type describing the output types and impls
+pub fn transform_struct(mut receiver: ConfigStructReceiver) -> syn::Result<TransformedStruct> {
     let attrs = receiver.take_partial_attrs();
 
     let complete_ident = receiver.ident.clone();
@@ -137,6 +125,7 @@ pub fn transform(mut receiver: ConfigStructReceiver) -> syn::Result<TransformedS
     }
 }
 
+/// Transform a parsed field into its partial form
 fn transform_field(
     mut field: ConfigFieldReceiver,
     all_freezeable: bool,
@@ -185,18 +174,16 @@ fn transform_field(
     };
 
     let unwrap = if complete_is_optional {
-        let span = field.default.span();
-
-        if field.default.into_inner() != DefaultStrategyReceiver::None {
+        if let Some(default) = field.default {
             return Err(syn::Error::new(
-                span,
+                default.span(),
                 "#[config[default(..)] is meaningless on an `Option` type",
             ));
         }
 
         UnwrapStrategy::DontUnwrap
-    } else if let Some(default) = transform_default_strategy(field.default.into_inner()) {
-        UnwrapStrategy::UnwrapWithDefault(default)
+    } else if let Some(default) = field.default {
+        UnwrapStrategy::UnwrapWithDefault(default.into_inner())
     } else {
         UnwrapStrategy::Unwrap
     };

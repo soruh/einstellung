@@ -40,25 +40,22 @@ impl ::einstellung::PartialConfig for ApiConfigPartial {
     fn build(
         self,
     ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
-        let key = self
-            .key
-            .ok_or(
-                ::einstellung::ConfigError::MissingField(
-                    ::einstellung::FieldPath::new("ApiConfig", "key"),
-                ),
-            )?;
-        let retries = self
-            .retries
-            .ok_or(
-                ::einstellung::ConfigError::MissingField(
-                    ::einstellung::FieldPath::new("ApiConfig", "retries"),
-                ),
-            )?;
-        let endpoint = self.endpoint;
         ::core::result::Result::Ok(ApiConfig {
-            key,
-            retries,
-            endpoint,
+            key: self
+                .key
+                .ok_or(
+                    ::einstellung::ConfigError::MissingField(
+                        ::einstellung::FieldPath::new("ApiConfig", "key"),
+                    ),
+                )?,
+            retries: self
+                .retries
+                .ok_or(
+                    ::einstellung::ConfigError::MissingField(
+                        ::einstellung::FieldPath::new("ApiConfig", "retries"),
+                    ),
+                )?,
+            endpoint: self.endpoint,
         })
     }
 }

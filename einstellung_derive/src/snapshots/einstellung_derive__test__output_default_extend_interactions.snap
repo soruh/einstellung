@@ -35,14 +35,15 @@ impl ::einstellung::PartialConfig for Config1Partial {
     fn build(
         self,
     ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
-        let x = self
-            .x
-            .ok_or(
-                ::einstellung::ConfigError::MissingField(
-                    ::einstellung::FieldPath::new("Config1", "x"),
-                ),
-            )?;
-        ::core::result::Result::Ok(Config1 { x })
+        ::core::result::Result::Ok(Config1 {
+            x: self
+                .x
+                .ok_or(
+                    ::einstellung::ConfigError::MissingField(
+                        ::einstellung::FieldPath::new("Config1", "x"),
+                    ),
+                )?,
+        })
     }
 }
 #[automatically_derived]
@@ -85,8 +86,9 @@ impl ::einstellung::PartialConfig for Config2Partial {
     fn build(
         self,
     ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
-        let x = self.x.unwrap_or_else(::core::default::Default::default);
-        ::core::result::Result::Ok(Config2 { x })
+        ::core::result::Result::Ok(Config2 {
+            x: self.x.unwrap_or_else(::core::default::Default::default),
+        })
     }
 }
 #[automatically_derived]
@@ -129,8 +131,7 @@ impl ::einstellung::PartialConfig for Config3Partial {
     fn build(
         self,
     ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
-        let x = self.x;
-        ::core::result::Result::Ok(Config3 { x })
+        ::core::result::Result::Ok(Config3 { x: self.x })
     }
 }
 #[automatically_derived]

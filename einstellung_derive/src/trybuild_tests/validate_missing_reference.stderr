@@ -11,15 +11,24 @@ error[E0308]: mismatched types
                 found fn item `fn(u16) -> Result<(), Box<(dyn StdError + 'static)>> {validate_port}`
 
 error[E0308]: mismatched types
- --> src/trybuild_tests/validate_missing_reference.rs
-  |
-  |     #[config(validate = validate_port)]
-  |                         ------------- arguments to this function are incorrect
-  |     port: u16,
-  |     ^^^^^^^^^ expected `u16`, found `&u16`
-  |
+  --> src/trybuild_tests/validate_missing_reference.rs
+   |
+   |       #[config(validate = validate_port)]
+   |                           ^------------
+   |                           |
+   |  _________________________arguments to this function are incorrect
+   | |
+   | |     port: u16,
+   | |________^ expected `u16`, found `&u16`
+   |
 note: function defined here
- --> src/trybuild_tests/validate_missing_reference.rs
-  |
-  | pub fn validate_port(_: u16) -> Result<(), Box<dyn std::error::Error>> {
-  |        ^^^^^^^^^^^^^ ------
+  --> src/trybuild_tests/validate_missing_reference.rs
+   |
+   | pub fn validate_port(_: u16) -> Result<(), Box<dyn std::error::Error>> {
+   |        ^^^^^^^^^^^^^ ------
+help: consider removing the borrow
+   |
+ 9 -     #[config(validate = validate_port)]
+10 -     port: u16,
+ 9 +     #[config(validate = port: u16,
+   |

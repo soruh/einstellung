@@ -37,13 +37,10 @@ impl ::einstellung::PartialConfig for NetworkConfigPartial {
     fn build(
         self,
     ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
-        let host = self.host.unwrap_or_else(|| "localhost".to_string());
-        let port = self.port.unwrap_or(8080);
-        let timeout = self.timeout.unwrap_or_else(|| std::time::Duration::from_secs(30));
         ::core::result::Result::Ok(NetworkConfig {
-            host,
-            port,
-            timeout,
+            host: self.host.unwrap_or_else(|| "localhost".to_string()),
+            port: self.port.unwrap_or(8080),
+            timeout: self.timeout.unwrap_or_else(|| std::time::Duration::from_secs(30)),
         })
     }
 }

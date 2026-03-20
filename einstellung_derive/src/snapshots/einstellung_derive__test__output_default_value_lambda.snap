@@ -27,8 +27,9 @@ impl ::einstellung::PartialConfig for ConfigPartial {
     fn build(
         self,
     ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
-        let x = self.x.unwrap_or_else(|| Vec::with_capacity(10));
-        ::core::result::Result::Ok(Config { x })
+        ::core::result::Result::Ok(Config {
+            x: self.x.unwrap_or_else(|| Vec::with_capacity(10)),
+        })
     }
 }
 #[automatically_derived]

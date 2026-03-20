@@ -58,24 +58,21 @@ impl ::einstellung::PartialConfig for ConfigFreezable1Partial {
     fn build(
         self,
     ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
-        let name = self.name.unwrap_or_else(|| "Freezable Config 1".to_string());
-        let pass = self
-            .pass
-            .ok_or(
-                ::einstellung::ConfigError::MissingField(
-                    ::einstellung::FieldPath::new("ConfigFreezable1", "pass"),
-                ),
-            )?;
-        let private_key = ::einstellung::Freeze::into_inner(self.private_key)
-            .ok_or(
-                ::einstellung::ConfigError::MissingField(
-                    ::einstellung::FieldPath::new("ConfigFreezable1", "private_key"),
-                ),
-            )?;
         ::core::result::Result::Ok(ConfigFreezable1 {
-            name,
-            pass,
-            private_key,
+            name: self.name.unwrap_or_else(|| "Freezable Config 1".to_string()),
+            pass: self
+                .pass
+                .ok_or(
+                    ::einstellung::ConfigError::MissingField(
+                        ::einstellung::FieldPath::new("ConfigFreezable1", "pass"),
+                    ),
+                )?,
+            private_key: ::einstellung::Freeze::into_inner(self.private_key)
+                .ok_or(
+                    ::einstellung::ConfigError::MissingField(
+                        ::einstellung::FieldPath::new("ConfigFreezable1", "private_key"),
+                    ),
+                )?,
         })
     }
 }

@@ -45,37 +45,44 @@ impl ::einstellung::PartialConfig for TlsConfigPartial {
     fn build(
         self,
     ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
-        let cert_path: String = self
-            .cert_path
-            .ok_or(
-                ::einstellung::ConfigError::MissingField(
-                    ::einstellung::FieldPath::new("TlsConfig", "cert_path"),
-                ),
-            )?;
-        let _: ::einstellung::ValidationFunction<String, _> = validators::validate_cert_path;
-        if let Err(e) = (validators::validate_cert_path)(&cert_path) {
-            return Err(::einstellung::ConfigError::Validation {
-                field: ::einstellung::FieldPath::new("TlsConfig", "cert_path"),
-                #[allow(clippy::useless_conversion)]
-                reason: e.into(),
-            });
-        }
-        let port: u16 = self
-            .port
-            .ok_or(
-                ::einstellung::ConfigError::MissingField(
-                    ::einstellung::FieldPath::new("TlsConfig", "port"),
-                ),
-            )?;
-        let _: ::einstellung::ValidationFunction<u16, _> = validators::validate_port;
-        if let Err(e) = (validators::validate_port)(&port) {
-            return Err(::einstellung::ConfigError::Validation {
-                field: ::einstellung::FieldPath::new("TlsConfig", "port"),
-                #[allow(clippy::useless_conversion)]
-                reason: e.into(),
-            });
-        }
-        ::core::result::Result::Ok(TlsConfig { cert_path, port })
+        ::core::result::Result::Ok(TlsConfig {
+            cert_path: {
+                let cert_path: String = self
+                    .cert_path
+                    .ok_or(
+                        ::einstellung::ConfigError::MissingField(
+                            ::einstellung::FieldPath::new("TlsConfig", "cert_path"),
+                        ),
+                    )?;
+                let _: ::einstellung::ValidationFunction<String, _> = validators::validate_cert_path;
+                if let Err(e) = (validators::validate_cert_path)(&cert_path) {
+                    return Err(::einstellung::ConfigError::Validation {
+                        field: ::einstellung::FieldPath::new("TlsConfig", "cert_path"),
+                        #[allow(clippy::useless_conversion)]
+                        reason: e.into(),
+                    });
+                }
+                cert_path
+            },
+            port: {
+                let port: u16 = self
+                    .port
+                    .ok_or(
+                        ::einstellung::ConfigError::MissingField(
+                            ::einstellung::FieldPath::new("TlsConfig", "port"),
+                        ),
+                    )?;
+                let _: ::einstellung::ValidationFunction<u16, _> = validators::validate_port;
+                if let Err(e) = (validators::validate_port)(&port) {
+                    return Err(::einstellung::ConfigError::Validation {
+                        field: ::einstellung::FieldPath::new("TlsConfig", "port"),
+                        #[allow(clippy::useless_conversion)]
+                        reason: e.into(),
+                    });
+                }
+                port
+            },
+        })
     }
 }
 #[automatically_derived]

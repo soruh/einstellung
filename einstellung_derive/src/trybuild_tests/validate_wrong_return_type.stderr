@@ -13,8 +13,8 @@ error[E0308]: mismatched types
 error[E0308]: mismatched types
  --> src/trybuild_tests/validate_wrong_return_type.rs
   |
-  |     port: u16,
-  |           ^^^ expected `bool`, found `Result<_, _>`
+  |     #[config(validate = validate_port)]
+  |                         ^^^^^^^^^^^^^ expected `bool`, found `Result<_, _>`
   |
   = note: expected type `bool`
              found enum `Result<_, _>`

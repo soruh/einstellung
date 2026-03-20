@@ -1,8 +1,7 @@
-use crate::derive_config::transformer::UnwrapStrategy;
+use crate::derive_config::{parser::DefaultStrategy, transformer::UnwrapStrategy};
 
 use super::transformer::{
-     DefaultInitializer, FreezeStrategy, MergeStrategy, PartialType, TransformedField,
-    TransformedStruct,
+    FreezeStrategy, MergeStrategy, PartialType, TransformedField, TransformedStruct,
 };
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote, quote_spanned};
@@ -13,6 +12,7 @@ impl ToTokens for TransformedStruct {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         generate_partial_struct(self).to_tokens(tokens);
         generate_partial_impl(self).to_tokens(tokens);
+        generate_freezable_impl(self).to_tokens(tokens);
         generate_config_impl(self).to_tokens(tokens);
     }
 }
@@ -60,6 +60,7 @@ fn render_partial_type(pt: &PartialType, einstellung: &syn::Path) -> TokenStream
     tokens
 }
 
+/// Generate the associated Partial as described by the `TransformedStruct`
 fn generate_partial_struct(model: &TransformedStruct) -> TokenStream {
     let partial_ident = &model.partial_ident;
     let vis = &model.vis;
@@ -91,6 +92,7 @@ fn generate_partial_struct(model: &TransformedStruct) -> TokenStream {
     }
 }
 
+/// Generate the code to merge the field `left` with the field `right`
 fn generate_field_merge(
     f: &TransformedField,
     einstellung: &syn::Path,
@@ -130,120 +132,139 @@ fn generate_field_merge(
     }
 }
 
-fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
-    let partial_ident = &model.partial_ident;
-    let complete_ident = &model.complete_ident;
-    let einstellung = &model.einstellung;
-    let complete_str = complete_ident.to_string();
+/// Generate the code to build a single field in a `PartialConfig::build` impl
+fn generate_build_for_field(
+    einstellung: &syn::Path,
+    complete_type_name: &str,
+    f: &TransformedField,
+) -> TokenStream {
+    let ident = &f.ident;
+    let ident_str = ident.to_string();
+    let complete_type = &f.complete_type;
 
-    let merge_fields = model.fields.iter().map(|f| {
-        let ident = &f.ident;
-
-        match f.freeze {
-            FreezeStrategy::NotFreezable => {
-                let merged = generate_field_merge(f, einstellung, &complete_str, quote!(self.#ident), quote!(next.#ident));
-                quote! { #ident: #merged }
-            }
-            FreezeStrategy::Wrapped => {
-                let ident_str = ident.to_string();
-                let merge = generate_field_merge(f, einstellung, &complete_str, quote!(left), quote!(right));
-
-                quote!{
-                    #ident: match #einstellung::FreezeCombination::of_freeze(self.#ident, next.#ident) {
-                        #einstellung::FreezeCombination::BothFree(left, right) => #einstellung::Freeze::Free(#merge),
-                        #einstellung::FreezeCombination::OneFrozen(x) => #einstellung::Freeze::Frozen(x),
-                        #einstellung::FreezeCombination::BothFrozen => return ::core::result::Result::Err(#einstellung::ConfigError::FreezeCollision(#einstellung::FieldPath::new(#complete_str, #ident_str))),
-                    }
-                }
-            },
-            FreezeStrategy::IntrinsicallyFreezable => {
-                let ident_str = ident.to_string();
-                let merge = generate_field_merge(f, einstellung, &complete_str, quote!(left), quote!(right));
-
-                quote!{
-                    #ident: match #einstellung::FreezeCombination::of(self.#ident, next.#ident) {
-                        #einstellung::FreezeCombination::BothFree(left, right) => #merge,
-                        #einstellung::FreezeCombination::OneFrozen(x) => x,
-                        #einstellung::FreezeCombination::BothFrozen => return ::core::result::Result::Err(#einstellung::ConfigError::FreezeCollision(#einstellung::FieldPath::new(#complete_str, #ident_str))),
-                    }
-                }
-            },
-        }
-    });
-
-    let build_fields = model.fields.iter().map(|f| {
-        let ident = &f.ident;
-        let ident_str = ident.to_string();
-        let complete_type = &f.complete_type;
-
-        let unfreeze = if f.freeze == FreezeStrategy::Wrapped {
-            quote! { #einstellung::Freeze::into_inner(self.#ident) }
-        } else {
-            quote! { self.#ident }
-        };
-
-        let built = if f.build.build {
-            quote! { #unfreeze.map(|x| #einstellung::build_with_context(x, #complete_str, #ident_str)).transpose()? }
-        } else {
-            quote! { #unfreeze }
-        };
-
-        let resolve = match &f.build.unwrap {
-            UnwrapStrategy::DontUnwrap => quote! { #built },
-            UnwrapStrategy::Unwrap  => quote! { #built.ok_or(#einstellung::ConfigError::MissingField(#einstellung::FieldPath::new(#complete_str, #ident_str)))? }, 
-            UnwrapStrategy::UnwrapWithDefault(default) => match default {
-                DefaultInitializer::Value(val) => quote! { #built.unwrap_or(#val) },
-                DefaultInitializer::Call(func) => quote! { #built.unwrap_or_else(#func) },
-                DefaultInitializer::DefaultTrait => quote! { #built.unwrap_or_else(::core::default::Default::default) },
-            },
-        };
-
-        if let Some(validate_func) = &f.validate_func {
-            quote_spanned! { complete_type.span() =>
-                let #ident: #complete_type = #resolve;
-                let _: #einstellung::ValidationFunction<#complete_type, _> = #validate_func;
-                if let Err(e) = (#validate_func)(&#ident) {
-                    return Err(#einstellung::ConfigError::Validation {
-                        field: #einstellung::FieldPath::new(#complete_str, #ident_str),
-                        #[allow(clippy::useless_conversion)]
-                        reason: e.into(),
-                    });
-                }
-            }
-        } else {
-            quote_spanned! { complete_type.span() => let #ident = #resolve; }
-        }
-    });
-
-    let freeze_fields = model.fields.iter().map(|f| {
-        let ident = &f.ident;
-        match f.freeze {
-            FreezeStrategy::NotFreezable => quote! { #ident: self.#ident },
-            _ => quote! { #ident: #einstellung::Freezable::freeze(self.#ident) },
-        }
-    });
-
-    let is_field_frozen = model.fields.iter().filter_map(|f| {
-        let ident = &f.ident;
-        match f.freeze {
-            FreezeStrategy::NotFreezable => None,
-            _ => Some(quote! { #einstellung::Freezable::is_frozen(&self.#ident) }),
-        }
-    });
-
-    let freezable_impl = if model.any_freezable {
-        quote! {
-            #[automatically_derived]
-            impl #einstellung::Freezable for #partial_ident {
-                fn freeze(self) -> Self { Self { #(#freeze_fields,)* } }
-                fn is_frozen(&self) -> bool { #(#is_field_frozen)||* }
-            }
-        }
+    let unfreeze = if f.freeze == FreezeStrategy::Wrapped {
+        quote! { #einstellung::Freeze::into_inner(self.#ident) }
     } else {
-        quote! {}
+        quote! { self.#ident }
     };
 
-    let field_names = model.fields.iter().map(|f| &f.ident);
+    let built = if f.build.build {
+        quote! { #unfreeze.map(|x| #einstellung::build_with_context(x, #complete_type_name, #ident_str)).transpose()? }
+    } else {
+        quote! { #unfreeze }
+    };
+
+    let resolve = match &f.build.unwrap {
+        UnwrapStrategy::DontUnwrap => quote! { #built },
+        UnwrapStrategy::Unwrap => {
+            quote! { #built.ok_or(#einstellung::ConfigError::MissingField(#einstellung::FieldPath::new(#complete_type_name, #ident_str)))? }
+        }
+        UnwrapStrategy::UnwrapWithDefault(default) => match default {
+            DefaultStrategy::Value(val) => quote! { #built.unwrap_or(#val) },
+            DefaultStrategy::Call(func) => quote! { #built.unwrap_or_else(#func) },
+            DefaultStrategy::DefaultTrait => {
+                quote! { #built.unwrap_or_else(::core::default::Default::default) }
+            }
+        },
+    };
+
+    let validated = if let Some(validate_func) = &f.validate_func {
+        quote_spanned!(validate_func.span() => {
+            let #ident: #complete_type = #resolve;
+            let _: #einstellung::ValidationFunction<#complete_type, _> = #validate_func;
+            if let Err(e) = (#validate_func)(&#ident) {
+                return Err(#einstellung::ConfigError::Validation {
+                    field: #einstellung::FieldPath::new(#complete_type_name, #ident_str),
+                    #[allow(clippy::useless_conversion)]
+                    reason: e.into(),
+                });
+            }
+            #ident
+        })
+    } else {
+        resolve
+    };
+
+    quote_spanned!(ident.span() => #ident: #validated)
+}
+
+/// Generate the code to merge a single field in a `PartialConfig::merge` impl
+fn generate_merge_for_field(
+    einstellung: &syn::Path,
+    complete_type_name: &str,
+    f: &TransformedField,
+) -> TokenStream {
+    let ident = &f.ident;
+
+    match f.freeze {
+        FreezeStrategy::NotFreezable => {
+            let merged = generate_field_merge(
+                f,
+                einstellung,
+                complete_type_name,
+                quote!(self.#ident),
+                quote!(next.#ident),
+            );
+            quote! { #ident: #merged }
+        }
+        FreezeStrategy::Wrapped => {
+            let ident_str = ident.to_string();
+            let merge = generate_field_merge(
+                f,
+                einstellung,
+                complete_type_name,
+                quote!(left),
+                quote!(right),
+            );
+
+            quote! {
+                #ident: match #einstellung::FreezeCombination::of_freeze(self.#ident, next.#ident) {
+                    #einstellung::FreezeCombination::BothFree(left, right) => #einstellung::Freeze::Free(#merge),
+                    #einstellung::FreezeCombination::OneFrozen(x) => #einstellung::Freeze::Frozen(x),
+                    #einstellung::FreezeCombination::BothFrozen => return ::core::result::Result::Err(#einstellung::ConfigError::FreezeCollision(#einstellung::FieldPath::new(#complete_type_name, #ident_str))),
+                }
+            }
+        }
+        FreezeStrategy::IntrinsicallyFreezable => {
+            let ident_str = ident.to_string();
+            let merge = generate_field_merge(
+                f,
+                einstellung,
+                complete_type_name,
+                quote!(left),
+                quote!(right),
+            );
+
+            quote! {
+                #ident: match #einstellung::FreezeCombination::of(self.#ident, next.#ident) {
+                    #einstellung::FreezeCombination::BothFree(left, right) => #merge,
+                    #einstellung::FreezeCombination::OneFrozen(x) => x,
+                    #einstellung::FreezeCombination::BothFrozen => return ::core::result::Result::Err(#einstellung::ConfigError::FreezeCollision(#einstellung::FieldPath::new(#complete_type_name, #ident_str))),
+                }
+            }
+        }
+    }
+}
+
+/// Generate the impl of `PartialConfig` for the associated partial struct
+fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
+    let TransformedStruct {
+        partial_ident,
+        complete_ident,
+        einstellung,
+        fields,
+        ..
+    } = model;
+
+    let complete_type_name = complete_ident.to_string();
+
+    let merge_fields = fields
+        .iter()
+        .map(|f| generate_merge_for_field(einstellung, &complete_type_name, f));
+
+    let build_fields = fields
+        .iter()
+        .map(|f| generate_build_for_field(einstellung, &complete_type_name, f));
 
     quote_spanned! { partial_ident.span() =>
         #[automatically_derived]
@@ -255,20 +276,63 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
             }
 
             fn build(self) -> ::core::result::Result<Self::Complete, #einstellung::ConfigError> {
-                #(#build_fields)*
-                ::core::result::Result::Ok(#complete_ident { #(#field_names,)* })
+                ::core::result::Result::Ok(#complete_ident { #(#build_fields),* })
             }
         }
-        #freezable_impl
     }
 }
 
-fn generate_config_impl(model: &TransformedStruct) -> TokenStream {
-    let complete_ident = &model.complete_ident;
-    let partial_ident = &model.partial_ident;
-    let einstellung = &model.einstellung;
+/// Generate the impl of `Freezable` for the associated partial struct if required
+fn generate_freezable_impl(model: &TransformedStruct) -> TokenStream {
+    let TransformedStruct {
+        partial_ident,
+        einstellung,
+        any_freezable,
+        fields,
+        ..
+    } = model;
 
-    quote_spanned! { complete_ident.span() =>
+    // don't impl `Freezable` for types without any freezable fields
+    if !any_freezable {
+        return quote! {};
+    }
+
+    let freeze_fields = fields.iter().map(|f| {
+        let ident = &f.ident;
+        let resolve = match f.freeze {
+            FreezeStrategy::NotFreezable => quote!(self.#ident),
+            _ => quote!(#einstellung::Freezable::freeze(self.#ident)),
+        };
+        quote_spanned!(ident.span() => #ident: #resolve)
+    });
+
+    let is_field_frozen = fields.iter().filter_map(|f| {
+        let ident = &f.ident;
+        (f.freeze != FreezeStrategy::NotFreezable).then(
+            || quote_spanned!(ident.span() => #einstellung::Freezable::is_frozen(&self.#ident)),
+        )
+    });
+
+    quote_spanned! {partial_ident.span() =>
+
+        #[automatically_derived]
+        impl #einstellung::Freezable for #partial_ident {
+            fn freeze(self) -> Self { Self { #(#freeze_fields,)* } }
+            fn is_frozen(&self) -> bool { #(#is_field_frozen)||* }
+        }
+    }
+}
+
+/// Generate the actual impl of `Config` for the input type
+fn generate_config_impl(model: &TransformedStruct) -> TokenStream {
+    let TransformedStruct {
+        partial_ident,
+        einstellung,
+        complete_ident,
+        ..
+    } = model;
+
+    quote_spanned! {partial_ident.span() =>
         #[automatically_derived]
         impl #einstellung::Config for #complete_ident {
             type Partial = #partial_ident;

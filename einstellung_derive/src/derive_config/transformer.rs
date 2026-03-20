@@ -1,5 +1,5 @@
 use super::parser::{ConfigFieldReceiver, ConfigStructReceiver};
-use crate::derive_config::parser::{DefaultStrategy, MergeStrategy};
+use crate::derive_config::parser::{DefaultStrategyReceiver, MergeStrategyReceiver};
 use darling::util::SpannedValue;
 use syn::{GenericArgument, PathArguments, Type, parse_quote};
 
@@ -10,34 +10,21 @@ pub struct TransformedStruct {
     pub any_freezable: bool,
     pub vis: syn::Visibility,
     pub fields: Vec<TransformedField>,
-    pub attrs_partial: Vec<darling::ast::NestedMeta>,
+    pub attrs: Vec<syn::Attribute>,
     pub einstellung: syn::Path,
 }
 
 #[derive(Debug)]
-pub enum FallbackStrategy {
-    Require,
-    Keep, // Used when the complete type is an Option
-    Value(syn::Expr),
-    Call(syn::Expr),
-    Standard, // Default::default()
-}
-
-#[derive(Debug)]
-pub enum FieldKind {
-    Subconfig {
-        complete_is_optional: bool,
-    },
-    Extend {
-        fallback: FallbackStrategy,
-    },
-    Replace {
-        fallback: FallbackStrategy,
-    },
-    CustomMerge {
-        func_path: SpannedValue<syn::Path>,
-        fallback: FallbackStrategy,
-    },
+pub struct TransformedField {
+    pub ident: syn::Ident,
+    pub vis: syn::Visibility,
+    pub complete_type: syn::Type,
+    pub partial_type: PartialType,
+    pub build: BuildStategy,
+    pub merge: MergeStrategy,
+    pub freeze: FreezeStrategy,
+    pub validate_func: Option<syn::Expr>,
+    pub attrs: Vec<syn::Attribute>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -48,18 +35,53 @@ pub enum FreezeStrategy {
 }
 
 #[derive(Debug)]
-pub struct TransformedField {
-    pub ident: syn::Ident,
-    pub vis: syn::Visibility,
-    pub complete_type: syn::Type,
-    pub partial_type: syn::Type,
-    pub kind: FieldKind,
-    pub freeze: FreezeStrategy,
-    pub validate_func: Option<syn::Expr>,
-    pub attrs: Vec<syn::Attribute>,
+pub enum DefaultInitializer {
+    Value(syn::Expr),
+    Call(syn::Expr),
+    DefaultTrait,
 }
 
-pub fn transform(receiver: ConfigStructReceiver) -> syn::Result<TransformedStruct> {
+#[derive(Debug)]
+pub enum BuildStategy {
+    SubconfigRequired,
+    SubconfigOptional,
+    Required,
+    Optional,
+    Default(DefaultInitializer),
+}
+
+#[derive(Debug)]
+pub enum MergeStrategy {
+    MergeSubconfig,
+    Replace,
+    Extend,
+    Custom(SpannedValue<String>),
+}
+
+#[derive(Debug)]
+pub struct PartialType {
+    pub core_type: syn::Type,
+    pub access_partial: bool,
+    pub wrap_option: bool,
+    pub wrap_freeze: bool,
+}
+
+fn extract_type_from_option(ty: &Type) -> Option<&Type> {
+    if let Type::Path(type_path) = ty
+        && type_path.qself.is_none()
+        && let Some(segment) = type_path.path.segments.last()
+        && segment.ident == "Option"
+        && let PathArguments::AngleBracketed(args) = &segment.arguments
+        && let Some(GenericArgument::Type(inner_ty)) = args.args.first()
+    {
+        return Some(inner_ty);
+    }
+    None
+}
+
+pub fn transform(mut receiver: ConfigStructReceiver) -> syn::Result<TransformedStruct> {
+    let attrs = receiver.take_partial_attrs();
+
     let complete_ident = receiver.ident.clone();
     let partial_ident = syn::Ident::new(&format!("{complete_ident}Partial"), complete_ident.span());
     let vis = receiver.vis;
@@ -70,14 +92,12 @@ pub fn transform(receiver: ConfigStructReceiver) -> syn::Result<TransformedStruc
         .take_struct()
         .expect("Only named structs supported");
 
-    let mut fields = Vec::new();
+    let any_freezable = receiver.freezable || struct_data.iter().any(|field| field.freezable);
+
+    let mut fields = Vec::with_capacity(struct_data.len());
     let mut errors: Option<syn::Error> = None;
 
-    let mut any_freezable = receiver.freezable;
-
     for field in struct_data {
-        any_freezable |= field.freezable;
-
         match transform_field(field, &einstellung, receiver.freezable) {
             Ok(f) => fields.push(f),
             Err(e) => {
@@ -97,7 +117,7 @@ pub fn transform(receiver: ConfigStructReceiver) -> syn::Result<TransformedStruc
             complete_ident,
             partial_ident,
             any_freezable,
-            attrs_partial: receiver.partial.into_iter().flat_map(|x| x.0).collect(),
+            attrs,
             vis,
             fields,
             einstellung,
@@ -106,89 +126,87 @@ pub fn transform(receiver: ConfigStructReceiver) -> syn::Result<TransformedStruc
 }
 
 fn transform_field(
-    field: ConfigFieldReceiver,
+    mut field: ConfigFieldReceiver,
     einstellung: &syn::Path,
     all_freezeable: bool,
 ) -> syn::Result<TransformedField> {
-    let ident = field.ident.clone().ok_or_else(|| {
-        syn::Error::new(proc_macro2::Span::call_site(), "Named fields are required")
-    })?;
+    let attrs = field.take_partial_attrs();
 
-    let partial_attrs = field
-        .partial
-        .into_iter()
-        .flat_map(|attr| attr.0)
-        .map(|attr| syn::parse_quote! { #[#attr] });
-
-    let serde_attrs = field
-        .serde
-        .into_iter()
-        .map(|meta| syn::parse_quote! { #[#meta] });
-
-    let attrs = partial_attrs.chain(serde_attrs).collect();
-
+    let ident = field.ident.unwrap();
     let complete_type = field.ty;
+
     let inner_type_if_optional = extract_type_from_option(&complete_type);
     let complete_is_optional = inner_type_if_optional.is_some();
     let core_type = inner_type_if_optional
         .cloned()
         .unwrap_or_else(|| complete_type.clone());
 
-    let (partial_type, kind) = if field.subconfig {
+    if field.subconfig {
         if let Some(strategy) = field.merge {
             return Err(syn::Error::new(
                 strategy.span(),
                 "Merge strategy is invalid on a subconfig",
             ));
         }
+    }
 
-        let partial_type = syn::parse_quote!(Option<<#core_type as #einstellung::Config>::Partial>);
-
-        (
-            partial_type,
-            FieldKind::Subconfig {
-                complete_is_optional,
-            },
-        )
+    let mut partial_type = if field.subconfig {
+        PartialType {
+            core_type,
+            access_partial: true,
+            wrap_option: true,
+            wrap_freeze: false,
+        }
     } else {
-        let span = field
-            .merge
-            .as_ref()
-            .map(|s| s.span())
-            .unwrap_or_else(|| ident.span());
-        let merge_strategy = match field.merge {
-            Some(m) => m.into_inner(),
-            None => MergeStrategy::Replace,
-        };
-
-        let partial_type = syn::parse_quote!(Option<#core_type>);
-
-        let kind = match merge_strategy {
-            MergeStrategy::Extend => FieldKind::Extend {
-                fallback: determine_fallback(&field.default, complete_is_optional),
-            },
-            MergeStrategy::Replace => FieldKind::Replace {
-                fallback: determine_fallback(&field.default, complete_is_optional),
-            },
-            MergeStrategy::Function(s) => {
-                let func_path = syn::parse_str::<syn::Path>(&s).map_err(|_| {
-                    syn::Error::new(span, format!("Invalid function path: '{}'", &*s))
-                })?;
-
-                let func_path = SpannedValue::new(func_path, s.span());
-
-                FieldKind::CustomMerge {
-                    func_path,
-                    fallback: determine_fallback(&field.default, complete_is_optional),
-                }
-            }
-        };
-
-        (partial_type, kind)
+        PartialType {
+            core_type,
+            access_partial: false,
+            wrap_option: true,
+            wrap_freeze: false,
+        }
     };
 
-    let freezable = field.freezable || all_freezeable;
+    // {
+    //     let span = field
+    //         .merge
+    //         .as_ref()
+    //         .map(|s| s.span())
+    //         .unwrap_or_else(|| ident.span());
+    //     let merge_strategy = match field.merge {
+    //         Some(m) => m.into_inner(),
+    //         None => MergeStrategy::Replace,
+    //     };
 
+    //     let partial_type = syn::parse_quote!(Option<#core_type>);
+
+    //     let kind = match merge_strategy {
+    //         MergeStrategyReceiver::Extend => FieldKind::Extend {
+    //             fallback: determine_fallback(&field.default, complete_is_optional),
+    //         },
+    //         MergeStrategyReceiver::Replace => FieldKind::Replace {
+    //             fallback: determine_fallback(&field.default, complete_is_optional),
+    //         },
+    //         MergeStrategyReceiver::Function(s) => {
+    //             let func_path = syn::parse_str::<syn::Path>(&s).map_err(|_| {
+    //                 syn::Error::new(span, format!("Invalid function path: '{}'", &*s))
+    //             })?;
+
+    //             let func_path = SpannedValue::new(func_path, s.span());
+
+    //             FieldKind::CustomMerge {
+    //                 func_path,
+    //                 fallback: determine_fallback(&field.default, complete_is_optional),
+    //             }
+    //         }
+    //     };
+
+    //     (partial_type, kind)
+    // }
+
+    let build = todo!();
+    let merge = todo!();
+
+    let freezable = field.freezable || all_freezeable;
     let freeze = if !freezable {
         FreezeStrategy::NotFreezable
     } else if field.subconfig {
@@ -197,54 +215,40 @@ fn transform_field(
         FreezeStrategy::Wrapped
     };
 
-    let partial_type = if freeze == FreezeStrategy::Wrapped {
-        parse_quote! { #einstellung::Freeze<#partial_type>}
-    } else {
-        partial_type
-    };
+    if freeze == FreezeStrategy::Wrapped {
+        partial_type.wrap_freeze = true;
+    }
 
     Ok(TransformedField {
         ident,
         vis: field.vis,
-        kind,
         freeze,
         partial_type,
         complete_type,
         validate_func: field.validate,
         attrs,
+        build,
+        merge,
     })
 }
 
-fn determine_fallback(default: &DefaultStrategy, is_optional: bool) -> FallbackStrategy {
+fn determine_fallback(default: &DefaultStrategyReceiver, is_optional: bool) -> FallbackStrategy {
     match default {
-        DefaultStrategy::Required => {
+        DefaultStrategyReceiver::Required => {
             if is_optional {
                 FallbackStrategy::Keep
             } else {
                 FallbackStrategy::Require
             }
         }
-        DefaultStrategy::Standard => {
+        DefaultStrategyReceiver::Standard => {
             if is_optional {
                 FallbackStrategy::Keep
             } else {
                 FallbackStrategy::Standard
             }
         }
-        DefaultStrategy::Value(e) => FallbackStrategy::Value(e.clone()),
-        DefaultStrategy::Call(e) => FallbackStrategy::Call(e.clone()),
+        DefaultStrategyReceiver::Value(e) => FallbackStrategy::Value(e.clone()),
+        DefaultStrategyReceiver::Call(e) => FallbackStrategy::Call(e.clone()),
     }
-}
-
-fn extract_type_from_option(ty: &Type) -> Option<&Type> {
-    if let Type::Path(type_path) = ty
-        && type_path.qself.is_none()
-        && let Some(segment) = type_path.path.segments.last()
-        && segment.ident == "Option"
-        && let PathArguments::AngleBracketed(args) = &segment.arguments
-        && let Some(GenericArgument::Type(inner_ty)) = args.args.first()
-    {
-        return Some(inner_ty);
-    }
-    None
 }

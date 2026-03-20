@@ -36,7 +36,7 @@ fn generate_partial_struct(model: &TransformedStruct) -> TokenStream {
     let partial_ident = &model.partial_ident;
     let vis = &model.vis;
     let einstellung = &model.einstellung;
-    let attrs = &model.attrs_partial;
+    let attrs = &model.attrs;
 
     let fields = model.fields.iter().map(|f| {
         let ident = &f.ident;

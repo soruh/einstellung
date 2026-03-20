@@ -19,6 +19,9 @@ pub struct ConfigStructReceiver {
     pub data: ast::Data<darling::util::Ignored, ConfigFieldReceiver>,
 
     #[darling(default, multiple)]
+    pub serde: Vec<syn::Meta>,
+
+    #[darling(default, multiple)]
     pub partial: Vec<PartialReceiver>,
 
     #[darling(default)]
@@ -36,33 +39,12 @@ pub struct ConfigStructReceiver {
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
-pub enum DefaultStrategy {
+pub enum DefaultStrategyReceiver {
     #[default]
     Required,
     Standard,
     Value(syn::Expr),
     Call(syn::Expr),
-}
-
-/// Custom parser for the 'default' attribute field
-fn parse_default_expr(meta: &syn::Meta) -> darling::Result<DefaultStrategy> {
-    match meta {
-        syn::Meta::Path(_) => Ok(DefaultStrategy::Standard),
-        syn::Meta::NameValue(nv) => {
-            let expr = &nv.value;
-
-            use syn::Expr::*;
-            Ok(match expr {
-                Closure(_) => DefaultStrategy::Call(expr.clone()),
-                Call(call) if call.args.is_empty() => DefaultStrategy::Call((*call.func).clone()),
-                Call(_) => DefaultStrategy::Call(parse_quote_spanned!(expr.span() => || #expr)),
-                _ => DefaultStrategy::Value(expr.clone()),
-            })
-        }
-        _ => Err(darling::Error::unsupported_format(
-            "expected default or default = ...",
-        )),
-    }
 }
 
 #[derive(FromField)]
@@ -82,23 +64,82 @@ pub struct ConfigFieldReceiver {
     pub partial: Vec<PartialReceiver>,
 
     #[darling(default, with = "parse_default_expr")]
-    pub default: DefaultStrategy,
+    pub default: DefaultStrategyReceiver,
 
     #[darling(default)]
     pub subconfig: bool,
 
     #[darling(default)]
-    pub merge: Option<SpannedValue<MergeStrategy>>,
+    pub merge: Option<SpannedValue<MergeStrategyReceiver>>,
 
     #[darling(default)]
     pub validate: Option<syn::Expr>,
 }
 
+impl ConfigStructReceiver {
+    pub fn take_partial_attrs(&mut self) -> Vec<syn::Attribute> {
+        let partial_attrs = std::mem::take(&mut self.partial)
+            .into_iter()
+            .flat_map(|meta| meta.0);
+
+        let serde_attrs = std::mem::take(&mut self.serde)
+            .into_iter()
+            .map(|meta| darling::ast::NestedMeta::Meta(meta));
+
+        partial_attrs
+            .chain(serde_attrs)
+            .map(|meta| syn::parse_quote!(#[#meta]))
+            .collect()
+    }
+}
+
+impl ConfigFieldReceiver {
+    pub fn take_partial_attrs(&mut self) -> Vec<syn::Attribute> {
+        let partial_attrs = std::mem::take(&mut self.partial)
+            .into_iter()
+            .flat_map(|meta| meta.0);
+
+        let serde_attrs = std::mem::take(&mut self.serde)
+            .into_iter()
+            .map(|meta| darling::ast::NestedMeta::Meta(meta));
+
+        partial_attrs
+            .chain(serde_attrs)
+            .map(|meta| syn::parse_quote!(#[#meta]))
+            .collect()
+    }
+}
+
 #[derive(Debug, darling::FromMeta)]
-pub enum MergeStrategy {
+pub enum MergeStrategyReceiver {
     Replace,
     Extend,
     Function(SpannedValue<String>),
+}
+
+/// Custom parser for the 'default' attribute field
+fn parse_default_expr(meta: &syn::Meta) -> darling::Result<DefaultStrategyReceiver> {
+    match meta {
+        syn::Meta::Path(_) => Ok(DefaultStrategyReceiver::Standard),
+        syn::Meta::NameValue(nv) => {
+            let expr = &nv.value;
+
+            use syn::Expr::*;
+            Ok(match expr {
+                Closure(_) => DefaultStrategyReceiver::Call(expr.clone()),
+                Call(call) if call.args.is_empty() => {
+                    DefaultStrategyReceiver::Call((*call.func).clone())
+                }
+                Call(_) => {
+                    DefaultStrategyReceiver::Call(parse_quote_spanned!(expr.span() => || #expr))
+                }
+                _ => DefaultStrategyReceiver::Value(expr.clone()),
+            })
+        }
+        _ => Err(darling::Error::unsupported_format(
+            "expected default or default = ...",
+        )),
+    }
 }
 
 pub fn parse(input: syn::DeriveInput) -> Result<ConfigStructReceiver, darling::Error> {

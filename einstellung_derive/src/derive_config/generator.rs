@@ -40,19 +40,16 @@ fn path_to_litstr(path: &syn::Path) -> syn::LitStr {
 fn render_partial_type(pt: &PartialType, einstellung: &syn::Path) -> TokenStream {
     let core = &pt.core_type;
 
-    // Determine the base type: either the core type or its Partial counterpart
     let mut tokens = if pt.access_partial {
         quote!(<#core as #einstellung::Config>::Partial)
     } else {
         quote!(#core)
     };
 
-    // Wrap in Option as partial fields are technically always optional during merging
     if pt.wrap_option {
         tokens = quote!(::core::option::Option<#tokens>);
     }
 
-    // Apply Freeze wrapping if the strategy requires it
     if pt.wrap_freeze {
         tokens = quote!(#einstellung::Freeze<#tokens>);
     }

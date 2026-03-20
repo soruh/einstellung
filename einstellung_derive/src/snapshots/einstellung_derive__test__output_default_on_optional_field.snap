@@ -1,0 +1,37 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- input ---
+#[derive(Config)]
+struct Config {
+    #[config(default)]
+    x: Option<u8>,
+}
+
+/// --- output ---
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+struct ConfigPartial {
+    x: Option<u8>,
+}
+#[automatically_derived]
+impl ::einstellung::PartialConfig for ConfigPartial {
+    type Complete = Config;
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self { x: next.x.or(self.x) })
+    }
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
+        let x = self.x;
+        ::core::result::Result::Ok(Config { x })
+    }
+}
+#[automatically_derived]
+impl ::einstellung::Config for Config {
+    type Partial = ConfigPartial;
+}

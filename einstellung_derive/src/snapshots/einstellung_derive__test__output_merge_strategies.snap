@@ -17,7 +17,6 @@ struct LoggerConfig {
 #[serde(crate = "::einstellung::serde")]
 struct LoggerConfigPartial {
     level: Option<String>,
-    #[serde(default)]
     log_files: Option<Vec<String>>,
     output_format: Option<String>,
 }

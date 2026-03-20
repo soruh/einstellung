@@ -1,8 +1,10 @@
-use crate::derive_config::transformer::{FallbackStrategy, FieldKind, FreezeStrategy, TransformedField, TransformedStruct};
+use crate::derive_config::transformer::{
+    FallbackStrategy, FieldKind, FreezeStrategy, TransformedField, TransformedStruct,
+};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote, quote_spanned};
 use std::fmt::Write;
-use syn::{ parse_quote_spanned, spanned::Spanned};
+use syn::{parse_quote_spanned, spanned::Spanned};
 
 impl ToTokens for TransformedStruct {
     fn to_tokens(&self, tokens: &mut TokenStream) {
@@ -42,20 +44,7 @@ fn generate_partial_struct(model: &TransformedStruct) -> TokenStream {
         let f_vis = &f.vis;
         let partial_type = &f.partial_type;
 
-        let needs_serde_default = if let FieldKind::Extend { complete_is_optional, .. } = &f.kind {
-            !complete_is_optional
-        } else {
-            false
-        };
-
-        let default_attr = if needs_serde_default {
-            quote! { #[serde(default)] }
-        } else {
-            quote! {}
-        };
-
         quote_spanned! { partial_type.span() =>
-            #default_attr
             #(#attrs)*
             #f_vis #ident: #partial_type
         }
@@ -74,53 +63,40 @@ fn generate_partial_struct(model: &TransformedStruct) -> TokenStream {
     }
 }
 
-fn generate_field_merge(f: &TransformedField, einstellung: &syn::Path, complete_str: &str, left: TokenStream, right: TokenStream) -> TokenStream {
-
+fn generate_field_merge(
+    f: &TransformedField,
+    einstellung: &syn::Path,
+    complete_str: &str,
+    left: TokenStream,
+    right: TokenStream,
+) -> TokenStream {
     let partial_type = &f.partial_type;
 
     match &f.kind {
         FieldKind::Replace { .. } => quote! { #right.or(#left) },
-        FieldKind::Extend {
-            partial_is_optional,
-            ..
-        } => {
-            if *partial_is_optional {
-                quote! {
-                    match (#left, #right) {
-                        (Some(mut a), Some(b)) => {
-                            ::core::iter::Extend::extend(&mut a, b);
-                            Some(a)
-                        },
-                        (a, b) => a.or(b)
-                    }
-                }
-            } else {
-                quote! {
-                    {
-                        let mut tmp = #left;
-                        tmp.extend(#right);
-                        tmp
-                    }
-                }
+        FieldKind::Extend { .. } => quote! {
+            match (#left, #right) {
+                (Some(mut a), Some(b)) => {
+                    ::core::iter::Extend::extend(&mut a, b);
+                    Some(a)
+                },
+                (a, b) => a.or(b)
             }
-        }
+        },
         FieldKind::CustomMerge { func_path, .. } => {
-
             let span = func_path.span();
             let func_path: &syn::Path = func_path;
 
             let ident_str = f.ident.to_string();
 
-            quote_spanned! { span =>
-                {
-                    let _: #einstellung::MergeFunction<#partial_type> = #func_path;
-                    #func_path(#left, #right).map_err(|reason| #einstellung::ConfigError::CustomMerge {
-                        field: #einstellung::FieldPath::new(#complete_str, #ident_str),
-                        reason,
-                    })
-                }
-            }
-        },
+            quote_spanned!(span => {
+                let _: #einstellung::MergeFunction<#partial_type> = #func_path;
+                #func_path(#left, #right).map_err(|reason| #einstellung::ConfigError::CustomMerge {
+                    field: #einstellung::FieldPath::new(#complete_str, #ident_str),
+                    reason,
+                })
+            })
+        }
         FieldKind::Subconfig { .. } => quote! {
             match (#left, #right) {
                 (Some(a), Some(b)) => Some(#einstellung::PartialConfig::merge(a, b)?),
@@ -158,7 +134,7 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
             FreezeStrategy::IntrinsicallyFreezable => {
                 let ident_str = ident.to_string();
                 let merge = generate_field_merge(f, einstellung, &complete_str, quote!(left), quote!(right));
-                
+
                 quote!{
                     match #einstellung::FreezeCombination::of(self.#ident, next.#ident) {
                         #einstellung::FreezeCombination::BothFree(left, right) => #merge,
@@ -184,21 +160,9 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
         };
 
         let resolve = match &f.kind {
-            FieldKind::Subconfig { complete_is_optional, .. } => {
-                if *complete_is_optional {
-                    quote! { #unfreeze.map(|x| #einstellung::build_with_context(x, #complete_str, #ident_str)).transpose()? }
-                } else {
-                    quote! { #einstellung::build_with_context(#unfreeze.unwrap_or_default(), #complete_str, #ident_str)? }
-                }
-            }
-            FieldKind::Extend { partial_is_optional, complete_is_optional, .. } => {
-                if *partial_is_optional && !*complete_is_optional {
-                    quote! { #unfreeze.ok_or(#einstellung::ConfigError::MissingField(#einstellung::FieldPath::new(#complete_str, #ident_str)))? }
-                } else {
-                    quote! { #unfreeze }
-                }
-            }
-            FieldKind::Replace { fallback, .. } | FieldKind::CustomMerge { fallback, .. } => match fallback {
+            FieldKind::Subconfig { complete_is_optional: true } => quote! { #unfreeze.map(|x| #einstellung::build_with_context(x, #complete_str, #ident_str)).transpose()? },
+            FieldKind::Subconfig { complete_is_optional: false } => quote! { #einstellung::build_with_context(#unfreeze.unwrap_or_default(), #complete_str, #ident_str)? },
+            FieldKind::Replace { fallback } | FieldKind::CustomMerge { fallback, .. } | FieldKind::Extend { fallback } => match fallback {
                 FallbackStrategy::Require => quote! { #unfreeze.ok_or(#einstellung::ConfigError::MissingField(#einstellung::FieldPath::new(#complete_str, #ident_str)))? },
                 FallbackStrategy::Keep => quote! { #unfreeze },
                 FallbackStrategy::Value(value) => quote! { #unfreeze.unwrap_or(#value) },
@@ -209,7 +173,7 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
 
 
         if let Some(validate_func) = &f.validate_func {
-            quote_spanned! { complete_type.span() => 
+            quote_spanned! { complete_type.span() =>
 
                 let #ident: #complete_type = #resolve;
                 let _: #einstellung::ValidationFunction<#complete_type, _> = #validate_func;
@@ -225,7 +189,6 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
             quote_spanned! { complete_type.span() => let #ident = #resolve; }
         }
     });
-
 
     let freeze_fields = model.fields.iter().map(|f| {
         let ident = &f.ident;

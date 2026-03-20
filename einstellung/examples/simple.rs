@@ -41,7 +41,7 @@ struct AppConfig {
     colors: Option<ColorConfig>,
 
     #[config(merge = "extend")]
-    #[config(default = || ["root"].collect())]
+    #[config(default = || ["root".to_string()].into_iter().collect())]
     users: HashSet<String>,
 
     max_open_files: Option<usize>,

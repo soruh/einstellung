@@ -29,8 +29,7 @@ pub enum FieldKind {
         complete_is_optional: bool,
     },
     Extend {
-        partial_is_optional: bool,
-        complete_is_optional: bool,
+        fallback: FallbackStrategy,
     },
     Replace {
         fallback: FallbackStrategy,
@@ -162,31 +161,15 @@ fn transform_field(
             None => MergeStrategy::Replace,
         };
 
-        match merge_strategy {
-            MergeStrategy::Extend => {
-                let partial_is_optional =
-                    complete_is_optional || field.default == DefaultStrategy::Required;
+        let partial_type = syn::parse_quote!(Option<#core_type>);
 
-                let partial_type = if partial_is_optional {
-                    syn::parse_quote!(Option<#core_type>)
-                } else {
-                    syn::parse_quote!(#core_type)
-                };
-
-                (
-                    partial_type,
-                    FieldKind::Extend {
-                        partial_is_optional,
-                        complete_is_optional,
-                    },
-                )
-            }
-            MergeStrategy::Replace => (
-                syn::parse_quote!(Option<#core_type>),
-                FieldKind::Replace {
-                    fallback: determine_fallback(&field.default, complete_is_optional),
-                },
-            ),
+        let kind = match merge_strategy {
+            MergeStrategy::Extend => FieldKind::Extend {
+                fallback: determine_fallback(&field.default, complete_is_optional),
+            },
+            MergeStrategy::Replace => FieldKind::Replace {
+                fallback: determine_fallback(&field.default, complete_is_optional),
+            },
             MergeStrategy::Function(s) => {
                 let func_path = syn::parse_str::<syn::Path>(&s).map_err(|_| {
                     syn::Error::new(span, format!("Invalid function path: '{}'", &*s))
@@ -194,17 +177,14 @@ fn transform_field(
 
                 let func_path = SpannedValue::new(func_path, s.span());
 
-                let partial_type = syn::parse_quote!(Option<#core_type>);
-
-                (
-                    partial_type,
-                    FieldKind::CustomMerge {
-                        func_path,
-                        fallback: determine_fallback(&field.default, complete_is_optional),
-                    },
-                )
+                FieldKind::CustomMerge {
+                    func_path,
+                    fallback: determine_fallback(&field.default, complete_is_optional),
+                }
             }
-        }
+        };
+
+        (partial_type, kind)
     };
 
     let freezable = field.freezable || all_freezeable;
@@ -244,7 +224,13 @@ fn determine_fallback(default: &DefaultStrategy, is_optional: bool) -> FallbackS
                 FallbackStrategy::Require
             }
         }
-        DefaultStrategy::Standard => FallbackStrategy::Standard,
+        DefaultStrategy::Standard => {
+            if is_optional {
+                FallbackStrategy::Keep
+            } else {
+                FallbackStrategy::Standard
+            }
+        }
         DefaultStrategy::Value(e) => FallbackStrategy::Value(e.clone()),
         DefaultStrategy::Call(e) => FallbackStrategy::Call(e.clone()),
     }

@@ -40,6 +40,7 @@ struct ListenConfig {
     port: u16,
 }
 
+#[track_caller]
 fn print_res<T: Debug>(res: Result<T, ConfigError>, expect_success: bool) -> String {
     let s = match &res {
         Ok(res) => format!("pass:\n{res:#?}"),
@@ -96,19 +97,19 @@ fn success() {
 
 #[derive(Config, Debug)]
 #[config(crate = crate)]
-struct UserConfig {
+struct UserConfig1 {
     #[config(merge = "extend", default)]
     users: BTreeSet<String>,
 }
 
 #[test]
 fn user_config() {
-    snapshot!(UserConfig, true, r#"{ "users": ["root", "bob"] }"#);
+    snapshot!(UserConfig1, true, r#"{ "users": ["root", "bob"] }"#);
 }
 
 #[test]
 fn user_config_allowed_empty() {
-    snapshot!(UserConfig, true, r#"{ }"#);
+    snapshot!(UserConfig1, true, r#"{ }"#);
 }
 
 #[derive(Config, Debug)]

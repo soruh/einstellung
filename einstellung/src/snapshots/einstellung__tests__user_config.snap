@@ -3,7 +3,7 @@ source: einstellung/src/tests.rs
 expression: "print_res(res, true)"
 ---
 pass:
-UserConfig {
+UserConfig1 {
     users: {
         "bob",
         "root",

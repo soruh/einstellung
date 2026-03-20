@@ -1,0 +1,183 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- input ---
+#[derive(Config)]
+struct Config1 {
+    #[config(merge = "extend")]
+    x: ::std::collections::HashSet<String>,
+}
+
+/// --- output ---
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+struct Config1Partial {
+    x: Option<::std::collections::HashSet<String>>,
+}
+#[automatically_derived]
+impl ::einstellung::PartialConfig for Config1Partial {
+    type Complete = Config1;
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
+            x: match (self.x, next.x) {
+                (Some(mut a), Some(b)) => {
+                    ::core::iter::Extend::extend(&mut a, b);
+                    Some(a)
+                }
+                (a, b) => a.or(b),
+            },
+        })
+    }
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
+        let x = self
+            .x
+            .ok_or(
+                ::einstellung::ConfigError::MissingField(
+                    ::einstellung::FieldPath::new("Config1", "x"),
+                ),
+            )?;
+        ::core::result::Result::Ok(Config1 { x })
+    }
+}
+#[automatically_derived]
+impl ::einstellung::Config for Config1 {
+    type Partial = Config1Partial;
+}
+
+// ---------------------------------
+
+/// --- input ---
+#[derive(Config)]
+struct Config2 {
+    #[config(merge = "extend", default)]
+    x: ::std::collections::HashSet<String>,
+}
+
+/// --- output ---
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+struct Config2Partial {
+    x: Option<::std::collections::HashSet<String>>,
+}
+#[automatically_derived]
+impl ::einstellung::PartialConfig for Config2Partial {
+    type Complete = Config2;
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
+            x: match (self.x, next.x) {
+                (Some(mut a), Some(b)) => {
+                    ::core::iter::Extend::extend(&mut a, b);
+                    Some(a)
+                }
+                (a, b) => a.or(b),
+            },
+        })
+    }
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
+        let x = self.x.unwrap_or_else(::core::default::Default::default);
+        ::core::result::Result::Ok(Config2 { x })
+    }
+}
+#[automatically_derived]
+impl ::einstellung::Config for Config2 {
+    type Partial = Config2Partial;
+}
+
+// ---------------------------------
+
+/// --- input ---
+#[derive(Config)]
+struct Config3 {
+    #[config(merge = "extend")]
+    x: Option<::std::collections::HashSet<String>>,
+}
+
+/// --- output ---
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+struct Config3Partial {
+    x: Option<::std::collections::HashSet<String>>,
+}
+#[automatically_derived]
+impl ::einstellung::PartialConfig for Config3Partial {
+    type Complete = Config3;
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
+            x: match (self.x, next.x) {
+                (Some(mut a), Some(b)) => {
+                    ::core::iter::Extend::extend(&mut a, b);
+                    Some(a)
+                }
+                (a, b) => a.or(b),
+            },
+        })
+    }
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
+        let x = self.x;
+        ::core::result::Result::Ok(Config3 { x })
+    }
+}
+#[automatically_derived]
+impl ::einstellung::Config for Config3 {
+    type Partial = Config3Partial;
+}
+
+// ---------------------------------
+
+/// --- input ---
+#[derive(Config)]
+struct Config4 {
+    #[config(merge = "extend", default)]
+    x: Option<::std::collections::HashSet<String>>,
+}
+
+/// --- output ---
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+struct Config4Partial {
+    x: Option<::std::collections::HashSet<String>>,
+}
+#[automatically_derived]
+impl ::einstellung::PartialConfig for Config4Partial {
+    type Complete = Config4;
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
+            x: match (self.x, next.x) {
+                (Some(mut a), Some(b)) => {
+                    ::core::iter::Extend::extend(&mut a, b);
+                    Some(a)
+                }
+                (a, b) => a.or(b),
+            },
+        })
+    }
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
+        let x = self.x;
+        ::core::result::Result::Ok(Config4 { x })
+    }
+}
+#[automatically_derived]
+impl ::einstellung::Config for Config4 {
+    type Partial = Config4Partial;
+}

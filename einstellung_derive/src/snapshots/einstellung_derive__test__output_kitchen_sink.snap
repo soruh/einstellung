@@ -36,10 +36,8 @@ struct FullSystemConfigPartial {
     name: Option<String>,
     port: Option<u16>,
     database: Option<<DatabaseConfig as ::einstellung::Config>::Partial>,
-    #[serde(default)]
     #[serde(alias = "files")]
     log_files: Option<Vec<String>>,
-    #[serde(default)]
     users: Option<std::collections::HashSet<String>>,
     optional_cache: Option<<CacheConfig as ::einstellung::Config>::Partial>,
 }

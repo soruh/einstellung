@@ -522,3 +522,44 @@ assert_macro_test!(PASS, serde_forward_shorthand:
         }
     }
 );
+
+assert_macro_test!(PASS, default_on_optional_field:
+    {
+        #[derive(Config)]
+        struct Config {
+            #[config(default)]
+            x: Option<u8>,
+        }
+    }
+);
+
+assert_macro_test!(PASS, default_extend_interactions:
+    {
+        #[derive(Config)]
+        struct Config1 {
+            #[config(merge="extend")]
+            x: ::std::collections::HashSet<String>,
+        }
+    }
+    {
+        #[derive(Config)]
+        struct Config2 {
+            #[config(merge="extend", default)]
+            x: ::std::collections::HashSet<String>,
+        }
+    }
+    {
+        #[derive(Config)]
+        struct Config3 {
+            #[config(merge="extend")]
+            x: Option<::std::collections::HashSet<String>>,
+        }
+    }
+    {
+        #[derive(Config)]
+        struct Config4 {
+            #[config(merge="extend", default)]
+            x: Option<::std::collections::HashSet<String>>,
+        }
+    }
+);

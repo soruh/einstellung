@@ -2,7 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/einstellung.svg)](https://crates.io/crates/einstellung)
 [![Docs.rs](https://docs.rs/einstellung/badge.svg)](https://docs.rs/einstellung)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/soruh/einstellung/.github/workflows/rust.yml?branch=master)](https://github.com/soruh/einstellung/actions)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/soruh/einstellung/.github/workflows/rust.yml?branch=main)](https://github.com/soruh/einstellung/actions)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 
 `einstellung` is a configuration parser for Rust based on `serde`. It allows you

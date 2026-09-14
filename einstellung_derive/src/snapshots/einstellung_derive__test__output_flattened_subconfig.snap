@@ -1,0 +1,137 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- input ---
+#[derive(Config)]
+struct AppConfig {
+    name: String,
+    #[config(subconfig)]
+    #[config(serde(flatten))]
+    credentials: CredentialsConfig,
+}
+
+/// --- output ---
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+struct AppConfigPartial {
+    name: ::core::option::Option<String>,
+    #[serde(flatten)]
+    credentials: ::core::option::Option<
+        <CredentialsConfig as ::einstellung::Config>::Partial,
+    >,
+}
+#[automatically_derived]
+impl ::einstellung::PartialConfig for AppConfigPartial {
+    type Complete = AppConfig;
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
+            name: next.name.or(self.name),
+            credentials: match (self.credentials, next.credentials) {
+                (Some(a), Some(b)) => Some(::einstellung::PartialConfig::merge(a, b)?),
+                (a, b) => a.or(b),
+            },
+        })
+    }
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(AppConfig {
+            name: self
+                .name
+                .ok_or(
+                    ::einstellung::ConfigError::MissingField(
+                        ::einstellung::FieldPath::new("AppConfig", "name"),
+                    ),
+                )?,
+            credentials: self
+                .credentials
+                .map(|x| ::einstellung::PartialConfig::build(x))
+                .transpose()?
+                .ok_or(
+                    ::einstellung::ConfigError::MissingField(
+                        ::einstellung::FieldPath::new("AppConfig", "credentials"),
+                    ),
+                )?,
+        })
+    }
+    fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.name).is_some() {
+            fields.push(::std::string::String::from("name"));
+        }
+        if let ::core::option::Option::Some(value) = (&self.credentials).as_ref() {
+            fields.extend(::einstellung::PartialConfig::provided_fields(value));
+        }
+        fields
+    }
+    fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if let ::core::option::Option::Some(value) = (&self.credentials).as_ref() {
+            fields.extend(::einstellung::PartialConfig::defaulted_fields(value));
+        }
+        fields
+    }
+}
+#[automatically_derived]
+impl ::einstellung::Config for AppConfig {
+    type Partial = AppConfigPartial;
+}
+
+// ---------------------------------
+
+/// --- input ---
+#[derive(Config)]
+struct CredentialsConfig {
+    api_key: String,
+}
+
+/// --- output ---
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+struct CredentialsConfigPartial {
+    api_key: ::core::option::Option<String>,
+}
+#[automatically_derived]
+impl ::einstellung::PartialConfig for CredentialsConfigPartial {
+    type Complete = CredentialsConfig;
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
+            api_key: next.api_key.or(self.api_key),
+        })
+    }
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(CredentialsConfig {
+            api_key: self
+                .api_key
+                .ok_or(
+                    ::einstellung::ConfigError::MissingField(
+                        ::einstellung::FieldPath::new("CredentialsConfig", "api_key"),
+                    ),
+                )?,
+        })
+    }
+    fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.api_key).is_some() {
+            fields.push(::std::string::String::from("api_key"));
+        }
+        fields
+    }
+    fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let fields = ::std::vec::Vec::new();
+        fields
+    }
+}
+#[automatically_derived]
+impl ::einstellung::Config for CredentialsConfig {
+    type Partial = CredentialsConfigPartial;
+}

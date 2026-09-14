@@ -81,6 +81,11 @@ mod derive_config;
 ///   of treating the field as an opaque `Option<T>`, the generated partial struct will
 ///   treat it as an `Option<T::Partial>`. When merged, both partial subconfigs will be
 ///   recursively merged. *(Note: Merge strategies cannot be applied to a subconfig).*
+/// * `#[config(subconfig)] #[config(serde(flatten))]`
+///   Flattens the nested partial through Serde while keeping merge/build diagnostics and
+///   provenance aligned with the external flattened keys. Optional flattened subconfigs remain
+///   `None` when none of their nested fields are supplied. Outer `#[config(default)]` is not
+///   supported on flattened subconfigs; place defaults on the nested fields instead.
 ///
 /// ### Merging Strategies (`merge`)
 /// Defines how values from a newer configuration layer interact with values from an

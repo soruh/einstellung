@@ -24,6 +24,7 @@ pub struct TransformedField {
     pub vis: syn::Visibility,
     pub complete_type: syn::Type,
     pub partial_type: PartialType,
+    pub flattened_subconfig: bool,
     pub build: BuildStategy,
     pub merge: MergeStrategy,
     pub freeze: FreezeStrategy,
@@ -213,6 +214,16 @@ fn serde_rename_rule(
     SerdeRenameRule::parse(&value.value(), value.span())
 }
 
+fn serde_has_flag(
+    direct: &[Meta],
+    partial: &[super::parser::PartialReceiver],
+    name: &str,
+) -> syn::Result<bool> {
+    Ok(forwarded_serde_metas(direct, partial)?
+        .iter()
+        .any(|meta| matches!(meta, Meta::Path(path) if path.is_ident(name))))
+}
+
 fn serde_field_name(
     field: &ConfigFieldReceiver,
     ident: &syn::Ident,
@@ -314,6 +325,8 @@ fn transform_field(
         .clone()
         .ok_or_else(|| syn::Error::new(field.ty.span(), "Config fields must be named"))?;
     let logical_name = serde_field_name(&field, &ident, rename_rule)?;
+    let flattened_subconfig =
+        field.subconfig && serde_has_flag(&field.serde, &field.partial, "flatten")?;
     let attrs = field.take_partial_attrs();
     let complete_type = field.ty;
 
@@ -329,6 +342,13 @@ fn transform_field(
         return Err(syn::Error::new(
             strategy.span(),
             "Merge strategy is invalid on a subconfig",
+        ));
+    }
+
+    if flattened_subconfig && let Some(default) = &field.default {
+        return Err(syn::Error::new(
+            default.span(),
+            "#[config(default)] is not supported on a flattened subconfig",
         ));
     }
 
@@ -398,6 +418,7 @@ fn transform_field(
         freeze,
         partial_type,
         complete_type,
+        flattened_subconfig,
         validate_func: field.validate,
         attrs,
         build,

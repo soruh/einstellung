@@ -132,15 +132,24 @@ fn generate_field_merge(
         }
         MergeStrategy::MergeSubconfig => {
             let ident_str = &f.logical_name;
-            quote! {
-                match (#left, #right) {
-                    (Some(a), Some(b)) => Some(#einstellung::merge_with_context(
-                        a,
-                        b,
-                        #complete_str,
-                        #ident_str,
-                    )?),
-                    (a, b) => a.or(b)
+            if f.flattened_subconfig {
+                quote! {
+                    match (#left, #right) {
+                        (Some(a), Some(b)) => Some(#einstellung::PartialConfig::merge(a, b)?),
+                        (a, b) => a.or(b)
+                    }
+                }
+            } else {
+                quote! {
+                    match (#left, #right) {
+                        (Some(a), Some(b)) => Some(#einstellung::merge_with_context(
+                            a,
+                            b,
+                            #complete_str,
+                            #ident_str,
+                        )?),
+                        (a, b) => a.or(b)
+                    }
                 }
             }
         }
@@ -163,10 +172,26 @@ fn generate_build_for_field(
         quote! { self.#ident }
     };
 
-    let built = if f.build.build {
-        quote! { #unfreeze.map(|x| #einstellung::build_with_context(x, #complete_type_name, #ident_str)).transpose()? }
+    let build_input = if f.flattened_subconfig
+        && matches!(f.build.unwrap, UnwrapStrategy::DontUnwrap)
+    {
+        quote! {
+            #unfreeze.and_then(|value| {
+                (!#einstellung::PartialConfig::provided_fields(&value).is_empty()).then_some(value)
+            })
+        }
     } else {
-        quote! { #unfreeze }
+        unfreeze
+    };
+
+    let built = if f.build.build {
+        if f.flattened_subconfig {
+            quote! { #build_input.map(|x| #einstellung::PartialConfig::build(x)).transpose()? }
+        } else {
+            quote! { #build_input.map(|x| #einstellung::build_with_context(x, #complete_type_name, #ident_str)).transpose()? }
+        }
+    } else {
+        quote! { #build_input }
     };
 
     let resolve = match &f.build.unwrap {
@@ -277,11 +302,19 @@ fn generate_provided_field(f: &TransformedField, einstellung: &syn::Path) -> Tok
     let field = partial_option_ref(f, einstellung);
 
     if f.build.build {
-        quote! {
-            if let ::core::option::Option::Some(value) = (#field).as_ref() {
-                fields.push(::std::string::String::from(#ident_str));
-                for nested in #einstellung::PartialConfig::provided_fields(value) {
-                    fields.push(::std::format!("{}.{}", #ident_str, nested));
+        if f.flattened_subconfig {
+            quote! {
+                if let ::core::option::Option::Some(value) = (#field).as_ref() {
+                    fields.extend(#einstellung::PartialConfig::provided_fields(value));
+                }
+            }
+        } else {
+            quote! {
+                if let ::core::option::Option::Some(value) = (#field).as_ref() {
+                    fields.push(::std::string::String::from(#ident_str));
+                    for nested in #einstellung::PartialConfig::provided_fields(value) {
+                        fields.push(::std::format!("{}.{}", #ident_str, nested));
+                    }
                 }
             }
         }
@@ -300,19 +333,27 @@ fn generate_defaulted_field(f: &TransformedField, einstellung: &syn::Path) -> To
     let has_default = matches!(f.build.unwrap, UnwrapStrategy::UnwrapWithDefault(_));
 
     if f.build.build {
-        let missing = has_default.then(|| {
+        if f.flattened_subconfig {
             quote! {
-                else {
-                    fields.push(::std::string::String::from(#ident_str));
+                if let ::core::option::Option::Some(value) = (#field).as_ref() {
+                    fields.extend(#einstellung::PartialConfig::defaulted_fields(value));
                 }
             }
-        });
-        quote! {
-            if let ::core::option::Option::Some(value) = (#field).as_ref() {
-                for nested in #einstellung::PartialConfig::defaulted_fields(value) {
-                    fields.push(::std::format!("{}.{}", #ident_str, nested));
+        } else {
+            let missing = has_default.then(|| {
+                quote! {
+                    else {
+                        fields.push(::std::string::String::from(#ident_str));
+                    }
                 }
-            } #missing
+            });
+            quote! {
+                if let ::core::option::Option::Some(value) = (#field).as_ref() {
+                    for nested in #einstellung::PartialConfig::defaulted_fields(value) {
+                        fields.push(::std::format!("{}.{}", #ident_str, nested));
+                    }
+                } #missing
+            }
         }
     } else if has_default {
         quote! {

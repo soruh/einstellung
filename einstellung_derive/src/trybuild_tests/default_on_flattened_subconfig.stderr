@@ -1,0 +1,5 @@
+error: #[config(default)] is not supported on a flattened subconfig
+ --> src/trybuild_tests/default_on_flattened_subconfig.rs
+  |
+  |     #[config(subconfig, default)]
+  |                         ^^^^^^^

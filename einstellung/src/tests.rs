@@ -96,6 +96,38 @@ struct RawIdentifierConfig {
 
 #[derive(Config, Debug)]
 #[config(crate = crate)]
+struct FlattenedInnerConfig {
+    value: String,
+}
+
+#[derive(Config, Debug)]
+#[config(crate = crate)]
+struct FlattenedOuterConfig {
+    name: String,
+    #[config(subconfig)]
+    #[config(serde(flatten))]
+    inner: FlattenedInnerConfig,
+}
+
+#[derive(Config, Debug)]
+#[config(crate = crate)]
+struct FlattenedCustomMergeConfig {
+    #[config(subconfig)]
+    #[config(serde(flatten))]
+    nested: CustomMergeConfig,
+}
+
+#[derive(Config, Debug)]
+#[config(crate = crate)]
+struct OptionalFlattenedOuterConfig {
+    name: String,
+    #[config(subconfig)]
+    #[config(serde(flatten))]
+    inner: Option<FlattenedInnerConfig>,
+}
+
+#[derive(Config, Debug)]
+#[config(crate = crate)]
 struct SecretConfig {
     api_key: crate::Secret<String>,
 }
@@ -931,6 +963,76 @@ fn custom_merge_accepts_convertible_error_types() {
         }
         other => panic!("unexpected error: {other}"),
     }
+}
+
+#[test]
+fn flattened_subconfigs_use_external_paths_for_provenance_and_errors() {
+    let tracked = FlattenedOuterConfig::builder()
+        .provider(&JsonFileProvider::from_contents(
+            r#"{ "name": "demo", "value": "configured" }"#,
+        ))
+        .build_tracked()
+        .unwrap();
+
+    assert_eq!(tracked.config().inner.value, "configured");
+    assert_eq!(
+        tracked.explain("value").unwrap().last().unwrap().label(),
+        "inline json"
+    );
+    assert!(tracked.explain("inner").is_none());
+    assert!(tracked.explain("inner.value").is_none());
+
+    let error = FlattenedOuterConfig::builder()
+        .provider(&JsonFileProvider::from_contents(r#"{ "name": "demo" }"#))
+        .build()
+        .unwrap_err();
+
+    assert_eq!(error.logical_path().as_deref(), Some("value"));
+    assert_eq!(
+        error
+            .field_sources()
+            .into_iter()
+            .map(crate::ConfigSource::label)
+            .collect::<Vec<_>>(),
+        vec!["inline json"]
+    );
+}
+
+#[test]
+fn optional_flattened_subconfig_stays_none_when_no_inner_fields_are_present() {
+    let absent = OptionalFlattenedOuterConfig::load_complete(&JsonFileProvider::from_contents(
+        r#"{ "name": "demo" }"#,
+    ))
+    .unwrap();
+    assert!(absent.inner.is_none());
+
+    let present = OptionalFlattenedOuterConfig::load_complete(&JsonFileProvider::from_contents(
+        r#"{ "name": "demo", "value": "configured" }"#,
+    ))
+    .unwrap();
+    assert_eq!(present.inner.unwrap().value, "configured");
+}
+
+#[test]
+fn flattened_subconfig_merge_errors_keep_external_paths() {
+    let base = FlattenedCustomMergeConfig::load_partial(&JsonFileProvider::from_contents(
+        r#"{ "value": "base" }"#,
+    ))
+    .unwrap();
+    let next = FlattenedCustomMergeConfig::load_partial(&JsonFileProvider::from_contents(
+        r#"{ "value": "" }"#,
+    ))
+    .unwrap();
+
+    let error = match base.merge(next) {
+        Ok(_) => panic!("flattened custom merge unexpectedly succeeded"),
+        Err(error) => error,
+    };
+    assert_eq!(error.logical_path().as_deref(), Some("value"));
+    assert!(matches!(
+        error.root_cause(),
+        ConfigError::CustomMerge { .. }
+    ));
 }
 
 #[test]

@@ -218,6 +218,41 @@ assert_macro_test!(PASS, optional_subconfig:
     }
 );
 
+assert_macro_test!(PASS, flattened_subconfig:
+    {
+        #[derive(Config)]
+        struct AppConfig {
+            name: String,
+            #[config(subconfig)]
+            #[config(serde(flatten))]
+            credentials: CredentialsConfig,
+        }
+    },
+    {
+        #[derive(Config)]
+        struct CredentialsConfig {
+            api_key: String,
+        }
+    }
+);
+
+assert_macro_test!(FAIL, default_on_flattened_subconfig:
+    {
+        #[derive(Config)]
+        struct AppConfig {
+            #[config(subconfig, default)]
+            #[config(serde(flatten))]
+            credentials: CredentialsConfig,
+        }
+    },
+    {
+        #[derive(Config, Default)]
+        struct CredentialsConfig {
+            api_key: String,
+        }
+    }
+);
+
 assert_macro_test!(PASS, merge_strategies: {
     #[derive(Config)]
     struct LoggerConfig {

@@ -380,6 +380,15 @@ defaults are applied. This distinction is useful for mode-specific sections:
 absence means “feature not configured,” while partial presence means “feature
 configured, so validate it completely.”
 
+Serde-flattened subconfigs are also supported with
+`#[config(subconfig)] #[config(serde(flatten))]`. Their nested keys remain flat in
+diagnostics and provenance: a nested `api_key` is tracked as `api_key`, not
+`credentials.api_key`. Optional flattened subconfigs stay `None` when none of
+their nested keys are present. An outer `#[config(default)]` is intentionally
+rejected on flattened subconfigs because Serde represents an absent flattened
+object as an empty partial, making outer-field absence ambiguous; put defaults
+on the nested fields instead.
+
 Field defaults are a final construction fallback, not an implicit merge layer.
 Providers are merged first; only then does `.build()` fill still-missing fields
 from `#[config(default ...)]` and run validators. This is why a later provider

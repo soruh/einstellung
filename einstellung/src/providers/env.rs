@@ -37,8 +37,9 @@ impl From<KeyValueProviderError> for EnvProviderError {
 /// Loads explicitly selected process environment variables into a partial configuration.
 ///
 /// The provider intentionally loads nothing unless at least one explicit mapping or prefix
-/// is configured. This avoids accidentally exposing unrelated environment variables to a
-/// configuration type.
+/// is configured. Explicit mappings query only the named process variables, so unrelated
+/// environment values are never materialized by the provider. Prefix selection necessarily
+/// enumerates the process environment in order to discover matching names.
 ///
 /// Explicit variables use dotted configuration paths, for example
 /// `with_var("DATABASE_URL", "database.url")`. A configured prefix maps matching variables
@@ -182,9 +183,38 @@ impl EnvProvider {
     }
 }
 
+impl EnvProvider {
+    fn load_from_lookup<T>(
+        &self,
+        provider_name: &'static str,
+        mut lookup: impl FnMut(&str) -> Option<OsString>,
+    ) -> Result<T, ConfigError>
+    where
+        T: DeserializeOwned,
+    {
+        debug_assert!(self.prefix.is_none());
+
+        let mut seen = std::collections::BTreeSet::new();
+        let vars = self.vars.iter().filter_map(|binding| {
+            if !seen.insert(binding.variable.clone()) {
+                return None;
+            }
+            lookup(&binding.variable).map(|value| (OsString::from(&binding.variable), value))
+        });
+
+        self.load_from_vars(provider_name, vars)
+    }
+}
+
 impl ConfigProvider for EnvProvider {
     fn load_partial<T: DeserializeOwned>(&self) -> Result<T, ConfigError> {
-        self.load_from_vars("environment", std::env::vars_os())
+        if self.prefix.is_some() {
+            // Prefix selection is discovery-based and therefore necessarily inspects the process
+            // environment. Explicit allowlists can avoid touching unrelated variables entirely.
+            self.load_from_vars("environment", std::env::vars_os())
+        } else {
+            self.load_from_lookup("environment", |variable| std::env::var_os(variable))
+        }
     }
 
     fn source(&self) -> crate::ConfigSource {
@@ -281,6 +311,38 @@ mod tests {
         assert!(config.enabled);
         assert_eq!(config.database.url, "postgres://localhost/app");
         assert_eq!(config.tags, ["api", "worker"]);
+    }
+
+    #[test]
+    fn explicit_lookup_queries_only_unique_selected_variables() {
+        #[derive(Debug, Deserialize, PartialEq)]
+        struct LookupConfig {
+            first: String,
+            first_copy: String,
+            second: String,
+        }
+
+        let provider = EnvProvider::new()
+            .with_var("FIRST", "first")
+            .with_var("FIRST", "first_copy")
+            .with_var("SECOND", "second");
+        let mut requested = Vec::new();
+
+        let config = provider
+            .load_from_lookup::<LookupConfig>("environment", |variable| {
+                requested.push(variable.to_owned());
+                match variable {
+                    "FIRST" => Some(OsString::from("one")),
+                    "SECOND" => Some(OsString::from("two")),
+                    other => panic!("unexpected environment lookup: {other}"),
+                }
+            })
+            .unwrap();
+
+        assert_eq!(requested, ["FIRST", "SECOND"]);
+        assert_eq!(config.first, "one");
+        assert_eq!(config.first_copy, "one");
+        assert_eq!(config.second, "two");
     }
 
     #[test]

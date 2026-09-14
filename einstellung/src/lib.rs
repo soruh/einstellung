@@ -144,9 +144,20 @@ impl<C: Config> ConfigBuilder<C> {
 
     /// Return the merged partial configuration without applying field defaults or validation.
     pub fn build_partial(self) -> Result<C::Partial, ConfigError> {
+        self.build_tracked_partial().map(TrackedConfig::into_inner)
+    }
+
+    /// Return the merged partial configuration together with its source provenance.
+    ///
+    /// Field defaults are not applied and therefore are not recorded. This is useful when a
+    /// composed partial will be inspected, transformed, or merged again before final construction.
+    pub fn build_tracked_partial(self) -> Result<TrackedConfig<C::Partial>, ConfigError> {
         match (self.partial, self.error) {
             (_, Some(error)) => Err(error.with_provenance(self.provenance)),
-            (Some(partial), None) => Ok(partial),
+            (Some(config), None) => Ok(TrackedConfig {
+                config,
+                provenance: self.provenance,
+            }),
             (None, None) => unreachable!("builder partial missing without error"),
         }
     }
@@ -291,7 +302,12 @@ impl<C> TrackedConfig<C> {
         }
     }
 
-    /// Consume the wrapper and return the configuration.
+    /// Consume the wrapper and return the configuration and its provenance separately.
+    pub fn into_parts(self) -> (C, ConfigProvenance) {
+        (self.config, self.provenance)
+    }
+
+    /// Consume the wrapper and return the configuration, discarding provenance.
     pub fn into_inner(self) -> C {
         self.config
     }

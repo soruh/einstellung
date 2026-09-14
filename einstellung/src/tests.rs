@@ -816,6 +816,25 @@ fn direct_load_attaches_source_to_validation_errors() {
 }
 
 #[test]
+fn tracked_partial_retains_sources_without_applying_defaults() {
+    let layer = AppConfig::load_partial(&JsonFileProvider::from_contents(
+        r#"{ "app_name": "base", "network": { "listen": { "address": "192.168.0.1" } } }"#,
+    ))
+    .unwrap();
+
+    let tracked = AppConfig::builder()
+        .layer_named("base config", layer)
+        .build_tracked_partial()
+        .unwrap();
+
+    assert_eq!(
+        tracked.explain("app_name").unwrap().last().unwrap().label(),
+        "base config"
+    );
+    assert!(tracked.explain("network.listen.port").is_none());
+}
+
+#[test]
 fn build_partial_errors_retain_prior_provenance() {
     let base = AppConfig::load_partial(&JsonFileProvider::from_contents(
         r#"{ "app_name": "base", "network": { "listen": { "address": "192.168.0.1" } } }"#,

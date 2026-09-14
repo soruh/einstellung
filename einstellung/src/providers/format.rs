@@ -140,7 +140,7 @@ impl ConfigProvider for FormatProvider<'_> {
             #[cfg(feature = "yaml")]
             ConfigFormat::Yaml => self
                 .source
-                .with_reader(|reader| Ok(serde_yaml::from_reader(reader)?)),
+                .with_reader(|reader| Ok(serde_saphyr::from_reader(reader)?)),
         }
     }
 

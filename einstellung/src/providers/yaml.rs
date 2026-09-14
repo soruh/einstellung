@@ -43,7 +43,7 @@ impl YamlFileProvider<'static> {
 impl<'i> ConfigProvider for YamlFileProvider<'i> {
     fn load_partial<T: serde::de::DeserializeOwned>(&self) -> Result<T, ConfigError> {
         self.0
-            .with_reader(|reader| Ok(serde_yaml::from_reader(reader)?))
+            .with_reader(|reader| Ok(serde_saphyr::from_reader(reader)?))
     }
 
     fn source(&self) -> crate::ConfigSource {
@@ -89,12 +89,15 @@ mod tests {
     #[test]
     fn rejects_duplicate_mapping_keys() {
         let err = YamlFileProvider::from_contents("---\nthing: true\nthing: false\n")
-            .load_partial::<serde_yaml::Value>()
+            .load_partial::<std::collections::BTreeMap<String, bool>>()
             .unwrap_err();
         let message = err.to_string();
 
-        assert!(message.contains("duplicate entry with key \"thing\""));
-        assert!(message.contains("line 2 column 1"));
+        assert!(
+            message.contains("duplicate mapping key: thing"),
+            "{message}"
+        );
+        assert!(message.contains("line 3 column 1"), "{message}");
     }
 
     #[test]

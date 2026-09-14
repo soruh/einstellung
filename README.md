@@ -48,7 +48,7 @@ You can customize enabled features to reduce compilation time or binary size:
 - `derive` (default): Enables the `#[derive(Config)]` macro.
 - `json` (default): Enables `JsonFileProvider`.
 - `toml` (default): Enables `TomlFileProvider`.
-- `yaml` (default): Enables `YamlFileProvider`, backed by the maintained `serde_yaml_ng` fork.
+- `yaml` (default): Enables `YamlFileProvider`, backed by the pure-Rust `serde-saphyr` parser.
 - `key-value`: Enables `KeyValueProvider` for dotted-path string overrides.
 - `env`: Enables the allowlist-first `EnvProvider` and `key-value`.
 - `dotenv`: Enables `DotenvProvider` and `env`. Dotenv files are parsed without

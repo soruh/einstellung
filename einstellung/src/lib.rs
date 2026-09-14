@@ -519,7 +519,7 @@ pub enum ConfigError {
 
     #[cfg(feature = "yaml")]
     #[error("YAML Parse Error: {0}")]
-    Yaml(#[from] serde_yaml::Error),
+    Yaml(#[from] serde_saphyr::Error),
 
     #[cfg(feature = "toml")]
     #[error("TOML Parse Error: {0}")]

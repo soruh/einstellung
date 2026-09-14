@@ -32,4 +32,4 @@ yaml = ["dep:serde_yaml"]
 
 full = ["dotenv", "env", "json", "toml", "yaml", "derive"]
 
-default = ["full"]
+default = ["json", "toml", "yaml", "derive"]

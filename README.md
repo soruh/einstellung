@@ -22,7 +22,7 @@ single final config.
 - **Layered Configurations**: Merge configurations from multiple layers, such as
   hardcoded defaults, global files, and user-specific overrides.
 - **Format Agnostic**: Flexible storage providers backed by `serde`. Built in
-  support for JSON, TOML, and YAML.
+  support for JSON, TOML, YAML, selected environment variables, and `.env` files.
 - **Granular Merging**: Choose to extend collections (like `HashSet` or `Vec`),
   replace fields entirely, or write custom merge logic.
 - **Freezable Fields**: Lock specific configuration layers to prevent downstream
@@ -49,7 +49,10 @@ You can customize enabled features to reduce compilation time or binary size:
 - `json` (default): Enables `JsonFileProvider`.
 - `toml` (default): Enables `TomlFileProvider`.
 - `yaml` (default): Enables `YamlFileProvider`.
-- `full` (default): Enables all format providers and the derive macro.
+- `env`: Enables the allowlist-first `EnvProvider`.
+- `dotenv`: Enables `DotenvProvider` and `env`. Dotenv files are parsed without
+  mutating the process environment.
+- `full`: Enables every provider and the derive macro.
 
 ---
 
@@ -85,7 +88,7 @@ struct ListenConfig {
 }
 
 fn main() {
-    let provider = YamlFileProvider::new("config.yaml");
+    let provider = YamlFileProvider::from_path(std::path::Path::new("config.yaml"));
     
     match AppConfig::load_complete(&provider) {
         Ok(config) => println!("Loaded config: {config:#?}"),
@@ -117,16 +120,61 @@ fn load_config() -> Result<AppConfig, ConfigError> {
     const DEFAULTS: &str = r#"{ "app_name": "MyApp", "users": ["root"], "max_open_files": 100 }"#;
 
     // Load defaults and "freeze" them to protect `max_open_files` from later changes
-    let base_layer = AppConfig::load_partial(&JsonFileProvider::new(DEFAULTS))?.freeze();
+    let base_layer = AppConfig::load_partial(&JsonFileProvider::from_contents(DEFAULTS))?.freeze();
     
     // Load an external override
-    let user_layer = TomlFileProvider::new("config.toml").load_partial()?;
+    let user_layer = TomlFileProvider::from_path(std::path::Path::new("config.toml"))
+        .load_partial()?;
 
     base_layer
         .merge(user_layer)?
         .build()
 }
 ```
+
+---
+
+### Environment and `.env` overlays
+
+Environment providers are opt-in and load nothing unless a mapping or prefix is
+configured. This makes it possible to reserve `.env` for secrets and
+machine-local paths without accidentally importing unrelated settings.
+
+```rust
+use einstellung::{Config, DotenvProvider, EnvProvider, PartialConfig, TomlFileProvider};
+
+#[derive(Config)]
+struct AppConfig {
+    api_key: String,
+    source_path: String,
+    model: String,
+}
+
+fn load_config() -> Result<AppConfig, einstellung::ConfigError> {
+    let local = EnvProvider::new()
+        .with_var("API_KEY", "api_key")
+        .with_var("SOURCE_PATH", "source_path");
+
+    let shared = AppConfig::load_partial(&TomlFileProvider::from_path(
+        std::path::Path::new("config.toml"),
+    ))?;
+    let dotenv = AppConfig::load_partial(
+        &DotenvProvider::from_path(std::path::Path::new(".env"))
+            .with_env_provider(local.clone()),
+    )?;
+    let process_env = AppConfig::load_partial(&local)?;
+
+    shared.merge(dotenv)?.merge(process_env)?.build()
+}
+```
+
+Layers are merged left-to-right in the example, so the selected process
+environment variables override the selected `.env` values, while portable
+settings such as `model` continue to come from the shared TOML file.
+
+When a JSON/TOML/YAML format is chosen at runtime, use `FormatProvider` with a
+`ConfigFormat` value instead of matching over separate provider types in the
+application.
 
 ---
 

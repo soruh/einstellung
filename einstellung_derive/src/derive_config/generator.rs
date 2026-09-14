@@ -37,7 +37,7 @@ fn path_to_litstr(path: &syn::Path) -> syn::LitStr {
 }
 
 /// Renders the Rust type for a partial field based on the PartialType metadata
-fn render_partial_type(pt: &PartialType, einstellung: &syn::Path) -> TokenStream {
+fn render_partial_value_type(pt: &PartialType, einstellung: &syn::Path) -> TokenStream {
     let core = &pt.core_type;
 
     let mut tokens = if pt.access_partial {
@@ -50,11 +50,17 @@ fn render_partial_type(pt: &PartialType, einstellung: &syn::Path) -> TokenStream
         tokens = quote!(::core::option::Option<#tokens>);
     }
 
-    if pt.wrap_freeze {
-        tokens = quote!(#einstellung::Freeze<#tokens>);
-    }
-
     tokens
+}
+
+fn render_partial_type(pt: &PartialType, einstellung: &syn::Path) -> TokenStream {
+    let tokens = render_partial_value_type(pt, einstellung);
+
+    if pt.wrap_freeze {
+        quote!(#einstellung::Freeze<#tokens>)
+    } else {
+        tokens
+    }
 }
 
 /// Generate the associated Partial as described by the `TransformedStruct`
@@ -114,7 +120,7 @@ fn generate_field_merge(
         },
         MergeStrategy::Custom(func_path) => {
             let ident_str = f.ident.to_string();
-            let partial_type = render_partial_type(&f.partial_type, einstellung);
+            let partial_type = render_partial_value_type(&f.partial_type, einstellung);
 
             quote_spanned!(func_path.span() => {
                 let _: #einstellung::MergeFunction<#partial_type, _> = #func_path;

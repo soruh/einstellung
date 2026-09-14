@@ -70,6 +70,13 @@ struct OptionalCustomMergeConfig {
 
 #[derive(Config, Debug)]
 #[config(crate = crate)]
+struct FreezableCustomMergeConfig {
+    #[config(freezable, merge(function = "merge_nonempty"))]
+    value: String,
+}
+
+#[derive(Config, Debug)]
+#[config(crate = crate)]
 struct NestedCustomMergeConfig {
     #[config(subconfig)]
     nested: CustomMergeConfig,
@@ -641,6 +648,21 @@ fn custom_merge_works_for_optional_complete_fields() {
 }
 
 #[test]
+fn custom_merge_works_for_freezable_fields() {
+    let base = FreezableCustomMergeConfig::load_partial(&JsonFileProvider::from_contents(
+        r#"{ "value": "base" }"#,
+    ))
+    .unwrap();
+    let next = FreezableCustomMergeConfig::load_partial(&JsonFileProvider::from_contents(
+        r#"{ "value": "next" }"#,
+    ))
+    .unwrap();
+
+    let merged = base.merge(next).unwrap().build().unwrap();
+    assert_eq!(merged.value, "next");
+}
+
+#[test]
 fn custom_merge_accepts_convertible_error_types() {
     let base =
         CustomMergeConfig::load_partial(&JsonFileProvider::from_contents(r#"{ "value": "base" }"#))
@@ -674,7 +696,12 @@ fn deny_unknown_fields_rejects_typos() {
     match error.root_cause() {
         ConfigError::Json(error) => {
             assert!(error.to_string().contains("data error"));
-            assert!(error.parser_error().to_string().contains("unknown field `vlaue`"));
+            assert!(
+                error
+                    .parser_error()
+                    .to_string()
+                    .contains("unknown field `vlaue`")
+            );
         }
         other => panic!("unexpected error: {other}"),
     }

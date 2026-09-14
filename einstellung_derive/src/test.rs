@@ -503,6 +503,21 @@ assert_macro_test!(PASS, custom_merge_optional_complete_field:
     }
 );
 
+assert_macro_test!(PASS, custom_merge_freezable_field:
+    helper {
+        pub fn merge_hosts(a: Option<String>, b: Option<String>) -> Result<Option<String>, &'static str> {
+            Ok(b.or(a))
+        }
+    },
+    {
+        #[derive(Config)]
+        struct ServerConfig {
+            #[config(freezable, merge(function = "merge_hosts"))]
+            host: String,
+        }
+    }
+);
+
 assert_macro_test!(PASS, default_value_literal:
     {
         #[derive(Config)]

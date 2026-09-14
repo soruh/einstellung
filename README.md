@@ -151,9 +151,7 @@ struct AppConfig {
 }
 
 fn load_config() -> Result<AppConfig, einstellung::ConfigError> {
-    let local = EnvProvider::new()
-        .with_var("API_KEY", "api_key")
-        .with_var("SOURCE_PATH", "source_path");
+    let local = EnvProvider::only(["API_KEY", "SOURCE_PATH"]);
 
     AppConfig::builder()
         .provider(&TomlFileProvider::from_path(std::path::Path::new("config.toml")))
@@ -179,8 +177,11 @@ constructs the final configuration. Use `.layer(...)` when a layer has already
 been loaded or transformed (for example, frozen).
 
 `EnvProvider` and `DotenvProvider` deliberately have no "load everything"
-default. Treat their mappings as a trust boundary: explicitly expose only the
-secrets and machine-local values that should enter the typed configuration.
+default. `EnvProvider::only(...)` is convenient when environment names map
+directly to lowercase field names; `EnvProvider::prefixed(...)` additionally
+supports `__` for nested fields. Treat these selections as a trust boundary:
+explicitly expose only the secrets and machine-local values that should enter
+the typed configuration.
 `einstellung` does not otherwise mark a field as secret or redact it from
 `Debug`; applications should keep secret fields private and avoid deriving or
 printing representations that expose them. `#[config(freezable)]` can prevent a

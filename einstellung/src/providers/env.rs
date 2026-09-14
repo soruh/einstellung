@@ -52,6 +52,41 @@ impl EnvProvider {
         Self::default()
     }
 
+    /// Create a provider that loads only the named environment variables.
+    ///
+    /// Variable names are mapped to configuration paths by lowercasing them and treating `__`
+    /// as a nested-field separator. For example, `API_KEY` maps to `api_key` and
+    /// `DATABASE__URL` maps to `database.url`. Use [`Self::with_var`] when a variable needs an
+    /// explicit mapping.
+    pub fn only<I, S>(variables: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        Self::new().with_vars(variables)
+    }
+
+    /// Add environment variables whose names map directly to configuration paths.
+    ///
+    /// This uses the same lowercase and `__` nesting rules as [`Self::only`].
+    pub fn with_vars<I, S>(mut self, variables: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        for variable in variables {
+            let variable = variable.into();
+            let path = env_key_path(&variable).join(".");
+            self = self.with_var(variable, path);
+        }
+        self
+    }
+
+    /// Create a provider that loads variables under the given prefix.
+    pub fn prefixed(prefix: impl Into<String>) -> Self {
+        Self::new().with_prefix(prefix)
+    }
+
     /// Add an explicit environment variable to configuration-field mapping.
     ///
     /// `config_path` uses `.` to address nested fields, such as `database.url`.
@@ -96,10 +131,7 @@ impl EnvProvider {
                     continue;
                 }
 
-                let path = suffix
-                    .split(NESTED_SEPARATOR)
-                    .map(str::to_ascii_lowercase)
-                    .collect::<Vec<_>>();
+                let path = env_key_path(suffix);
                 insert_env_value(provider_name, &mut root, &path, key, value)?;
             }
         }
@@ -129,6 +161,12 @@ impl ConfigProvider for EnvProvider {
     fn load_partial<T: DeserializeOwned>(&self) -> Result<T, ConfigError> {
         self.load_from_vars("environment", std::env::vars_os())
     }
+}
+
+fn env_key_path(key: &str) -> Vec<String> {
+    key.split(NESTED_SEPARATOR)
+        .map(str::to_ascii_lowercase)
+        .collect()
 }
 
 #[derive(Debug)]
@@ -571,8 +609,38 @@ mod tests {
     }
 
     #[test]
+    fn only_maps_selected_variables_by_name() {
+        let provider = EnvProvider::only([
+            "API_KEY",
+            "SOURCE_PATH",
+            "PORT",
+            "ENABLED",
+            "DATABASE__URL",
+            "TAGS",
+        ]);
+        let config = provider
+            .load_from_vars::<TestConfig>(
+                "environment",
+                vars(&[
+                    ("API_KEY", "secret"),
+                    ("SOURCE_PATH", "/srv/app"),
+                    ("PORT", "443"),
+                    ("ENABLED", "true"),
+                    ("DATABASE__URL", "postgres://db/app"),
+                    ("TAGS", r#"["one"]"#),
+                    ("IGNORED", "does-not-load"),
+                ]),
+            )
+            .unwrap();
+
+        assert_eq!(config.api_key, "secret");
+        assert_eq!(config.database.url, "postgres://db/app");
+        assert_eq!(config.tags, ["one"]);
+    }
+
+    #[test]
     fn prefix_maps_nested_fields() {
-        let provider = EnvProvider::new().with_prefix("APP_");
+        let provider = EnvProvider::prefixed("APP_");
         let config = provider
             .load_from_vars::<TestConfig>(
                 "environment",

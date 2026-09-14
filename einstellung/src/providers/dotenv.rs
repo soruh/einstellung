@@ -46,6 +46,19 @@ impl<'i> DotenvProvider<'i> {
         self
     }
 
+    /// Add dotenv variables whose names map directly to configuration paths.
+    ///
+    /// Variable names are lowercased and `__` denotes nested fields, matching
+    /// [`EnvProvider::only`].
+    pub fn with_vars<I, S>(mut self, variables: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        self.selection = self.selection.with_vars(variables);
+        self
+    }
+
     /// Load all dotenv variables under the given prefix.
     pub fn with_prefix(mut self, prefix: impl Into<String>) -> Self {
         self.selection = self.selection.with_prefix(prefix);
@@ -108,8 +121,7 @@ mod tests {
         let provider = DotenvProvider::from_contents(
             "API_KEY=secret\nSOURCE_PATH=/srv/project\nMODEL=should-not-load\n",
         )
-        .with_var("API_KEY", "api_key")
-        .with_var("SOURCE_PATH", "source_path");
+        .with_vars(["API_KEY", "SOURCE_PATH"]);
 
         let config = provider.load_partial::<LocalConfig>().unwrap();
 
@@ -126,8 +138,7 @@ mod tests {
         let provider = DotenvProvider::from_contents(
             "EINSTELLUNG_DOTENV_TEST_DO_NOT_SET=secret\nAPI_KEY=secret\nSOURCE_PATH=/tmp\n",
         )
-        .with_var("API_KEY", "api_key")
-        .with_var("SOURCE_PATH", "source_path");
+        .with_vars(["API_KEY", "SOURCE_PATH"]);
 
         let _ = provider.load_partial::<LocalConfig>().unwrap();
         assert!(std::env::var_os(KEY).is_none());

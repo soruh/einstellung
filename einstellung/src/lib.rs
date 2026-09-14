@@ -235,6 +235,20 @@ impl ConfigProvenance {
     pub fn latest_supplier(&self, path: impl AsRef<str>) -> Option<&ConfigSource> {
         self.explain(path).and_then(|sources| sources.last())
     }
+
+    /// Iterate over every tracked logical field path and its source history.
+    ///
+    /// Values are intentionally not exposed. Paths are returned in deterministic lexical order.
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &[ConfigSource])> {
+        self.fields
+            .iter()
+            .map(|(path, sources)| (path.as_str(), sources.as_slice()))
+    }
+
+    /// Return whether no field provenance has been recorded.
+    pub fn is_empty(&self) -> bool {
+        self.fields.is_empty()
+    }
 }
 
 /// A built configuration together with the provenance captured during composition.
@@ -571,6 +585,26 @@ impl ConfigError {
             Self::Validation { field, .. } | Self::CustomMerge { field, .. } => Some(field),
             Self::Source { error, .. } => error.field_path(),
             _ => None,
+        }
+    }
+
+    /// Return the external configuration source attached to this error, if any.
+    pub fn config_source(&self) -> Option<&ConfigSource> {
+        match self {
+            Self::Source { source, .. } => Some(source),
+            _ => None,
+        }
+    }
+
+    /// Return the logical dotted field path associated with this error, if any.
+    ///
+    /// This also covers mode-specific [`ConfigView`] requirements, which use owned logical paths
+    /// rather than [`FieldPath`].
+    pub fn logical_path(&self) -> Option<String> {
+        match self {
+            Self::MissingForView { field, .. } => Some(field.clone()),
+            Self::Source { error, .. } => error.logical_path(),
+            _ => self.field_path().map(FieldPath::logical_path),
         }
     }
 

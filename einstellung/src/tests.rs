@@ -780,6 +780,50 @@ fn direct_load_attaches_source_to_validation_errors() {
 }
 
 #[test]
+fn diagnostic_accessors_expose_paths_and_sources_without_values() {
+    let error = AppConfig::load_complete(&JsonFileProvider::from_contents(
+        r#"{ "app_name": "bad", "network": { "listen": { "address": "127.0.0.1" } } }"#,
+    ))
+    .unwrap_err();
+
+    assert_eq!(
+        error.logical_path().as_deref(),
+        Some("network.listen.address")
+    );
+    assert_eq!(error.config_source().unwrap().label(), "inline json");
+
+    let missing = ConfigError::missing_for_view::<RemoteMode>("remote.api_url");
+    assert_eq!(missing.logical_path().as_deref(), Some("remote.api_url"));
+    assert!(missing.config_source().is_none());
+}
+
+#[test]
+fn provenance_can_be_enumerated_without_configuration_values() {
+    let tracked = AppConfig::builder()
+        .provider(&JsonFileProvider::from_contents(
+            r#"{ "app_name": "api", "network": { "listen": { "address": "192.168.0.1" } } }"#,
+        ))
+        .build_tracked()
+        .unwrap();
+
+    let paths = tracked
+        .provenance()
+        .iter()
+        .map(|(path, sources)| (path, sources.last().unwrap().label()))
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        paths,
+        vec![
+            ("app_name", "inline json"),
+            ("network.listen.address", "inline json"),
+            ("network.listen.port", "field default"),
+        ]
+    );
+    assert!(!tracked.provenance().is_empty());
+}
+
+#[test]
 fn providers_describe_sources_without_inline_contents() {
     let provider = JsonFileProvider::from_contents(r#"{ "api_key": "do-not-leak" }"#);
     assert_eq!(

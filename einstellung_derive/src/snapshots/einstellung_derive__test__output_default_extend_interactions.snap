@@ -53,7 +53,7 @@ impl ::einstellung::PartialConfig for Config1Partial {
         fields
     }
     fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
-        let mut fields = ::std::vec::Vec::new();
+        let fields = ::std::vec::Vec::new();
         fields
     }
 }
@@ -166,7 +166,7 @@ impl ::einstellung::PartialConfig for Config3Partial {
         fields
     }
     fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
-        let mut fields = ::std::vec::Vec::new();
+        let fields = ::std::vec::Vec::new();
         fields
     }
 }

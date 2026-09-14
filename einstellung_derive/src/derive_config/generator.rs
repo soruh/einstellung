@@ -331,10 +331,22 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
 
     let provided_fields = fields
         .iter()
-        .map(|f| generate_provided_field(f, einstellung));
+        .map(|f| generate_provided_field(f, einstellung))
+        .collect::<Vec<_>>();
     let defaulted_fields = fields
         .iter()
-        .map(|f| generate_defaulted_field(f, einstellung));
+        .map(|f| generate_defaulted_field(f, einstellung))
+        .collect::<Vec<_>>();
+    let provided_fields_decl = if provided_fields.iter().any(|tokens| !tokens.is_empty()) {
+        quote!(let mut fields = ::std::vec::Vec::new();)
+    } else {
+        quote!(let fields = ::std::vec::Vec::new();)
+    };
+    let defaulted_fields_decl = if defaulted_fields.iter().any(|tokens| !tokens.is_empty()) {
+        quote!(let mut fields = ::std::vec::Vec::new();)
+    } else {
+        quote!(let fields = ::std::vec::Vec::new();)
+    };
 
     quote_spanned! { partial_ident.span() =>
         #[automatically_derived]
@@ -348,12 +360,12 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
                 ::core::result::Result::Ok(#complete_ident { #(#build_fields),* })
             }
             fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
-                let mut fields = ::std::vec::Vec::new();
+                #provided_fields_decl
                 #(#provided_fields)*
                 fields
             }
             fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
-                let mut fields = ::std::vec::Vec::new();
+                #defaulted_fields_decl
                 #(#defaulted_fields)*
                 fields
             }

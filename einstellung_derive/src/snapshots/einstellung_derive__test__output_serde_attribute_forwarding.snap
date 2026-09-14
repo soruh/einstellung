@@ -72,7 +72,7 @@ impl ::einstellung::PartialConfig for ApiConfigPartial {
         fields
     }
     fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
-        let mut fields = ::std::vec::Vec::new();
+        let fields = ::std::vec::Vec::new();
         fields
     }
 }

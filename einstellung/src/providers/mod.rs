@@ -91,6 +91,12 @@ impl<'i> FileContentProvider<'i> {
     }
 
     /// Describe this source for diagnostics without exposing inline contents.
+    #[cfg(any(
+        feature = "json",
+        feature = "toml",
+        feature = "yaml",
+        feature = "dotenv"
+    ))]
     pub(crate) fn source_label(&self, provider: &str) -> String {
         use FileContentProvider::*;
 

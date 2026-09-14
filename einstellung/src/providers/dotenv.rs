@@ -417,4 +417,23 @@ mod tests {
         assert_eq!(error.logical_path().as_deref(), Some("database.port"));
         assert!(!error.to_string().contains("super-secret-value"));
     }
+
+    #[test]
+    fn repeated_mapping_of_one_dotenv_variable_reports_exact_destination_path() {
+        #[derive(Debug, Deserialize)]
+        #[allow(dead_code)]
+        struct Config {
+            a_port: u16,
+            z_port: u16,
+        }
+
+        let provider = DotenvProvider::from_contents("PORT=not-a-number\n")
+            .with_var("PORT", "a_port")
+            .with_var("PORT", "z_port");
+        let error = provider.load_partial::<Config>().unwrap_err();
+
+        assert_eq!(error.logical_path().as_deref(), Some("a_port"));
+        assert!(error.to_string().contains("PORT"));
+        assert!(!error.to_string().contains("not-a-number"));
+    }
 }

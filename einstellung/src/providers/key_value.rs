@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, fmt};
 
-use serde::de::{self, DeserializeOwned, DeserializeSeed, IntoDeserializer, MapAccess, Visitor};
+use serde::de::{self, DeserializeOwned, DeserializeSeed, MapAccess, Visitor};
 use thiserror::Error;
 
 use crate::{ConfigError, ConfigProvider, ConfigSource};
@@ -13,6 +13,59 @@ pub enum KeyValueProviderError {
 
     #[error("invalid value for configuration input {input:?}: {message}")]
     InvalidValue { input: String, message: String },
+}
+
+#[derive(Debug)]
+pub(super) struct MappedValueError {
+    path: String,
+    source: KeyValueProviderError,
+}
+
+impl MappedValueError {
+    fn new(path: impl Into<String>, source: KeyValueProviderError) -> Self {
+        Self {
+            path: path.into(),
+            source,
+        }
+    }
+
+    fn with_path_if_unknown(mut self, path: impl Into<String>) -> Self {
+        if self.path == "<key/value>" {
+            self.path = path.into();
+        }
+        self
+    }
+
+    pub(super) fn into_parts(self) -> (String, KeyValueProviderError) {
+        (self.path, self.source)
+    }
+}
+
+impl fmt::Display for MappedValueError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.source.fmt(f)
+    }
+}
+
+impl std::error::Error for MappedValueError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.source)
+    }
+}
+
+impl de::Error for MappedValueError {
+    fn custom<T>(_message: T) -> Self
+    where
+        T: fmt::Display,
+    {
+        Self::new(
+            "<key/value>",
+            KeyValueProviderError::InvalidValue {
+                input: "<key/value>".to_owned(),
+                message: "value does not match target type".to_owned(),
+            },
+        )
+    }
 }
 
 /// Loads dotted-path string values into a partial configuration.
@@ -103,11 +156,8 @@ impl ConfigProvider for KeyValueProvider {
             )
         }))
         .map_err(|error| {
-            let path = match &error {
-                KeyValueProviderError::ConflictingPath { path } => path.clone(),
-                KeyValueProviderError::InvalidValue { input, .. } => input.clone(),
-            };
-            ConfigError::provider_at("key/value", path, error)
+            let (path, source) = error.into_parts();
+            ConfigError::provider_at("key/value", path, source)
         })
     }
 
@@ -131,17 +181,35 @@ impl MappedValue {
 
 #[derive(Debug)]
 enum ValueNode {
-    Branch(BTreeMap<String, ValueNode>),
-    Leaf { input: String, value: String },
+    Branch {
+        path: String,
+        children: BTreeMap<String, ValueNode>,
+    },
+    Leaf {
+        path: String,
+        input: String,
+        value: String,
+    },
+}
+
+impl ValueNode {
+    fn path(&self) -> &str {
+        match self {
+            Self::Branch { path, .. } | Self::Leaf { path, .. } => path,
+        }
+    }
 }
 
 pub(super) fn load_mapped_values<T>(
     values: impl IntoIterator<Item = MappedValue>,
-) -> Result<T, KeyValueProviderError>
+) -> Result<T, MappedValueError>
 where
     T: DeserializeOwned,
 {
-    let mut root = ValueNode::Branch(BTreeMap::new());
+    let mut root = ValueNode::Branch {
+        path: String::new(),
+        children: BTreeMap::new(),
+    };
     for value in values {
         insert_mapped_value(&mut root, value)?;
     }
@@ -149,38 +217,37 @@ where
     T::deserialize(ValueNodeDeserializer::new(&root))
 }
 
-fn insert_mapped_value(
-    root: &mut ValueNode,
-    mapped: MappedValue,
-) -> Result<(), KeyValueProviderError> {
+fn insert_mapped_value(root: &mut ValueNode, mapped: MappedValue) -> Result<(), MappedValueError> {
     let MappedValue { path, input, value } = mapped;
+    let logical_path = path.join(".");
+    let conflict = || {
+        MappedValueError::new(
+            logical_path.clone(),
+            KeyValueProviderError::ConflictingPath {
+                path: logical_path.clone(),
+            },
+        )
+    };
 
     if path.is_empty() || path.iter().any(String::is_empty) {
-        return Err(KeyValueProviderError::ConflictingPath {
-            path: path.join("."),
-        });
+        return Err(conflict());
     }
 
     let mut node = root;
     for (index, segment) in path.iter().enumerate() {
         let is_leaf = index + 1 == path.len();
-        let ValueNode::Branch(children) = node else {
-            return Err(KeyValueProviderError::ConflictingPath {
-                path: path.join("."),
-            });
+        let ValueNode::Branch { children, .. } = node else {
+            return Err(conflict());
         };
 
         if is_leaf {
             match children.get(segment) {
-                Some(ValueNode::Branch(_)) => {
-                    return Err(KeyValueProviderError::ConflictingPath {
-                        path: path.join("."),
-                    });
-                }
+                Some(ValueNode::Branch { .. }) => return Err(conflict()),
                 Some(ValueNode::Leaf { .. }) | None => {
                     children.insert(
                         segment.clone(),
                         ValueNode::Leaf {
+                            path: logical_path.clone(),
                             input: input.clone(),
                             value: value.clone(),
                         },
@@ -190,9 +257,13 @@ fn insert_mapped_value(
             }
         }
 
+        let branch_path = path[..=index].join(".");
         node = children
             .entry(segment.clone())
-            .or_insert_with(|| ValueNode::Branch(BTreeMap::new()));
+            .or_insert_with(|| ValueNode::Branch {
+                path: branch_path,
+                children: BTreeMap::new(),
+            });
     }
 
     Ok(())
@@ -207,28 +278,34 @@ impl<'a> ValueNodeDeserializer<'a> {
         Self { node }
     }
 
-    fn leaf(&self) -> Result<(&'a str, &'a str), KeyValueProviderError> {
+    fn leaf(&self) -> Result<(&'a str, &'a str, &'a str), MappedValueError> {
         match self.node {
-            ValueNode::Leaf { input, value } => Ok((input, value)),
-            ValueNode::Branch(_) => Err(KeyValueProviderError::InvalidValue {
-                input: "<nested mapping>".to_owned(),
-                message: "expected a scalar value".to_owned(),
-            }),
+            ValueNode::Leaf { path, input, value } => Ok((path, input, value)),
+            ValueNode::Branch { path, .. } => Err(MappedValueError::new(
+                path.clone(),
+                KeyValueProviderError::InvalidValue {
+                    input: "<nested mapping>".to_owned(),
+                    message: "expected a scalar value".to_owned(),
+                },
+            )),
         }
     }
 
-    fn invalid(input: &str, message: &'static str) -> KeyValueProviderError {
-        KeyValueProviderError::InvalidValue {
-            input: input.to_owned(),
-            message: message.to_owned(),
-        }
+    fn invalid(path: &str, input: &str, message: &'static str) -> MappedValueError {
+        MappedValueError::new(
+            path.to_owned(),
+            KeyValueProviderError::InvalidValue {
+                input: input.to_owned(),
+                message: message.to_owned(),
+            },
+        )
     }
 
-    fn json_value(&self) -> Result<(&'a str, serde_json::Value), KeyValueProviderError> {
-        let (input, value) = self.leaf()?;
-        let value =
-            serde_json::from_str(value).map_err(|_| Self::invalid(input, "invalid JSON value"))?;
-        Ok((input, value))
+    fn json_value(&self) -> Result<(&'a str, &'a str, serde_json::Value), MappedValueError> {
+        let (path, input, value) = self.leaf()?;
+        let value = serde_json::from_str(value)
+            .map_err(|_| Self::invalid(path, input, "invalid JSON value"))?;
+        Ok((path, input, value))
     }
 }
 
@@ -238,25 +315,31 @@ macro_rules! deserialize_number {
         where
             V: Visitor<'de>,
         {
-            let (input, value) = self.leaf()?;
+            let (path, input, value) = self.leaf()?;
             let parsed = value
                 .parse::<$ty>()
-                .map_err(|_| Self::invalid(input, concat!("expected ", stringify!($ty))))?;
-            visitor.$visit(parsed)
+                .map_err(|_| Self::invalid(path, input, concat!("expected ", stringify!($ty))))?;
+            visitor
+                .$visit::<MappedValueError>(parsed)
+                .map_err(|error| error.with_path_if_unknown(path))
         }
     };
 }
 
 impl<'de> de::Deserializer<'de> for ValueNodeDeserializer<'de> {
-    type Error = KeyValueProviderError;
+    type Error = MappedValueError;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
         match self.node {
-            ValueNode::Branch(children) => visitor.visit_map(ValueMapAccess::new(children)),
-            ValueNode::Leaf { value, .. } => visitor.visit_borrowed_str(value),
+            ValueNode::Branch { path, children } => visitor
+                .visit_map(ValueMapAccess::new(path, children))
+                .map_err(|error| error.with_path_if_unknown(path)),
+            ValueNode::Leaf { path, value, .. } => visitor
+                .visit_borrowed_str::<MappedValueError>(value)
+                .map_err(|error| error.with_path_if_unknown(path)),
         }
     }
 
@@ -264,11 +347,13 @@ impl<'de> de::Deserializer<'de> for ValueNodeDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        let (input, value) = self.leaf()?;
+        let (path, input, value) = self.leaf()?;
         let parsed = value
             .parse::<bool>()
-            .map_err(|_| Self::invalid(input, "expected a boolean"))?;
-        visitor.visit_bool(parsed)
+            .map_err(|_| Self::invalid(path, input, "expected a boolean"))?;
+        visitor
+            .visit_bool::<MappedValueError>(parsed)
+            .map_err(|error| error.with_path_if_unknown(path))
     }
 
     deserialize_number!(deserialize_i8, visit_i8, i8);
@@ -288,65 +373,84 @@ impl<'de> de::Deserializer<'de> for ValueNodeDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        let (input, value) = self.leaf()?;
+        let (path, input, value) = self.leaf()?;
         let mut chars = value.chars();
         let Some(value) = chars.next() else {
-            return Err(Self::invalid(input, "expected one character"));
+            return Err(Self::invalid(path, input, "expected one character"));
         };
         if chars.next().is_some() {
-            return Err(Self::invalid(input, "expected one character"));
+            return Err(Self::invalid(path, input, "expected one character"));
         }
-        visitor.visit_char(value)
+        visitor
+            .visit_char::<MappedValueError>(value)
+            .map_err(|error| error.with_path_if_unknown(path))
     }
 
     fn deserialize_str<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        let (_, value) = self.leaf()?;
-        visitor.visit_borrowed_str(value)
+        let (path, _, value) = self.leaf()?;
+        visitor
+            .visit_borrowed_str::<MappedValueError>(value)
+            .map_err(|error| error.with_path_if_unknown(path))
     }
 
     fn deserialize_string<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        let (_, value) = self.leaf()?;
-        visitor.visit_string(value.to_owned())
+        let (path, _, value) = self.leaf()?;
+        visitor
+            .visit_string::<MappedValueError>(value.to_owned())
+            .map_err(|error| error.with_path_if_unknown(path))
     }
 
     fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        let (_, value) = self.leaf()?;
-        visitor.visit_borrowed_bytes(value.as_bytes())
+        let (path, _, value) = self.leaf()?;
+        visitor
+            .visit_borrowed_bytes::<MappedValueError>(value.as_bytes())
+            .map_err(|error| error.with_path_if_unknown(path))
     }
 
     fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        let (_, value) = self.leaf()?;
-        visitor.visit_byte_buf(value.as_bytes().to_vec())
+        let (path, _, value) = self.leaf()?;
+        visitor
+            .visit_byte_buf::<MappedValueError>(value.as_bytes().to_vec())
+            .map_err(|error| error.with_path_if_unknown(path))
     }
 
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        visitor.visit_some(self)
+        let path = self.node.path().to_owned();
+        visitor
+            .visit_some(self)
+            .map_err(|error| error.with_path_if_unknown(path))
     }
 
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        let (input, value) = self.leaf()?;
+        let (path, input, value) = self.leaf()?;
         if value.is_empty() || value == "null" {
-            visitor.visit_unit()
+            visitor
+                .visit_unit::<MappedValueError>()
+                .map_err(|error| error.with_path_if_unknown(path))
         } else {
-            Err(Self::invalid(input, "expected an empty value or `null`"))
+            Err(Self::invalid(
+                path,
+                input,
+                "expected an empty value or `null`",
+            ))
         }
     }
 
@@ -369,25 +473,28 @@ impl<'de> de::Deserializer<'de> for ValueNodeDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        visitor.visit_newtype_struct(self)
+        let path = self.node.path().to_owned();
+        visitor
+            .visit_newtype_struct(self)
+            .map_err(|error| error.with_path_if_unknown(path))
     }
 
     fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        let (input, value) = self.json_value()?;
+        let (path, input, value) = self.json_value()?;
         de::Deserializer::deserialize_seq(value, visitor)
-            .map_err(|_| Self::invalid(input, "value does not match expected sequence"))
+            .map_err(|_| Self::invalid(path, input, "value does not match expected sequence"))
     }
 
     fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        let (input, value) = self.json_value()?;
+        let (path, input, value) = self.json_value()?;
         de::Deserializer::deserialize_seq(value, visitor)
-            .map_err(|_| Self::invalid(input, "value does not match expected sequence"))
+            .map_err(|_| Self::invalid(path, input, "value does not match expected sequence"))
     }
 
     fn deserialize_tuple_struct<V>(
@@ -399,9 +506,9 @@ impl<'de> de::Deserializer<'de> for ValueNodeDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        let (input, value) = self.json_value()?;
+        let (path, input, value) = self.json_value()?;
         de::Deserializer::deserialize_seq(value, visitor)
-            .map_err(|_| Self::invalid(input, "value does not match expected sequence"))
+            .map_err(|_| Self::invalid(path, input, "value does not match expected sequence"))
     }
 
     fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -409,11 +516,13 @@ impl<'de> de::Deserializer<'de> for ValueNodeDeserializer<'de> {
         V: Visitor<'de>,
     {
         match self.node {
-            ValueNode::Branch(children) => visitor.visit_map(ValueMapAccess::new(children)),
+            ValueNode::Branch { path, children } => visitor
+                .visit_map(ValueMapAccess::new(path, children))
+                .map_err(|error| error.with_path_if_unknown(path)),
             ValueNode::Leaf { .. } => {
-                let (input, value) = self.json_value()?;
+                let (path, input, value) = self.json_value()?;
                 de::Deserializer::deserialize_map(value, visitor)
-                    .map_err(|_| Self::invalid(input, "value does not match expected map"))
+                    .map_err(|_| Self::invalid(path, input, "value does not match expected map"))
             }
         }
     }
@@ -439,8 +548,10 @@ impl<'de> de::Deserializer<'de> for ValueNodeDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        let (_, value) = self.leaf()?;
-        visitor.visit_enum(value.into_deserializer())
+        let (path, input, value) = self.leaf()?;
+        visitor
+            .visit_enum(de::value::StrDeserializer::<MappedValueError>::new(value))
+            .map_err(|_| Self::invalid(path, input, "value does not match expected enum"))
     }
 
     fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -454,26 +565,36 @@ impl<'de> de::Deserializer<'de> for ValueNodeDeserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        visitor.visit_unit()
+        visitor.visit_unit::<MappedValueError>()
     }
 }
 
 struct ValueMapAccess<'a> {
+    path: &'a str,
     iter: std::collections::btree_map::Iter<'a, String, ValueNode>,
     value: Option<&'a ValueNode>,
 }
 
 impl<'a> ValueMapAccess<'a> {
-    fn new(children: &'a BTreeMap<String, ValueNode>) -> Self {
+    fn new(path: &'a str, children: &'a BTreeMap<String, ValueNode>) -> Self {
         Self {
+            path,
             iter: children.iter(),
             value: None,
+        }
+    }
+
+    fn child_path(&self, key: &str) -> String {
+        if self.path.is_empty() {
+            key.to_owned()
+        } else {
+            format!("{}.{}", self.path, key)
         }
     }
 }
 
 impl<'de> MapAccess<'de> for ValueMapAccess<'de> {
-    type Error = KeyValueProviderError;
+    type Error = MappedValueError;
 
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
     where
@@ -483,33 +604,29 @@ impl<'de> MapAccess<'de> for ValueMapAccess<'de> {
             return Ok(None);
         };
         self.value = Some(value);
-        seed.deserialize(key.as_str().into_deserializer()).map(Some)
+        let path = self.child_path(key);
+        seed.deserialize(de::value::StrDeserializer::<MappedValueError>::new(
+            key.as_str(),
+        ))
+        .map(Some)
+        .map_err(|error| error.with_path_if_unknown(path))
     }
 
     fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
     where
         V: DeserializeSeed<'de>,
     {
-        let value = self
-            .value
-            .take()
-            .ok_or_else(|| KeyValueProviderError::InvalidValue {
-                input: "<nested mapping>".to_owned(),
-                message: "map value requested before map key".to_owned(),
-            })?;
+        let value = self.value.take().ok_or_else(|| {
+            MappedValueError::new(
+                self.path.to_owned(),
+                KeyValueProviderError::InvalidValue {
+                    input: "<nested mapping>".to_owned(),
+                    message: "map value requested before map key".to_owned(),
+                },
+            )
+        })?;
         seed.deserialize(ValueNodeDeserializer::new(value))
-    }
-}
-
-impl de::Error for KeyValueProviderError {
-    fn custom<T>(_message: T) -> Self
-    where
-        T: fmt::Display,
-    {
-        Self::InvalidValue {
-            input: "<key/value>".to_owned(),
-            message: "value does not match target type".to_owned(),
-        }
+            .map_err(|error| error.with_path_if_unknown(value.path()))
     }
 }
 
@@ -642,5 +759,30 @@ mod tests {
         assert_eq!(error.logical_path().as_deref(), Some("database.port"));
         assert!(!error.to_string().contains("not-a-port"));
         assert!(!format!("{error:?}").contains("not-a-port"));
+    }
+
+    #[test]
+    fn unknown_nested_keys_report_their_destination_path() {
+        #[derive(Debug, Deserialize)]
+        #[serde(deny_unknown_fields)]
+        #[allow(dead_code)]
+        struct Config {
+            database: StrictDatabase,
+        }
+
+        #[derive(Debug, Deserialize)]
+        #[serde(deny_unknown_fields)]
+        #[allow(dead_code)]
+        struct StrictDatabase {
+            url: String,
+        }
+
+        let error = KeyValueProvider::new()
+            .with("database.typo", "secret")
+            .load_partial::<Config>()
+            .unwrap_err();
+
+        assert_eq!(error.logical_path().as_deref(), Some("database.typo"));
+        assert!(!error.to_string().contains("secret"));
     }
 }

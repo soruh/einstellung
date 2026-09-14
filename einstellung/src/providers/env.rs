@@ -131,7 +131,6 @@ impl EnvProvider {
     {
         let vars: Vec<_> = vars.into_iter().collect();
         let mut mapped = Vec::new();
-        let mut input_paths = std::collections::BTreeMap::new();
 
         if let Some(prefix) = &self.prefix {
             for (key, value) in &vars {
@@ -146,7 +145,6 @@ impl EnvProvider {
                 }
 
                 let path = env_key_path(suffix);
-                input_paths.insert(key.to_owned(), path.join("."));
                 mapped.push(mapped_env_value(provider_name, path, key, value)?);
             }
         }
@@ -161,7 +159,6 @@ impl EnvProvider {
             };
 
             let path = binding.path.split('.').map(str::to_owned).collect();
-            input_paths.insert(binding.variable.clone(), binding.path.clone());
             mapped.push(mapped_env_value(
                 provider_name,
                 path,
@@ -171,14 +168,8 @@ impl EnvProvider {
         }
 
         load_mapped_values(mapped).map_err(|error| {
-            let path = match &error {
-                KeyValueProviderError::ConflictingPath { path } => path.clone(),
-                KeyValueProviderError::InvalidValue { input, .. } => input_paths
-                    .get(input)
-                    .cloned()
-                    .unwrap_or_else(|| input.clone()),
-            };
-            ConfigError::provider_at(provider_name, path, EnvProviderError::from(error))
+            let (path, source) = error.into_parts();
+            ConfigError::provider_at(provider_name, path, EnvProviderError::from(source))
         })
     }
 }
@@ -448,5 +439,29 @@ mod tests {
 
         assert_eq!(error.logical_path().as_deref(), Some("database.port"));
         assert!(!error.to_string().contains("super-secret-value"));
+    }
+
+    #[test]
+    fn one_variable_mapped_to_multiple_fields_reports_the_failing_destination() {
+        #[derive(Debug, Deserialize)]
+        #[allow(dead_code)]
+        struct Config {
+            a_port: u16,
+            z_port: u16,
+        }
+
+        let provider = EnvProvider::new()
+            .with_var("PORT", "a_port")
+            .with_var("PORT", "z_port");
+        let error = provider
+            .load_from_vars::<Config>(
+                "environment",
+                [(OsString::from("PORT"), OsString::from("not-a-number"))],
+            )
+            .unwrap_err();
+
+        assert_eq!(error.logical_path().as_deref(), Some("a_port"));
+        assert!(error.to_string().contains("PORT"));
+        assert!(!error.to_string().contains("not-a-number"));
     }
 }

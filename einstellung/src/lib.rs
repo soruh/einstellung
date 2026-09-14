@@ -116,9 +116,15 @@ impl<C: Config> ConfigBuilder<C> {
         P: ConfigProvider + 'a,
         I: IntoIterator<Item = &'a P>,
     {
-        providers
-            .into_iter()
-            .fold(self, |builder, provider| builder.provider(provider))
+        let mut builder = self;
+        let mut providers = providers.into_iter();
+        while matches!(&builder.state, ConfigBuilderState::Ready(_)) {
+            let Some(provider) = providers.next() else {
+                break;
+            };
+            builder = builder.provider(provider);
+        }
+        builder
     }
 
     /// Merge an object-safe provider for this specific configuration type.
@@ -147,9 +153,15 @@ impl<C: Config> ConfigBuilder<C> {
         C: 'a,
         I: IntoIterator<Item = &'a dyn ConfigProviderFor<C>>,
     {
-        providers
-            .into_iter()
-            .fold(self, |builder, provider| builder.typed_provider(provider))
+        let mut builder = self;
+        let mut providers = providers.into_iter();
+        while matches!(&builder.state, ConfigBuilderState::Ready(_)) {
+            let Some(provider) = providers.next() else {
+                break;
+            };
+            builder = builder.typed_provider(provider);
+        }
+        builder
     }
 
     fn provider_with<F>(self, load: F) -> Self

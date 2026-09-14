@@ -776,6 +776,41 @@ fn failed_builder_does_not_load_later_providers() {
 }
 
 #[test]
+fn provider_iterators_stop_advancing_after_failure() {
+    use std::cell::Cell;
+
+    let providers = [
+        JsonFileProvider::from_contents("{"),
+        JsonFileProvider::from_contents(
+            r#"{ "app_name": "late", "network": { "listen": { "address": "192.168.0.1" } } }"#,
+        ),
+    ];
+    let yielded = Cell::new(0);
+
+    let _ = AppConfig::builder()
+        .providers(providers.iter().inspect(|_| yielded.set(yielded.get() + 1)))
+        .build()
+        .unwrap_err();
+    assert_eq!(yielded.get(), 1);
+
+    let typed: Vec<&dyn crate::ConfigProviderFor<AppConfig>> = providers
+        .iter()
+        .map(|provider| provider as &dyn crate::ConfigProviderFor<AppConfig>)
+        .collect();
+    yielded.set(0);
+
+    let _ = AppConfig::builder()
+        .typed_providers(
+            typed
+                .into_iter()
+                .inspect(|_| yielded.set(yielded.get() + 1)),
+        )
+        .build()
+        .unwrap_err();
+    assert_eq!(yielded.get(), 1);
+}
+
+#[test]
 fn custom_merge_works_for_optional_complete_fields() {
     let base = OptionalCustomMergeConfig::load_partial(&JsonFileProvider::from_contents(
         r#"{ "value": "base" }"#,

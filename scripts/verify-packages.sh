@@ -5,7 +5,18 @@ workspace_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$workspace_root"
 
 scratch="$(mktemp -d)"
-trap 'rm -rf "$scratch"' EXIT
+lock_backup="$scratch/Cargo.lock"
+cp Cargo.lock "$lock_backup"
+cleanup() {
+    cp "$lock_backup" Cargo.lock
+    rm -rf "$scratch"
+}
+trap cleanup EXIT
+
+# Fail before packaging if the checked-in lockfile is already stale. The main package check below
+# uses a temporary crates.io patch, which Cargo records in Cargo.lock; cleanup restores the exact
+# checked-in lockfile afterward.
+cargo metadata --locked --no-deps --format-version 1 >/dev/null
 
 cargo package -p einstellung_derive --target-dir "$scratch/derive-target"
 

@@ -220,6 +220,10 @@ let tracked = AppConfig::builder()
 for source in tracked.explain("api_key").unwrap_or_default() {
     eprintln!("api_key was supplied by {source}");
 }
+
+for (path, sources) in tracked.provenance().iter() {
+    eprintln!("{path}: {} source(s)", sources.len());
+}
 ```
 
 Provenance stores only logical field paths and source labels, never configuration
@@ -228,6 +232,34 @@ supplier is the winner; `extend`, custom merge functions, and frozen fields can
 retain data from earlier layers, so `explain()` deliberately preserves the full
 supply history rather than pretending there is always one winner. Values filled
 by `#[config(default ...)]` are attributed to `field default`.
+
+Builder errors retain the provenance accumulated before the failure. This is
+particularly useful for final validation errors, where there is no single parser
+failure to identify the source directly:
+
+```rust
+match AppConfig::builder()
+    .provider(&TomlFileProvider::from_path(std::path::Path::new("config.toml")))
+    .provider(&EnvProvider::only(["PORT"]))
+    .build()
+{
+    Ok(config) => use_config(config),
+    Err(error) => {
+        if let (Some(path), Some(provenance)) = (error.logical_path(), error.provenance()) {
+            if let Some(sources) = provenance.explain(&path) {
+                eprintln!("{path} was supplied by: {sources:?}");
+            }
+        }
+        return Err(error.into());
+    }
+}
+# fn use_config<T>(_config: T) {}
+```
+
+`ConfigError::root_cause()` unwraps source/provenance context when code needs to
+inspect the concrete error variant. `config_source()` reports the external source
+that triggered a load/merge error, and `logical_path()` returns a dotted field
+path when the error is field-specific.
 
 Provider parse errors and single-provider build errors include the provider
 source. File providers identify the path; inline providers identify only the

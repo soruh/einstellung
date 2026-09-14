@@ -90,6 +90,18 @@ impl<'i> FileContentProvider<'i> {
         }
     }
 
+    /// Describe this source for diagnostics without exposing inline contents.
+    pub(crate) fn source_label(&self, provider: &str) -> String {
+        use FileContentProvider::*;
+
+        match self {
+            InlineBorrowed(_) | InlineOwned(_) => format!("inline {provider}"),
+            PathBorrowed(path) => format!("{provider} file {}", path.display()),
+            PathOwned(path) => format!("{provider} file {}", path.display()),
+            CustomFn(_) | CustomBoxed(_) | CustomRef(_) => format!("custom {provider} source"),
+        }
+    }
+
     /// Convert to `'static` owned data.
     pub fn into_owned(self) -> FileContentProvider<'static> {
         use FileContentProvider::*;

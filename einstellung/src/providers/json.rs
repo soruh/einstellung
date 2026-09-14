@@ -46,4 +46,8 @@ impl<'i> ConfigProvider for JsonFileProvider<'i> {
         self.0
             .with_reader(|reader| Ok(serde_json::from_reader(reader)?))
     }
+
+    fn source(&self) -> crate::ConfigSource {
+        crate::ConfigSource::new(self.0.source_label("json"))
+    }
 }

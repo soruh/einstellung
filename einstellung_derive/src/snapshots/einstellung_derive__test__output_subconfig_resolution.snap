@@ -70,6 +70,37 @@ impl ::einstellung::PartialConfig for AppConfigPartial {
                 )?,
         })
     }
+    fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.app_name).is_some() {
+            fields.push(::std::string::String::from("app_name"));
+        }
+        if let ::core::option::Option::Some(value) = (&self.database).as_ref() {
+            for nested in ::einstellung::PartialConfig::provided_fields(value) {
+                fields.push(::std::format!("{}.{}", "database", nested));
+            }
+        }
+        if let ::core::option::Option::Some(value) = (&self.redis).as_ref() {
+            for nested in ::einstellung::PartialConfig::provided_fields(value) {
+                fields.push(::std::format!("{}.{}", "redis", nested));
+            }
+        }
+        fields
+    }
+    fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if let ::core::option::Option::Some(value) = (&self.database).as_ref() {
+            for nested in ::einstellung::PartialConfig::defaulted_fields(value) {
+                fields.push(::std::format!("{}.{}", "database", nested));
+            }
+        }
+        if let ::core::option::Option::Some(value) = (&self.redis).as_ref() {
+            for nested in ::einstellung::PartialConfig::defaulted_fields(value) {
+                fields.push(::std::format!("{}.{}", "redis", nested));
+            }
+        }
+        fields
+    }
 }
 #[automatically_derived]
 impl ::einstellung::Config for AppConfig {
@@ -124,6 +155,20 @@ impl ::einstellung::PartialConfig for DatabaseConfigPartial {
                 )?,
         })
     }
+    fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.url).is_some() {
+            fields.push(::std::string::String::from("url"));
+        }
+        if (&self.pool_size).is_some() {
+            fields.push(::std::string::String::from("pool_size"));
+        }
+        fields
+    }
+    fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        fields
+    }
 }
 #[automatically_derived]
 impl ::einstellung::Config for DatabaseConfig {
@@ -167,6 +212,17 @@ impl ::einstellung::PartialConfig for RedisConfigPartial {
                     ),
                 )?,
         })
+    }
+    fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.cluster_mode).is_some() {
+            fields.push(::std::string::String::from("cluster_mode"));
+        }
+        fields
+    }
+    fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        fields
     }
 }
 #[automatically_derived]

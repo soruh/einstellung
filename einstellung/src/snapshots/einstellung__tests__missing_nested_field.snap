@@ -3,14 +3,19 @@ source: einstellung/src/tests.rs
 expression: "print_res(res, false)"
 ---
 error:
-Missing required configuration field: 'AppConfig::network::listen::address'
-MissingField(
-    FieldPath {
-        base_type: "AppConfig",
-        field: "address",
-        path: [
-            "listen",
-            "network",
-        ],
+configuration source inline json: Missing required configuration field: 'AppConfig::network::listen::address'
+Source {
+    source: ConfigSource {
+        label: "inline json",
     },
-)
+    error: MissingField(
+        FieldPath {
+            base_type: "AppConfig",
+            field: "address",
+            path: [
+                "listen",
+                "network",
+            ],
+        },
+    ),
+}

@@ -53,6 +53,27 @@ impl ::einstellung::PartialConfig for TelemetryConfigPartial {
                 .transpose()?,
         })
     }
+    fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.enabled).is_some() {
+            fields.push(::std::string::String::from("enabled"));
+        }
+        if let ::core::option::Option::Some(value) = (&self.datadog).as_ref() {
+            for nested in ::einstellung::PartialConfig::provided_fields(value) {
+                fields.push(::std::format!("{}.{}", "datadog", nested));
+            }
+        }
+        fields
+    }
+    fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if let ::core::option::Option::Some(value) = (&self.datadog).as_ref() {
+            for nested in ::einstellung::PartialConfig::defaulted_fields(value) {
+                fields.push(::std::format!("{}.{}", "datadog", nested));
+            }
+        }
+        fields
+    }
 }
 #[automatically_derived]
 impl ::einstellung::Config for TelemetryConfig {
@@ -96,6 +117,17 @@ impl ::einstellung::PartialConfig for DatadogConfigPartial {
                     ),
                 )?,
         })
+    }
+    fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.api_key).is_some() {
+            fields.push(::std::string::String::from("api_key"));
+        }
+        fields
+    }
+    fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        fields
     }
 }
 #[automatically_derived]

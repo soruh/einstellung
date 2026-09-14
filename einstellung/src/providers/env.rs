@@ -161,6 +161,10 @@ impl ConfigProvider for EnvProvider {
     fn load_partial<T: DeserializeOwned>(&self) -> Result<T, ConfigError> {
         self.load_from_vars("environment", std::env::vars_os())
     }
+
+    fn source(&self) -> crate::ConfigSource {
+        crate::ConfigSource::new("process environment")
+    }
 }
 
 fn env_key_path(key: &str) -> Vec<String> {

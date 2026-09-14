@@ -45,6 +45,17 @@ impl ::einstellung::PartialConfig for Config1Partial {
                 )?,
         })
     }
+    fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.x).is_some() {
+            fields.push(::std::string::String::from("x"));
+        }
+        fields
+    }
+    fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        fields
+    }
 }
 #[automatically_derived]
 impl ::einstellung::Config for Config1 {
@@ -90,6 +101,20 @@ impl ::einstellung::PartialConfig for Config2Partial {
             x: self.x.unwrap_or_else(::core::default::Default::default),
         })
     }
+    fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.x).is_some() {
+            fields.push(::std::string::String::from("x"));
+        }
+        fields
+    }
+    fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.x).is_none() {
+            fields.push(::std::string::String::from("x"));
+        }
+        fields
+    }
 }
 #[automatically_derived]
 impl ::einstellung::Config for Config2 {
@@ -132,6 +157,17 @@ impl ::einstellung::PartialConfig for Config3Partial {
         self,
     ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
         ::core::result::Result::Ok(Config3 { x: self.x })
+    }
+    fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.x).is_some() {
+            fields.push(::std::string::String::from("x"));
+        }
+        fields
+    }
+    fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        fields
     }
 }
 #[automatically_derived]

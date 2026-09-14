@@ -75,6 +75,32 @@ impl ::einstellung::PartialConfig for ConfigFreezable1Partial {
                 )?,
         })
     }
+    fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.name).is_some() {
+            fields.push(::std::string::String::from("name"));
+        }
+        if (&self.pass).is_some() {
+            fields.push(::std::string::String::from("pass"));
+        }
+        if (match &self.private_key {
+            ::einstellung::Freeze::Free(value) | ::einstellung::Freeze::Frozen(value) => {
+                value
+            }
+        })
+            .is_some()
+        {
+            fields.push(::std::string::String::from("private_key"));
+        }
+        fields
+    }
+    fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.name).is_none() {
+            fields.push(::std::string::String::from("name"));
+        }
+        fields
+    }
 }
 #[automatically_derived]
 impl ::einstellung::Freezable for ConfigFreezable1Partial {

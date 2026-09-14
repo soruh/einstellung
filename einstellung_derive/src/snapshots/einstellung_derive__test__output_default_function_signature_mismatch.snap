@@ -40,6 +40,20 @@ impl ::einstellung::PartialConfig for ServerConfigPartial {
             port: self.port.unwrap_or_else(provide_default_port),
         })
     }
+    fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.port).is_some() {
+            fields.push(::std::string::String::from("port"));
+        }
+        fields
+    }
+    fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.port).is_none() {
+            fields.push(::std::string::String::from("port"));
+        }
+        fields
+    }
 }
 #[automatically_derived]
 impl ::einstellung::Config for ServerConfig {

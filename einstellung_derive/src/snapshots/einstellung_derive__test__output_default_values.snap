@@ -43,6 +43,32 @@ impl ::einstellung::PartialConfig for NetworkConfigPartial {
             timeout: self.timeout.unwrap_or_else(|| std::time::Duration::from_secs(30)),
         })
     }
+    fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.host).is_some() {
+            fields.push(::std::string::String::from("host"));
+        }
+        if (&self.port).is_some() {
+            fields.push(::std::string::String::from("port"));
+        }
+        if (&self.timeout).is_some() {
+            fields.push(::std::string::String::from("timeout"));
+        }
+        fields
+    }
+    fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.host).is_none() {
+            fields.push(::std::string::String::from("host"));
+        }
+        if (&self.port).is_none() {
+            fields.push(::std::string::String::from("port"));
+        }
+        if (&self.timeout).is_none() {
+            fields.push(::std::string::String::from("timeout"));
+        }
+        fields
+    }
 }
 #[automatically_derived]
 impl ::einstellung::Config for NetworkConfig {

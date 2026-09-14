@@ -26,12 +26,17 @@ pub trait Config: Sized {
 
     /// Load this config as a [`PartialConfig`] for merging with other partial configs.
     fn load_partial(provider: &impl ConfigProvider) -> Result<Self::Partial, ConfigError> {
-        provider.load_partial::<Self::Partial>()
+        provider
+            .load_partial::<Self::Partial>()
+            .map_err(|error| error.with_source(provider.source()))
     }
 
     /// Load this config in its complete form.
     fn load_complete(provider: &impl ConfigProvider) -> Result<Self, ConfigError> {
-        Self::load_partial(provider)?.build()
+        let source = provider.source();
+        Self::load_partial(provider)?
+            .build()
+            .map_err(|error| error.with_source(source))
     }
 
     /// Start a builder for composing multiple configuration layers.
@@ -46,49 +51,197 @@ pub trait Config: Sized {
 
 /// Composes configuration layers before building a complete [`Config`].
 ///
-/// The builder loads providers eagerly, but retains the first error until [`Self::build`] or
-/// [`Self::build_partial`] is called. Once a layer fails, later providers are not loaded.
-/// This keeps fluent composition concise while preserving fail-fast behavior.
+/// Providers are merged in call order. The builder records which sources supplied each field so
+/// callers can inspect provenance with [`Self::build_tracked`]. Once a layer fails, later providers
+/// are not loaded.
 pub struct ConfigBuilder<C: Config> {
-    partial: Result<C::Partial, ConfigError>,
+    partial: Option<C::Partial>,
+    error: Option<ConfigError>,
+    provenance: ConfigProvenance,
 }
 
 impl<C: Config> ConfigBuilder<C> {
     /// Create an empty configuration builder.
     pub fn new() -> Self {
         Self {
-            partial: Ok(C::Partial::default()),
+            partial: Some(C::Partial::default()),
+            error: None,
+            provenance: ConfigProvenance::default(),
         }
     }
 
     /// Merge a provider as the next, higher-precedence layer.
     pub fn provider(mut self, provider: &impl ConfigProvider) -> Self {
-        self.partial = self
+        if self.error.is_some() {
+            return self;
+        }
+
+        let source = provider.source();
+        let next = match C::load_partial(provider) {
+            Ok(next) => next,
+            Err(error) => {
+                self.error = Some(error);
+                return self;
+            }
+        };
+        let fields = next.provided_fields();
+        let current = self
             .partial
-            .and_then(|current| C::load_partial(provider).and_then(|next| current.merge(next)));
+            .take()
+            .expect("builder partial missing without error");
+
+        match current.merge(next) {
+            Ok(merged) => {
+                self.partial = Some(merged);
+                self.provenance.record(source, fields);
+            }
+            Err(error) => self.error = Some(error.with_source(source)),
+        }
         self
     }
 
     /// Merge an already-loaded partial configuration as the next layer.
-    pub fn layer(mut self, next: C::Partial) -> Self {
-        self.partial = self.partial.and_then(|current| current.merge(next));
+    ///
+    /// Use [`Self::layer_named`] when provenance for manually constructed layers matters.
+    pub fn layer(self, next: C::Partial) -> Self {
+        self.layer_named("manual layer", next)
+    }
+
+    /// Merge an already-loaded partial configuration with an explicit provenance label.
+    pub fn layer_named(mut self, source: impl Into<String>, next: C::Partial) -> Self {
+        if self.error.is_some() {
+            return self;
+        }
+
+        let source = ConfigSource::new(source);
+        let fields = next.provided_fields();
+        let current = self
+            .partial
+            .take()
+            .expect("builder partial missing without error");
+        match current.merge(next) {
+            Ok(merged) => {
+                self.partial = Some(merged);
+                self.provenance.record(source, fields);
+            }
+            Err(error) => self.error = Some(error.with_source(source)),
+        }
         self
     }
 
     /// Return the merged partial configuration without applying field defaults or validation.
     pub fn build_partial(self) -> Result<C::Partial, ConfigError> {
-        self.partial
+        match (self.partial, self.error) {
+            (_, Some(error)) => Err(error),
+            (Some(partial), None) => Ok(partial),
+            (None, None) => unreachable!("builder partial missing without error"),
+        }
     }
 
     /// Build the final configuration, applying field defaults and validation.
     pub fn build(self) -> Result<C, ConfigError> {
-        self.build_partial()?.build()
+        self.finish().map(|tracked| tracked.config)
+    }
+
+    /// Build the final configuration while retaining field provenance.
+    pub fn build_tracked(self) -> Result<TrackedConfig<C>, ConfigError> {
+        self.finish()
+    }
+
+    fn finish(mut self) -> Result<TrackedConfig<C>, ConfigError> {
+        if let Some(error) = self.error {
+            return Err(error);
+        }
+
+        let partial = self
+            .partial
+            .take()
+            .expect("builder partial missing without error");
+        self.provenance
+            .record(ConfigSource::defaults(), partial.defaulted_fields());
+
+        match partial.build() {
+            Ok(config) => Ok(TrackedConfig {
+                config,
+                provenance: self.provenance,
+            }),
+            Err(error) => {
+                let source = error
+                    .field_path()
+                    .and_then(|field| self.provenance.latest(field.logical_path()))
+                    .cloned();
+                Err(match source {
+                    Some(source) => error.with_source(source),
+                    None => error,
+                })
+            }
+        }
     }
 }
 
 impl<C: Config> Default for ConfigBuilder<C> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Provenance recorded while composing configuration layers.
+///
+/// Values are never stored here: provenance contains only logical field paths and source labels,
+/// making it safe to use for secret-bearing fields as long as provider labels themselves contain
+/// no secret data.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ConfigProvenance {
+    fields: std::collections::BTreeMap<String, Vec<ConfigSource>>,
+}
+
+impl ConfigProvenance {
+    fn record(&mut self, source: ConfigSource, fields: Vec<String>) {
+        for field in fields {
+            self.fields.entry(field).or_default().push(source.clone());
+        }
+    }
+
+    /// Return every source that supplied a value for `path`, in merge order.
+    ///
+    /// For replace semantics the last source is the winner. For extend/custom merge strategies,
+    /// earlier sources may still contribute to the final value, so the complete history is kept.
+    pub fn explain(&self, path: impl AsRef<str>) -> Option<&[ConfigSource]> {
+        self.fields.get(path.as_ref()).map(Vec::as_slice)
+    }
+
+    /// Return the most recent source that supplied `path`.
+    pub fn latest(&self, path: impl AsRef<str>) -> Option<&ConfigSource> {
+        self.explain(path).and_then(|sources| sources.last())
+    }
+}
+
+/// A built configuration together with the provenance captured during composition.
+#[derive(Clone, Debug)]
+pub struct TrackedConfig<C> {
+    config: C,
+    provenance: ConfigProvenance,
+}
+
+impl<C> TrackedConfig<C> {
+    /// Borrow the built configuration.
+    pub fn config(&self) -> &C {
+        &self.config
+    }
+
+    /// Borrow the captured provenance.
+    pub fn provenance(&self) -> &ConfigProvenance {
+        &self.provenance
+    }
+
+    /// Return the source history for a logical dotted field path.
+    pub fn explain(&self, path: impl AsRef<str>) -> Option<&[ConfigSource]> {
+        self.provenance.explain(path)
+    }
+
+    /// Consume the wrapper and return the configuration.
+    pub fn into_inner(self) -> C {
+        self.config
     }
 }
 
@@ -108,6 +261,18 @@ pub trait PartialConfig: Default + DeserializeOwned {
     /// Build this partial config into its complete form. All required fields need to be present for this to succeed.
     /// See the derive macro for [`derive@Config`] for how to define validation stategies and field contents.
     fn build(self) -> Result<Self::Complete, ConfigError>;
+
+    /// Return logical dotted paths for fields explicitly present in this partial.
+    #[doc(hidden)]
+    fn provided_fields(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// Return logical dotted paths whose values will be supplied by field defaults.
+    #[doc(hidden)]
+    fn defaulted_fields(&self) -> Vec<String> {
+        Vec::new()
+    }
 }
 
 /// Indicates that parts of this type can be "frozen".
@@ -135,6 +300,47 @@ pub trait Freezable {
 pub trait ConfigProvider {
     /// Load a [`PartialConfig`] (or any other deserializable type) from this provider.
     fn load_partial<T: DeserializeOwned>(&self) -> Result<T, ConfigError>;
+
+    /// Describe this provider for diagnostics and provenance.
+    ///
+    /// Implementations should identify the source without exposing configuration contents. File
+    /// providers, for example, should include the path but never inline source text.
+    fn source(&self) -> ConfigSource {
+        ConfigSource::new(::core::any::type_name::<Self>())
+    }
+}
+
+/// Human-readable identity of a configuration source.
+///
+/// Source labels are intended for diagnostics and provenance. They must not contain secret values
+/// or raw configuration contents.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct ConfigSource {
+    label: String,
+}
+
+impl ConfigSource {
+    /// Create a source label.
+    pub fn new(label: impl Into<String>) -> Self {
+        Self {
+            label: label.into(),
+        }
+    }
+
+    /// Return the source label.
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+
+    fn defaults() -> Self {
+        Self::new("field default")
+    }
+}
+
+impl Display for ConfigSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.label)
+    }
 }
 
 /// Indicates where a configuration error occurred.
@@ -162,6 +368,17 @@ impl FieldPath {
         self.base_type = complete;
         self.path.push(field);
         self
+    }
+
+    /// Return the logical dotted path, omitting the Rust config type name.
+    pub fn logical_path(&self) -> String {
+        self.path
+            .iter()
+            .rev()
+            .copied()
+            .chain(::core::iter::once(self.field))
+            .collect::<Vec<_>>()
+            .join(".")
     }
 }
 
@@ -240,6 +457,13 @@ pub enum ConfigError {
         source: BoxError,
     },
 
+    #[error("configuration source {source}: {error}")]
+    Source {
+        source: ConfigSource,
+        #[source]
+        error: Box<ConfigError>,
+    },
+
     #[error("Missing required configuration field: '{0}'")]
     MissingField(FieldPath),
 
@@ -267,6 +491,32 @@ impl ConfigError {
         Self::Provider {
             provider,
             source: Box::new(source),
+        }
+    }
+
+    /// Attach the external configuration source responsible for this error.
+    pub fn with_source(self, source: ConfigSource) -> Self {
+        Self::Source {
+            source,
+            error: Box::new(self),
+        }
+    }
+
+    /// Return the field associated with a build or merge error, if any.
+    pub fn field_path(&self) -> Option<&FieldPath> {
+        match self {
+            Self::MissingField(field) | Self::FreezeCollision(field) => Some(field),
+            Self::Validation { field, .. } | Self::CustomMerge { field, .. } => Some(field),
+            Self::Source { error, .. } => error.field_path(),
+            _ => None,
+        }
+    }
+
+    /// Return the underlying configuration error beneath any source context wrappers.
+    pub fn root_cause(&self) -> &ConfigError {
+        match self {
+            Self::Source { error, .. } => error.root_cause(),
+            error => error,
         }
     }
 }

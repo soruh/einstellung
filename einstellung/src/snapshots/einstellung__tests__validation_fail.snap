@@ -3,15 +3,20 @@ source: einstellung/src/tests.rs
 expression: "print_res(res, false)"
 ---
 error:
-Validation failed for field 'AppConfig::network::listen::address': Address must not be a multicast address
-Validation {
-    field: FieldPath {
-        base_type: "AppConfig",
-        field: "address",
-        path: [
-            "listen",
-            "network",
-        ],
+configuration source inline json: Validation failed for field 'AppConfig::network::listen::address': Address must not be a multicast address
+Source {
+    source: ConfigSource {
+        label: "inline json",
     },
-    reason: "Address must not be a multicast address",
+    error: Validation {
+        field: FieldPath {
+            base_type: "AppConfig",
+            field: "address",
+            path: [
+                "listen",
+                "network",
+            ],
+        },
+        reason: "Address must not be a multicast address",
+    },
 }

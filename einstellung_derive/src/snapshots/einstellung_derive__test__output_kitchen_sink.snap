@@ -137,6 +137,49 @@ impl ::einstellung::PartialConfig for FullSystemConfigPartial {
                 .transpose()?,
         })
     }
+    fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.name).is_some() {
+            fields.push(::std::string::String::from("name"));
+        }
+        if (&self.port).is_some() {
+            fields.push(::std::string::String::from("port"));
+        }
+        if let ::core::option::Option::Some(value) = (&self.database).as_ref() {
+            for nested in ::einstellung::PartialConfig::provided_fields(value) {
+                fields.push(::std::format!("{}.{}", "database", nested));
+            }
+        }
+        if (&self.log_files).is_some() {
+            fields.push(::std::string::String::from("log_files"));
+        }
+        if (&self.users).is_some() {
+            fields.push(::std::string::String::from("users"));
+        }
+        if let ::core::option::Option::Some(value) = (&self.optional_cache).as_ref() {
+            for nested in ::einstellung::PartialConfig::provided_fields(value) {
+                fields.push(::std::format!("{}.{}", "optional_cache", nested));
+            }
+        }
+        fields
+    }
+    fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.name).is_none() {
+            fields.push(::std::string::String::from("name"));
+        }
+        if let ::core::option::Option::Some(value) = (&self.database).as_ref() {
+            for nested in ::einstellung::PartialConfig::defaulted_fields(value) {
+                fields.push(::std::format!("{}.{}", "database", nested));
+            }
+        }
+        if let ::core::option::Option::Some(value) = (&self.optional_cache).as_ref() {
+            for nested in ::einstellung::PartialConfig::defaulted_fields(value) {
+                fields.push(::std::format!("{}.{}", "optional_cache", nested));
+            }
+        }
+        fields
+    }
 }
 #[automatically_derived]
 impl ::einstellung::Config for FullSystemConfig {
@@ -186,6 +229,23 @@ impl ::einstellung::PartialConfig for DatabaseConfigPartial {
             port: self.port.unwrap_or(5432),
         })
     }
+    fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.url).is_some() {
+            fields.push(::std::string::String::from("url"));
+        }
+        if (&self.port).is_some() {
+            fields.push(::std::string::String::from("port"));
+        }
+        fields
+    }
+    fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.port).is_none() {
+            fields.push(::std::string::String::from("port"));
+        }
+        fields
+    }
 }
 #[automatically_derived]
 impl ::einstellung::Config for DatabaseConfig {
@@ -224,6 +284,20 @@ impl ::einstellung::PartialConfig for CacheConfigPartial {
         ::core::result::Result::Ok(CacheConfig {
             size_mb: self.size_mb.unwrap_or(1024),
         })
+    }
+    fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.size_mb).is_some() {
+            fields.push(::std::string::String::from("size_mb"));
+        }
+        fields
+    }
+    fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.size_mb).is_none() {
+            fields.push(::std::string::String::from("size_mb"));
+        }
+        fields
     }
 }
 #[automatically_derived]

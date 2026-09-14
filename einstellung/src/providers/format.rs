@@ -143,6 +143,18 @@ impl ConfigProvider for FormatProvider<'_> {
                 .with_reader(|reader| Ok(serde_yaml::from_reader(reader)?)),
         }
     }
+
+    fn source(&self) -> crate::ConfigSource {
+        let format = match self.format {
+            #[cfg(feature = "json")]
+            ConfigFormat::Json => "json",
+            #[cfg(feature = "toml")]
+            ConfigFormat::Toml => "toml",
+            #[cfg(feature = "yaml")]
+            ConfigFormat::Yaml => "yaml",
+        };
+        crate::ConfigSource::new(self.source.source_label(format))
+    }
 }
 
 #[cfg(test)]

@@ -244,6 +244,71 @@ fn generate_merge_for_field(
     quote_spanned!(ident.span() => #ident: #merged)
 }
 
+fn partial_option_ref(f: &TransformedField, einstellung: &syn::Path) -> TokenStream {
+    let ident = &f.ident;
+    if f.freeze == FreezeStrategy::Wrapped {
+        quote! {
+            match &self.#ident {
+                #einstellung::Freeze::Free(value) | #einstellung::Freeze::Frozen(value) => value
+            }
+        }
+    } else {
+        quote! { &self.#ident }
+    }
+}
+
+fn generate_provided_field(f: &TransformedField, einstellung: &syn::Path) -> TokenStream {
+    let ident_str = f.ident.to_string();
+    let field = partial_option_ref(f, einstellung);
+
+    if f.build.build {
+        quote! {
+            if let ::core::option::Option::Some(value) = (#field).as_ref() {
+                for nested in #einstellung::PartialConfig::provided_fields(value) {
+                    fields.push(::std::format!("{}.{}", #ident_str, nested));
+                }
+            }
+        }
+    } else {
+        quote! {
+            if (#field).is_some() {
+                fields.push(::std::string::String::from(#ident_str));
+            }
+        }
+    }
+}
+
+fn generate_defaulted_field(f: &TransformedField, einstellung: &syn::Path) -> TokenStream {
+    let ident_str = f.ident.to_string();
+    let field = partial_option_ref(f, einstellung);
+    let has_default = matches!(f.build.unwrap, UnwrapStrategy::UnwrapWithDefault(_));
+
+    if f.build.build {
+        let missing = has_default.then(|| {
+            quote! {
+                else {
+                    fields.push(::std::string::String::from(#ident_str));
+                }
+            }
+        });
+        quote! {
+            if let ::core::option::Option::Some(value) = (#field).as_ref() {
+                for nested in #einstellung::PartialConfig::defaulted_fields(value) {
+                    fields.push(::std::format!("{}.{}", #ident_str, nested));
+                }
+            } #missing
+        }
+    } else if has_default {
+        quote! {
+            if (#field).is_none() {
+                fields.push(::std::string::String::from(#ident_str));
+            }
+        }
+    } else {
+        quote! {}
+    }
+}
+
 /// Generate the impl of `PartialConfig` for the associated partial struct
 fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
     let TransformedStruct {
@@ -264,6 +329,13 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
         .iter()
         .map(|f| generate_build_for_field(einstellung, &complete_type_name, f));
 
+    let provided_fields = fields
+        .iter()
+        .map(|f| generate_provided_field(f, einstellung));
+    let defaulted_fields = fields
+        .iter()
+        .map(|f| generate_defaulted_field(f, einstellung));
+
     quote_spanned! { partial_ident.span() =>
         #[automatically_derived]
         impl #einstellung::PartialConfig for #partial_ident {
@@ -274,6 +346,16 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
             }
             fn build(self) -> ::core::result::Result<Self::Complete, #einstellung::ConfigError> {
                 ::core::result::Result::Ok(#complete_ident { #(#build_fields),* })
+            }
+            fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+                let mut fields = ::std::vec::Vec::new();
+                #(#provided_fields)*
+                fields
+            }
+            fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+                let mut fields = ::std::vec::Vec::new();
+                #(#defaulted_fields)*
+                fields
             }
         }
     }

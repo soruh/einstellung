@@ -48,4 +48,8 @@ impl<'i> ConfigProvider for TomlFileProvider<'i> {
             Ok(::toml::from_str(&buffer)?)
         })
     }
+
+    fn source(&self) -> crate::ConfigSource {
+        crate::ConfigSource::new(self.0.source_label("toml"))
+    }
 }

@@ -45,6 +45,10 @@ impl<'i> ConfigProvider for YamlFileProvider<'i> {
         self.0
             .with_reader(|reader| Ok(serde_yaml::from_reader(reader)?))
     }
+
+    fn source(&self) -> crate::ConfigSource {
+        crate::ConfigSource::new(self.0.source_label("yaml"))
+    }
 }
 
 #[cfg(test)]

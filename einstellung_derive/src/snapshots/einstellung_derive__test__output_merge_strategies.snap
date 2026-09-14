@@ -66,6 +66,23 @@ impl ::einstellung::PartialConfig for LoggerConfigPartial {
                 )?,
         })
     }
+    fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.level).is_some() {
+            fields.push(::std::string::String::from("level"));
+        }
+        if (&self.log_files).is_some() {
+            fields.push(::std::string::String::from("log_files"));
+        }
+        if (&self.output_format).is_some() {
+            fields.push(::std::string::String::from("output_format"));
+        }
+        fields
+    }
+    fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        fields
+    }
 }
 #[automatically_derived]
 impl ::einstellung::Config for LoggerConfig {

@@ -54,6 +54,23 @@ impl ::einstellung::PartialConfig for Config1Partial {
                 )?,
         })
     }
+    fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (match &self.x {
+            ::einstellung::Freeze::Free(value) | ::einstellung::Freeze::Frozen(value) => {
+                value
+            }
+        })
+            .is_some()
+        {
+            fields.push(::std::string::String::from("x"));
+        }
+        fields
+    }
+    fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        fields
+    }
 }
 #[automatically_derived]
 impl ::einstellung::Freezable for Config1Partial {
@@ -121,6 +138,32 @@ impl ::einstellung::PartialConfig for Config2Partial {
                 .unwrap_or_else(::core::default::Default::default),
         })
     }
+    fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (match &self.x {
+            ::einstellung::Freeze::Free(value) | ::einstellung::Freeze::Frozen(value) => {
+                value
+            }
+        })
+            .is_some()
+        {
+            fields.push(::std::string::String::from("x"));
+        }
+        fields
+    }
+    fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (match &self.x {
+            ::einstellung::Freeze::Free(value) | ::einstellung::Freeze::Frozen(value) => {
+                value
+            }
+        })
+            .is_none()
+        {
+            fields.push(::std::string::String::from("x"));
+        }
+        fields
+    }
 }
 #[automatically_derived]
 impl ::einstellung::Freezable for Config2Partial {
@@ -186,6 +229,23 @@ impl ::einstellung::PartialConfig for Config3Partial {
         ::core::result::Result::Ok(Config3 {
             x: ::einstellung::Freeze::into_inner(self.x),
         })
+    }
+    fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (match &self.x {
+            ::einstellung::Freeze::Free(value) | ::einstellung::Freeze::Frozen(value) => {
+                value
+            }
+        })
+            .is_some()
+        {
+            fields.push(::std::string::String::from("x"));
+        }
+        fields
+    }
+    fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        fields
     }
 }
 #[automatically_derived]

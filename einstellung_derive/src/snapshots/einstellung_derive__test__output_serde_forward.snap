@@ -38,6 +38,17 @@ impl ::einstellung::PartialConfig for ConfigPartial {
                 )?,
         })
     }
+    fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.x).is_some() {
+            fields.push(::std::string::String::from("x"));
+        }
+        fields
+    }
+    fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        fields
+    }
 }
 #[automatically_derived]
 impl ::einstellung::Config for Config {

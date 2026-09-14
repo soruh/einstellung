@@ -431,7 +431,7 @@ fn config_builder_retains_first_provider_error() {
         .build()
         .unwrap_err();
 
-    assert!(matches!(error, ConfigError::Json(_)));
+    assert!(matches!(error.root_cause(), ConfigError::Json(_)));
 }
 
 #[test]
@@ -465,7 +465,7 @@ fn deny_unknown_fields_rejects_typos() {
     .err()
     .expect("unknown field should be rejected");
 
-    match error {
+    match error.root_cause() {
         ConfigError::Json(error) => assert!(error.to_string().contains("unknown field `vlaue`")),
         other => panic!("unexpected error: {other}"),
     }
@@ -486,4 +486,94 @@ fn validator_uses_normal_reference_coercions() {
         }
         other => panic!("unexpected error: {other}"),
     }
+}
+
+#[test]
+fn field_paths_have_logical_dotted_form() {
+    let path = crate::FieldPath::new("ListenConfig", "address")
+        .context("NetworkConfig", "listen")
+        .context("AppConfig", "network");
+
+    assert_eq!(path.logical_path(), "network.listen.address");
+    assert_eq!(path.to_string(), "AppConfig::network::listen::address");
+}
+
+#[test]
+fn tracked_builder_explains_nested_sources_and_defaults() {
+    let base = AppConfig::load_partial(&JsonFileProvider::from_contents(
+        r#"{ "app_name": "base", "network": { "listen": { "address": "192.168.0.1" } } }"#,
+    ))
+    .unwrap();
+    let override_layer = AppConfig::load_partial(&JsonFileProvider::from_contents(
+        r#"{ "app_name": "override", "network": { "listen": {} } }"#,
+    ))
+    .unwrap();
+
+    let tracked = AppConfig::builder()
+        .layer_named("base config", base)
+        .layer_named("local override", override_layer)
+        .build_tracked()
+        .unwrap();
+
+    assert_eq!(tracked.config().app_name, "override");
+    assert_eq!(
+        tracked
+            .explain("app_name")
+            .unwrap()
+            .iter()
+            .map(crate::ConfigSource::label)
+            .collect::<Vec<_>>(),
+        vec!["base config", "local override"]
+    );
+    assert_eq!(
+        tracked
+            .explain("network.listen.address")
+            .unwrap()
+            .last()
+            .unwrap()
+            .label(),
+        "base config"
+    );
+    assert_eq!(
+        tracked
+            .explain("network.listen.port")
+            .unwrap()
+            .last()
+            .unwrap()
+            .label(),
+        "field default"
+    );
+}
+
+#[test]
+fn builder_attaches_winning_source_to_validation_errors() {
+    let invalid = AppConfig::load_partial(&JsonFileProvider::from_contents(
+        r#"{ "app_name": "bad", "network": { "listen": { "address": "127.0.0.1" } } }"#,
+    ))
+    .unwrap();
+
+    let error = AppConfig::builder()
+        .layer_named("local config", invalid)
+        .build()
+        .unwrap_err();
+
+    assert_eq!(
+        error.field_path().unwrap().logical_path(),
+        "network.listen.address"
+    );
+    assert!(
+        error
+            .to_string()
+            .starts_with("configuration source local config:")
+    );
+    assert!(matches!(error.root_cause(), ConfigError::Validation { .. }));
+}
+
+#[test]
+fn providers_describe_sources_without_inline_contents() {
+    let provider = JsonFileProvider::from_contents(r#"{ "api_key": "do-not-leak" }"#);
+    assert_eq!(
+        crate::ConfigProvider::source(&provider).label(),
+        "inline json"
+    );
 }

@@ -100,6 +100,10 @@ impl ConfigProvider for DotenvProvider<'_> {
             self.selection.load_from_vars("dotenv", vars)
         })
     }
+
+    fn source(&self) -> crate::ConfigSource {
+        crate::ConfigSource::new(self.source.source_label("dotenv"))
+    }
 }
 
 #[cfg(test)]

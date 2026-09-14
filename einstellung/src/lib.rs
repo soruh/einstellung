@@ -619,6 +619,10 @@ fn context(error: ConfigError, complete: &'static str, segment: &'static str) ->
             source,
             error: Box::new(context(*error, complete, segment)),
         },
+        ConfigError::Path { path, error } => ConfigError::Path {
+            path: format!("{segment}.{path}"),
+            error: Box::new(context(*error, complete, segment)),
+        },
         ConfigError::Composition { provenance, error } => ConfigError::Composition {
             provenance,
             error: Box::new(context(*error, complete, segment)),

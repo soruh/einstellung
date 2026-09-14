@@ -910,6 +910,42 @@ fn validator_uses_normal_reference_coercions() {
     }
 }
 
+#[derive(Debug)]
+struct ContextErrorConfig;
+
+#[derive(Default, serde::Deserialize)]
+struct ContextErrorPartial;
+
+impl Config for ContextErrorConfig {
+    type Partial = ContextErrorPartial;
+}
+
+impl PartialConfig for ContextErrorPartial {
+    type Complete = ContextErrorConfig;
+
+    fn merge(self, _next: Self) -> Result<Self, ConfigError> {
+        Ok(self)
+    }
+
+    fn build(self) -> Result<Self::Complete, ConfigError> {
+        Err(
+            ConfigError::provider("custom", std::io::Error::other("failed"))
+                .with_logical_path("leaf.value")
+                .with_source(crate::ConfigSource::new("custom source")),
+        )
+    }
+}
+
+#[test]
+fn nested_context_prefixes_custom_logical_paths() {
+    let error = crate::build_with_context(ContextErrorPartial, "OuterConfig", "nested")
+        .expect_err("custom partial should fail");
+
+    assert_eq!(error.logical_path().as_deref(), Some("nested.leaf.value"));
+    assert_eq!(error.config_source().unwrap().label(), "custom source");
+    assert!(matches!(error.root_cause(), ConfigError::Provider { .. }));
+}
+
 #[test]
 fn field_paths_have_logical_dotted_form() {
     let path = crate::FieldPath::new("ListenConfig", "address")

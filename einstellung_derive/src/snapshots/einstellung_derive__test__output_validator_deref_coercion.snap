@@ -3,60 +3,60 @@ source: einstellung_derive/src/test.rs
 expression: formatted
 ---
 /// --- helper ---
-pub fn validate_port(_: &u16) -> bool {
-    true
+fn non_empty(value: &str) -> Result<(), &'static str> {
+    if value.is_empty() { Err("empty") } else { Ok(()) }
 }
 
 // ---------------------------------
 
 /// --- input ---
 #[derive(Config)]
-struct ServerConfig {
-    #[config(validate = validate_port)]
-    port: u16,
+struct AppConfig {
+    #[config(validate = non_empty)]
+    name: String,
 }
 
 /// --- output ---
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
-struct ServerConfigPartial {
-    port: ::core::option::Option<u16>,
+struct AppConfigPartial {
+    name: ::core::option::Option<String>,
 }
 #[automatically_derived]
-impl ::einstellung::PartialConfig for ServerConfigPartial {
-    type Complete = ServerConfig;
+impl ::einstellung::PartialConfig for AppConfigPartial {
+    type Complete = AppConfig;
     fn merge(
         self,
         next: Self,
     ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
         ::core::result::Result::Ok(Self {
-            port: next.port.or(self.port),
+            name: next.name.or(self.name),
         })
     }
     fn build(
         self,
     ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
-        ::core::result::Result::Ok(ServerConfig {
-            port: {
-                let port: u16 = self
-                    .port
+        ::core::result::Result::Ok(AppConfig {
+            name: {
+                let name: String = self
+                    .name
                     .ok_or(
                         ::einstellung::ConfigError::MissingField(
-                            ::einstellung::FieldPath::new("ServerConfig", "port"),
+                            ::einstellung::FieldPath::new("AppConfig", "name"),
                         ),
                     )?;
-                if let Err(e) = (validate_port)(&port) {
+                if let Err(e) = (non_empty)(&name) {
                     return Err(::einstellung::ConfigError::Validation {
-                        field: ::einstellung::FieldPath::new("ServerConfig", "port"),
+                        field: ::einstellung::FieldPath::new("AppConfig", "name"),
                         reason: ::einstellung::into_box_error(e),
                     });
                 }
-                port
+                name
             },
         })
     }
 }
 #[automatically_derived]
-impl ::einstellung::Config for ServerConfig {
-    type Partial = ServerConfigPartial;
+impl ::einstellung::Config for AppConfig {
+    type Partial = AppConfigPartial;
 }

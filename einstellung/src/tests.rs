@@ -15,6 +15,21 @@ fn not_loopback(address: &IpAddr) -> Result<(), crate::BoxError> {
     Ok(())
 }
 
+fn validate_nonempty(value: &str) -> Result<(), &'static str> {
+    if value.is_empty() {
+        Err("value must not be empty")
+    } else {
+        Ok(())
+    }
+}
+
+#[derive(Config, Debug)]
+#[config(crate = crate)]
+struct CoercedValidatorConfig {
+    #[config(validate = validate_nonempty)]
+    value: String,
+}
+
 fn merge_nonempty(
     current: Option<String>,
     next: Option<String>,
@@ -452,6 +467,23 @@ fn deny_unknown_fields_rejects_typos() {
 
     match error {
         ConfigError::Json(error) => assert!(error.to_string().contains("unknown field `vlaue`")),
+        other => panic!("unexpected error: {other}"),
+    }
+}
+
+#[test]
+fn validator_uses_normal_reference_coercions() {
+    let partial = CoercedValidatorConfig::load_partial(&JsonFileProvider::from_contents(
+        r#"{ "value": "" }"#,
+    ))
+    .unwrap();
+
+    let error = partial.build().unwrap_err();
+    match error {
+        ConfigError::Validation { field, reason } => {
+            assert_eq!(field.to_string(), "CoercedValidatorConfig::value");
+            assert_eq!(reason.to_string(), "value must not be empty");
+        }
         other => panic!("unexpected error: {other}"),
     }
 }

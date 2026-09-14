@@ -271,7 +271,11 @@ impl ConfigError {
     }
 }
 
-/// A function passed to `#[config(validate ... )]` needs to match this signature. See the derive macro for [`derive@Config`] for more details on `validate`.
+/// Function-pointer shape for validators that borrow the exact field type.
+///
+/// The derive macro also accepts validators reached through normal Rust argument coercions, such
+/// as `fn(&str)` for a `String` field. Validator errors must be convertible into [`BoxError`]. See
+/// the derive macro for [`derive@Config`] for more details on `validate`.
 pub type ValidationFunction<T, E> = for<'a> fn(&'a T) -> Result<(), E>;
 
 /// A function passed to `#[config(merge ... )]` needs to match this signature.

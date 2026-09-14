@@ -219,7 +219,8 @@ all fields are optional.
 ## Customizability
 
 - **Validation**: Use `#[config(validate = path::to::func)]` to ensure fields
-  meet specific criteria before the final config is built.
+  meet specific criteria before the final config is built. Normal reference
+  coercions apply, so `String` fields can use idiomatic `fn(&str)` validators.
 - **Custom Merging**: Implement custom merge logic via
   `#[config(merge(function = "path"))]`.
 - **Attribute Forwarding**: Attributes like `#[config(partial(...))]` are

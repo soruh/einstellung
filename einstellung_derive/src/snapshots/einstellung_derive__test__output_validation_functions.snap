@@ -58,12 +58,10 @@ impl ::einstellung::PartialConfig for TlsConfigPartial {
                             ::einstellung::FieldPath::new("TlsConfig", "cert_path"),
                         ),
                     )?;
-                let _: ::einstellung::ValidationFunction<String, _> = validators::validate_cert_path;
                 if let Err(e) = (validators::validate_cert_path)(&cert_path) {
                     return Err(::einstellung::ConfigError::Validation {
                         field: ::einstellung::FieldPath::new("TlsConfig", "cert_path"),
-                        #[allow(clippy::useless_conversion)]
-                        reason: e.into(),
+                        reason: ::einstellung::into_box_error(e),
                     });
                 }
                 cert_path
@@ -76,12 +74,10 @@ impl ::einstellung::PartialConfig for TlsConfigPartial {
                             ::einstellung::FieldPath::new("TlsConfig", "port"),
                         ),
                     )?;
-                let _: ::einstellung::ValidationFunction<u16, _> = validators::validate_port;
                 if let Err(e) = (validators::validate_port)(&port) {
                     return Err(::einstellung::ConfigError::Validation {
                         field: ::einstellung::FieldPath::new("TlsConfig", "port"),
-                        #[allow(clippy::useless_conversion)]
-                        reason: e.into(),
+                        reason: ::einstellung::into_box_error(e),
                     });
                 }
                 port

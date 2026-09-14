@@ -635,3 +635,18 @@ assert_macro_test!(PASS, with_validate:
         }
     }
 );
+
+assert_macro_test!(PASS, validator_deref_coercion:
+    helper {
+        fn non_empty(value: &str) -> Result<(), &'static str> {
+            if value.is_empty() { Err("empty") } else { Ok(()) }
+        }
+    },
+    {
+        #[derive(Config)]
+        struct AppConfig {
+            #[config(validate = non_empty)]
+            name: String,
+        }
+    }
+);

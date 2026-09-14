@@ -172,12 +172,10 @@ fn generate_build_for_field(
     let validated = if let Some(validate_func) = &f.validate_func {
         quote_spanned!(validate_func.span() => {
             let #ident: #complete_type = #resolve;
-            let _: #einstellung::ValidationFunction<#complete_type, _> = #validate_func;
             if let Err(e) = (#validate_func)(&#ident) {
                 return Err(#einstellung::ConfigError::Validation {
                     field: #einstellung::FieldPath::new(#complete_type_name, #ident_str),
-                    #[allow(clippy::useless_conversion)]
-                    reason: e.into(),
+                    reason: #einstellung::into_box_error(e),
                 });
             }
             #ident

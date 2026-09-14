@@ -92,12 +92,10 @@ impl ::einstellung::PartialConfig for FullSystemConfigPartial {
                             ::einstellung::FieldPath::new("FullSystemConfig", "port"),
                         ),
                     )?;
-                let _: ::einstellung::ValidationFunction<u16, _> = validate_system_port;
                 if let Err(e) = (validate_system_port)(&port) {
                     return Err(::einstellung::ConfigError::Validation {
                         field: ::einstellung::FieldPath::new("FullSystemConfig", "port"),
-                        #[allow(clippy::useless_conversion)]
-                        reason: e.into(),
+                        reason: ::einstellung::into_box_error(e),
                     });
                 }
                 port

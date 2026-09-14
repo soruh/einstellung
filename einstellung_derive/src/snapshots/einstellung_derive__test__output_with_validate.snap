@@ -54,12 +54,10 @@ impl ::einstellung::PartialConfig for ListenConfigPartial {
                             ::einstellung::FieldPath::new("ListenConfig", "address"),
                         ),
                     )?;
-                let _: ::einstellung::ValidationFunction<std::net::IpAddr, _> = not_loopback;
                 if let Err(e) = (not_loopback)(&address) {
                     return Err(::einstellung::ConfigError::Validation {
                         field: ::einstellung::FieldPath::new("ListenConfig", "address"),
-                        #[allow(clippy::useless_conversion)]
-                        reason: e.into(),
+                        reason: ::einstellung::into_box_error(e),
                     });
                 }
                 address

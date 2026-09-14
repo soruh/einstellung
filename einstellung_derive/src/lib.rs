@@ -94,8 +94,11 @@ mod derive_config;
 /// ### Data Integrity (`validate`, `freezable`)
 /// * `#[config(validate = path::to::function)]`
 ///   Runs a custom validation function on the final, fully-merged value during the
-///   `.build()` phase. The function must conform to the signature `fn(&T) -> Result<(), E>`.
-///   If it returns an `Err`, `.build()` halts and returns a `ConfigError::Validation`.
+///   `.build()` phase. The function must be callable with a shared reference to the field and
+///   return `Result<(), E>`, where `E` is convertible into `einstellung::BoxError`. Normal Rust
+///   argument coercions apply, so a `String` field can use a validator taking `&str`, a `PathBuf`
+///   can use one taking `&Path`, and a `Vec<T>` can use one taking `&[T]`. If validation returns
+///   an `Err`, `.build()` halts and returns a `ConfigError::Validation`.
 /// * If you want a custom validation function for every instance of a
 ///   given type it may be more practical to write a custom `serde::Deserialze` implementation.
 /// * `#[config(freezable)]`

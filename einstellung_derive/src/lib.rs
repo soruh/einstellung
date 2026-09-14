@@ -22,7 +22,7 @@ mod derive_config;
 /// * Wraps the fields of the complete type to make them optional
 /// * Implements `Default`, `serde::Deserialize`, and `einstellung::PartialConfig`.
 /// * Inherits all `#[config(partial(...))]` attributes as `#[...]`
-/// * Is also accessable as `<AppConfig as Config>::Partial`
+/// * Is also accessible as `<AppConfig as Config>::Partial`
 /// * References the complete type as `<AppConfigPartial as PartialConfig>::Complete`
 ///
 /// If any field (or the struct) is marked as `freezable`, the partial struct will also

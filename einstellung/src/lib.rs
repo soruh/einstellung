@@ -711,18 +711,21 @@ fn line_column(input: &str, offset: usize) -> (usize, usize) {
     (line, column)
 }
 
+#[cfg(feature = "key-value")]
 #[derive(Debug)]
 struct ProviderPathError {
     path: String,
     source: BoxError,
 }
 
+#[cfg(feature = "key-value")]
 impl Display for ProviderPathError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Display::fmt(&self.source, f)
     }
 }
 
+#[cfg(feature = "key-value")]
 impl StdError for ProviderPathError {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         Some(self.source.as_ref())
@@ -823,6 +826,7 @@ impl ConfigError {
         }
     }
 
+    #[cfg(feature = "key-value")]
     pub(crate) fn provider_at(
         provider: &'static str,
         path: impl Into<String>,
@@ -895,9 +899,12 @@ impl ConfigError {
     pub fn logical_path(&self) -> Option<String> {
         match self {
             Self::MissingForView { field, .. } => Some(field.clone()),
+            #[cfg(feature = "key-value")]
             Self::Provider { source, .. } => source
                 .downcast_ref::<ProviderPathError>()
                 .map(|error| error.path.clone()),
+            #[cfg(not(feature = "key-value"))]
+            Self::Provider { .. } => None,
             Self::Source { error, .. } | Self::Composition { error, .. } => error.logical_path(),
             _ => self.field_path().map(FieldPath::logical_path),
         }

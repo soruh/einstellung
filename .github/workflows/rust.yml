@@ -69,6 +69,9 @@ jobs:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc --workspace --all-features --no-deps
 
+      - name: Verify publishable packages
+        run: scripts/verify-packages.sh
+
       - name: Check individual features
         shell: bash
         run: |

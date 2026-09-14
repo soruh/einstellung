@@ -74,9 +74,11 @@ jobs:
         run: |
           set -euo pipefail
           cargo check -p einstellung --no-default-features
+          cargo clippy -p einstellung --lib --no-default-features -- -D warnings
           for feature in derive json toml yaml key-value env dotenv; do
             cargo check -p einstellung --no-default-features --features "$feature"
             cargo test -p einstellung --lib --no-default-features --features "$feature"
+            cargo clippy -p einstellung --lib --no-default-features --features "$feature" -- -D warnings
           done
 
       - name: Run clippy

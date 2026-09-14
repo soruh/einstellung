@@ -4,10 +4,10 @@ expression: formatted
 ---
 /// --- helper ---
 pub fn merge_hosts(
-    _: String,
-    b: String,
-) -> Result<String, Box<dyn core::error::Error + Send + Sync>> {
-    Ok(b)
+    _: Option<String>,
+    b: Option<String>,
+) -> Result<Option<String>, &'static str> {
+    if b.is_some() { Ok(b) } else { Err("missing host") }
 }
 
 // ---------------------------------

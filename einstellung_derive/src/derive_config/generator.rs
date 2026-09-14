@@ -116,9 +116,8 @@ fn generate_field_merge(
                 let _: #einstellung::MergeFunction<#partial_type, _> = #func_path;
                 #func_path(#left, #right).map_err(|reason| #einstellung::ConfigError::CustomMerge {
                     field: #einstellung::FieldPath::new(#complete_str, #ident_str),
-                    #[allow(clippy::useless_conversion)]
-                    reason: reason.into(),
-                })
+                    reason: #einstellung::into_box_error(reason),
+                })?
             })
         }
         MergeStrategy::MergeSubconfig => quote! {

@@ -15,6 +15,24 @@ fn not_loopback(address: &IpAddr) -> Result<(), crate::BoxError> {
     Ok(())
 }
 
+fn merge_nonempty(
+    current: Option<String>,
+    next: Option<String>,
+) -> Result<Option<String>, &'static str> {
+    match next.as_deref() {
+        Some("") => Err("value must not be empty"),
+        Some(_) => Ok(next),
+        None => Ok(current),
+    }
+}
+
+#[derive(Config, Debug)]
+#[config(crate = crate)]
+struct CustomMergeConfig {
+    #[config(merge(function = "merge_nonempty"))]
+    value: String,
+}
+
 #[derive(Config, Debug)]
 #[config(crate = crate)]
 struct AppConfig {
@@ -393,4 +411,27 @@ fn config_builder_retains_first_provider_error() {
         .unwrap_err();
 
     assert!(matches!(error, ConfigError::Json(_)));
+}
+
+#[test]
+fn custom_merge_accepts_convertible_error_types() {
+    let base =
+        CustomMergeConfig::load_partial(&JsonFileProvider::from_contents(r#"{ "value": "base" }"#))
+            .unwrap();
+    let invalid =
+        CustomMergeConfig::load_partial(&JsonFileProvider::from_contents(r#"{ "value": "" }"#))
+            .unwrap();
+
+    let error = match base.merge(invalid) {
+        Ok(_) => panic!("custom merge unexpectedly succeeded"),
+        Err(error) => error,
+    };
+
+    match error {
+        ConfigError::CustomMerge { field, reason } => {
+            assert_eq!(field.to_string(), "CustomMergeConfig::value");
+            assert_eq!(reason.to_string(), "value must not be empty");
+        }
+        other => panic!("unexpected error: {other}"),
+    }
 }

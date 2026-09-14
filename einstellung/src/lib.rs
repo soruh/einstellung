@@ -206,6 +206,14 @@ impl Display for FieldPath {
 /// Thread-safe boxed error used by configuration callbacks and providers.
 pub type BoxError = Box<dyn StdError + Send + Sync + 'static>;
 
+#[doc(hidden)]
+pub fn into_box_error<E>(error: E) -> BoxError
+where
+    E: Into<BoxError>,
+{
+    error.into()
+}
+
 /// Errors which can be produced while loading, merging, or building a configuration.
 #[derive(Error, Debug)]
 #[non_exhaustive]
@@ -266,7 +274,10 @@ impl ConfigError {
 /// A function passed to `#[config(validate ... )]` needs to match this signature. See the derive macro for [`derive@Config`] for more details on `validate`.
 pub type ValidationFunction<T, E> = for<'a> fn(&'a T) -> Result<(), E>;
 
-/// A function passed to `#[config(merge ... )]` needs to match this signature. See the derive macro for [`derive@Config`] for more details on `merge`.
+/// A function passed to `#[config(merge ... )]` needs to match this signature.
+///
+/// The error type `E` may be any type convertible into [`BoxError`]. See the derive macro for
+/// [`derive@Config`] for more details on `merge`.
 pub type MergeFunction<T, E> = fn(T, T) -> Result<T, E>;
 
 /// Wraps a type to make it [`trait@Freezable`].

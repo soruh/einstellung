@@ -38,9 +38,8 @@ impl ::einstellung::PartialConfig for ServerConfigPartial {
                 merge_hosts(self.host, next.host)
                     .map_err(|reason| ::einstellung::ConfigError::CustomMerge {
                         field: ::einstellung::FieldPath::new("ServerConfig", "host"),
-                        #[allow(clippy::useless_conversion)]
-                        reason: reason.into(),
-                    })
+                        reason: ::einstellung::into_box_error(reason),
+                    })?
             },
         })
     }

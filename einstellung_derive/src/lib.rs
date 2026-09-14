@@ -83,8 +83,8 @@ mod derive_config;
 ///   trait. This can be used to join collections like `Vec`, `HashSet`, or `HashMap`.
 /// * `#[config(merge(function = "path::to::function"))]`
 ///   Defines a custom merge function. The function must conform to the signature:
-///   `fn(Option<T>, Option<T>) -> Result<Option<T>, E>`. The error will be mapped to a
-///   `ConfigError::CustomMerge`.
+///   `fn(Option<T>, Option<T>) -> Result<Option<T>, E>`, where `E` is convertible into
+///   `einstellung::BoxError`. The error will be mapped to a `ConfigError::CustomMerge`.
 ///
 /// ### Data Integrity (`validate`, `freezable`)
 /// * `#[config(validate = path::to::function)]`

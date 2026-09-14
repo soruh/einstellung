@@ -464,6 +464,21 @@ assert_macro_test!(FAIL, custom_merge_type_mismatch:
     }
 );
 
+assert_macro_test!(PASS, custom_merge_generic_error:
+    helper {
+        pub fn merge_hosts(_: Option<String>, b: Option<String>) -> Result<Option<String>, &'static str> {
+            if b.is_some() { Ok(b) } else { Err("missing host") }
+        }
+    },
+    {
+        #[derive(Config)]
+        struct ServerConfig {
+            #[config(merge(function = "merge_hosts"))]
+            host: String,
+        }
+    }
+);
+
 assert_macro_test!(PASS, default_value_literal:
     {
         #[derive(Config)]

@@ -32,12 +32,13 @@ note: function defined here
   |     --------------
   = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error[E0308]: mismatched types
+error[E0308]: `?` operator has incompatible types
  --> src/trybuild_tests/custom_merge_type_mismatch.rs
   |
   | #[derive(Config)]
-  |          ^^^^^^ expected `Option<String>`, found `Result<Option<u16>, ConfigError>`
+  |          ^^^^^^ expected `Option<String>`, found `Option<u16>`
   |
+  = note: `?` operator cannot convert from `std::option::Option<u16>` to `std::option::Option<String>`
   = note: expected enum `std::option::Option<String>`
-             found enum `Result<std::option::Option<u16>, ConfigError>`
+             found enum `std::option::Option<u16>`
   = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)

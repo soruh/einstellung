@@ -3,7 +3,9 @@ source: einstellung_derive/src/test.rs
 expression: formatted
 ---
 /// --- helper ---
-pub fn validate_port(_: &String) -> Result<(), Box<dyn std::error::Error>> {
+pub fn validate_port(
+    _: &String,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     Ok(())
 }
 

@@ -228,8 +228,8 @@ assert_macro_test!(PASS, serde_attribute_forwarding: {
 assert_macro_test!(PASS, validation_functions:
     helper {
         pub mod validators {
-            pub fn validate_cert_path(_: &String) -> Result<(), Box<dyn std::error::Error>> { Ok(()) }
-            pub fn validate_port(_: &u16) -> Result<(), Box<dyn std::error::Error>> { Ok(()) }
+            pub fn validate_cert_path(_: &String) -> Result<(), Box<dyn std::error::Error + Send + Sync>> { Ok(()) }
+            pub fn validate_port(_: &u16) -> Result<(), Box<dyn std::error::Error + Send + Sync>> { Ok(()) }
         }
     },
     {
@@ -245,7 +245,7 @@ assert_macro_test!(PASS, validation_functions:
 
 assert_macro_test!(PASS, kitchen_sink:
     helper {
-        fn validate_system_port(_: &u16) -> Result<(), Box<dyn std::error::Error>> { Ok(()) }
+        fn validate_system_port(_: &u16) -> Result<(), Box<dyn std::error::Error + Send + Sync>> { Ok(()) }
     },
     {
         #[derive(Config)]
@@ -401,7 +401,7 @@ assert_macro_test!(FAIL, default_function_signature_mismatch:
 
 assert_macro_test!(FAIL, validate_wrong_argument_type:
     helper {
-        pub fn validate_port(_: &String) -> Result<(), Box<dyn std::error::Error>> { Ok(()) }
+        pub fn validate_port(_: &String) -> Result<(), Box<dyn std::error::Error + Send + Sync>> { Ok(()) }
     },
     {
         #[derive(Config)]
@@ -414,7 +414,7 @@ assert_macro_test!(FAIL, validate_wrong_argument_type:
 
 assert_macro_test!(FAIL, validate_missing_reference:
     helper {
-        pub fn validate_port(_: u16) -> Result<(), Box<dyn std::error::Error>> { Ok(()) }
+        pub fn validate_port(_: u16) -> Result<(), Box<dyn std::error::Error + Send + Sync>> { Ok(()) }
     },
     {
         #[derive(Config)]
@@ -440,7 +440,7 @@ assert_macro_test!(FAIL, validate_wrong_return_type:
 
 assert_macro_test!(FAIL, custom_merge_wrong_signature:
     helper {
-        pub fn merge_hosts(_: String, b: String) -> Result<String, Box<dyn core::error::Error>> { Ok(b) }
+        pub fn merge_hosts(_: String, b: String) -> Result<String, Box<dyn core::error::Error + Send + Sync>> { Ok(b) }
     },
     {
         #[derive(Config)]
@@ -453,7 +453,7 @@ assert_macro_test!(FAIL, custom_merge_wrong_signature:
 
 assert_macro_test!(FAIL, custom_merge_type_mismatch:
     helper {
-        pub fn merge_hosts(_: Option<u16>, b: Option<u16>) -> Result<Option<u16>, Box<dyn core::error::Error>> { Ok(b) }
+        pub fn merge_hosts(_: Option<u16>, b: Option<u16>) -> Result<Option<u16>, Box<dyn core::error::Error + Send + Sync>> { Ok(b) }
     },
     {
         #[derive(Config)]
@@ -594,7 +594,7 @@ assert_macro_test!(PASS, freezable:
 
 assert_macro_test!(PASS, with_validate:
     helper {
-        fn not_loopback(address: &std::net::IpAddr) -> Result<(), Box<dyn std::error::Error>> {
+        fn not_loopback(address: &std::net::IpAddr) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             if address.is_loopback() {
                 return Err("Address must not be a multicast address".into());
             }

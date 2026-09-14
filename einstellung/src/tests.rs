@@ -8,7 +8,7 @@ use std::{
     net::IpAddr,
 };
 
-fn not_loopback(address: &IpAddr) -> Result<(), Box<dyn std::error::Error>> {
+fn not_loopback(address: &IpAddr) -> Result<(), crate::BoxError> {
     if address.is_loopback() {
         return Err("Address must not be a multicast address".into());
     }
@@ -38,6 +38,29 @@ struct ListenConfig {
     address: IpAddr,
     #[config(default = 443)]
     port: u16,
+}
+
+fn assert_send_sync<T: Send + Sync>() {}
+
+#[test]
+fn config_error_is_send_sync() {
+    assert_send_sync::<ConfigError>();
+}
+
+#[test]
+fn provider_error_preserves_source() {
+    use std::error::Error;
+
+    let err = ConfigError::provider(
+        "test",
+        std::io::Error::new(std::io::ErrorKind::InvalidData, "bad provider input"),
+    );
+
+    assert_eq!(err.to_string(), "test provider error: bad provider input");
+    assert_eq!(
+        err.source().map(ToString::to_string),
+        Some("bad provider input".to_owned())
+    );
 }
 
 #[track_caller]

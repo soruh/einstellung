@@ -6,7 +6,7 @@ expression: formatted
 pub fn merge_hosts(
     _: Option<u16>,
     b: Option<u16>,
-) -> Result<Option<u16>, Box<dyn core::error::Error>> {
+) -> Result<Option<u16>, Box<dyn core::error::Error + Send + Sync>> {
     Ok(b)
 }
 
@@ -38,7 +38,8 @@ impl ::einstellung::PartialConfig for ServerConfigPartial {
                 merge_hosts(self.host, next.host)
                     .map_err(|reason| ::einstellung::ConfigError::CustomMerge {
                         field: ::einstellung::FieldPath::new("ServerConfig", "host"),
-                        reason,
+                        #[allow(clippy::useless_conversion)]
+                        reason: reason.into(),
                     })
             },
         })

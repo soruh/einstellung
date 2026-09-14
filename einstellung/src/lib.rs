@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{error::Error as StdError, fmt::Display};
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
@@ -137,6 +137,9 @@ impl Display for FieldPath {
     }
 }
 
+/// Thread-safe boxed error used by configuration callbacks and providers.
+pub type BoxError = Box<dyn StdError + Send + Sync + 'static>;
+
 /// Possible errors which can be produces when loading a config
 #[derive(Error, Debug)]
 #[non_exhaustive]
@@ -156,6 +159,13 @@ pub enum ConfigError {
     #[error("TOML Parse Error: {0}")]
     Toml(#[from] ::toml::de::Error),
 
+    #[error("{provider} provider error: {source}")]
+    Provider {
+        provider: &'static str,
+        #[source]
+        source: BoxError,
+    },
+
     #[error("Missing required configuration field: '{0}'")]
     MissingField(FieldPath),
 
@@ -165,14 +175,26 @@ pub enum ConfigError {
     #[error("Validation failed for field '{field}': {reason}")]
     Validation {
         field: FieldPath,
-        reason: Box<dyn std::error::Error>,
+        #[source]
+        reason: BoxError,
     },
 
     #[error("Custom Merge failed for field '{field}': {reason}")]
     CustomMerge {
         field: FieldPath,
-        reason: Box<dyn std::error::Error>,
+        #[source]
+        reason: BoxError,
     },
+}
+
+impl ConfigError {
+    /// Wrap an error raised by a configuration provider while preserving its source.
+    pub fn provider(provider: &'static str, source: impl StdError + Send + Sync + 'static) -> Self {
+        Self::Provider {
+            provider,
+            source: Box::new(source),
+        }
+    }
 }
 
 /// A function passed to `#[config(validate ... )]` needs to match this signature. See the derive macro for [`derive@Config`] for more details on `validate`.

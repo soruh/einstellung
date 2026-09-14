@@ -3,7 +3,9 @@ source: einstellung_derive/src/test.rs
 expression: formatted
 ---
 /// --- helper ---
-fn validate_system_port(_: &u16) -> Result<(), Box<dyn std::error::Error>> {
+fn validate_system_port(
+    _: &u16,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     Ok(())
 }
 

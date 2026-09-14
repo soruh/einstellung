@@ -3,7 +3,10 @@ source: einstellung_derive/src/test.rs
 expression: formatted
 ---
 /// --- helper ---
-pub fn merge_hosts(_: String, b: String) -> Result<String, Box<dyn core::error::Error>> {
+pub fn merge_hosts(
+    _: String,
+    b: String,
+) -> Result<String, Box<dyn core::error::Error + Send + Sync>> {
     Ok(b)
 }
 
@@ -35,7 +38,8 @@ impl ::einstellung::PartialConfig for ServerConfigPartial {
                 merge_hosts(self.host, next.host)
                     .map_err(|reason| ::einstellung::ConfigError::CustomMerge {
                         field: ::einstellung::FieldPath::new("ServerConfig", "host"),
-                        reason,
+                        #[allow(clippy::useless_conversion)]
+                        reason: reason.into(),
                     })
             },
         })

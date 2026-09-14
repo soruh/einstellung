@@ -4,10 +4,14 @@ expression: formatted
 ---
 /// --- helper ---
 pub mod validators {
-    pub fn validate_cert_path(_: &String) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn validate_cert_path(
+        _: &String,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         Ok(())
     }
-    pub fn validate_port(_: &u16) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn validate_port(
+        _: &u16,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         Ok(())
     }
 }

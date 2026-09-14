@@ -3,7 +3,9 @@ source: einstellung_derive/src/test.rs
 expression: formatted
 ---
 /// --- helper ---
-fn not_loopback(address: &std::net::IpAddr) -> Result<(), Box<dyn std::error::Error>> {
+fn not_loopback(
+    address: &std::net::IpAddr,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     if address.is_loopback() {
         return Err("Address must not be a multicast address".into());
     }

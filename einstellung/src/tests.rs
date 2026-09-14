@@ -30,6 +30,19 @@ struct CoercedValidatorConfig {
     value: String,
 }
 
+#[derive(Config, Debug)]
+#[config(crate = crate)]
+struct BuiltinValidatorConfig {
+    #[config(validate = crate::validators::non_blank)]
+    name: String,
+    #[config(validate = crate::validators::non_empty_slice)]
+    tags: Vec<String>,
+    #[config(validate = |port: &u16| {
+        if (1..=49151).contains(port) { Ok(()) } else { Err("port must be in the registered range") }
+    })]
+    port: u16,
+}
+
 fn merge_nonempty(
     current: Option<String>,
     next: Option<String>,
@@ -608,6 +621,33 @@ fn deny_unknown_fields_rejects_typos() {
         ConfigError::Json(error) => assert!(error.to_string().contains("unknown field `vlaue`")),
         other => panic!("unexpected error: {other}"),
     }
+}
+
+#[test]
+fn builtin_and_closure_validators_work() {
+    let valid = BuiltinValidatorConfig::load_complete(&JsonFileProvider::from_contents(
+        r#"{ "name": "worker", "tags": ["api"], "port": 443 }"#,
+    ))
+    .unwrap();
+    assert_eq!(valid.port, 443);
+
+    let error = BuiltinValidatorConfig::load_complete(&JsonFileProvider::from_contents(
+        r#"{ "name": "   ", "tags": ["api"], "port": 443 }"#,
+    ))
+    .unwrap_err();
+    assert_eq!(error.field_path().unwrap().logical_path(), "name");
+
+    let error = BuiltinValidatorConfig::load_complete(&JsonFileProvider::from_contents(
+        r#"{ "name": "worker", "tags": [], "port": 443 }"#,
+    ))
+    .unwrap_err();
+    assert_eq!(error.field_path().unwrap().logical_path(), "tags");
+
+    let error = BuiltinValidatorConfig::load_complete(&JsonFileProvider::from_contents(
+        r#"{ "name": "worker", "tags": ["api"], "port": 60000 }"#,
+    ))
+    .unwrap_err();
+    assert_eq!(error.field_path().unwrap().logical_path(), "port");
 }
 
 #[test]

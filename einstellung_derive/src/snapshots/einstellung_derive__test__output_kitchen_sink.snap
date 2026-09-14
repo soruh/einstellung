@@ -92,7 +92,8 @@ impl ::einstellung::PartialConfig for FullSystemConfigPartial {
                             ::einstellung::FieldPath::new("FullSystemConfig", "port"),
                         ),
                     )?;
-                if let Err(e) = (validate_system_port)(&port) {
+                let validator = validate_system_port;
+                if let Err(e) = validator(&port) {
                     return Err(::einstellung::ConfigError::Validation {
                         field: ::einstellung::FieldPath::new("FullSystemConfig", "port"),
                         reason: ::einstellung::into_box_error(e),

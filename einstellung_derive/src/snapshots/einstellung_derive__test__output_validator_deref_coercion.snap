@@ -45,7 +45,8 @@ impl ::einstellung::PartialConfig for AppConfigPartial {
                             ::einstellung::FieldPath::new("AppConfig", "name"),
                         ),
                     )?;
-                if let Err(e) = (non_empty)(&name) {
+                let validator = non_empty;
+                if let Err(e) = validator(&name) {
                     return Err(::einstellung::ConfigError::Validation {
                         field: ::einstellung::FieldPath::new("AppConfig", "name"),
                         reason: ::einstellung::into_box_error(e),

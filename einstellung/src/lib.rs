@@ -15,6 +15,9 @@ pub mod tests;
 
 mod providers;
 
+/// Reusable dependency-free validators for common configuration invariants.
+pub mod validators;
+
 pub use providers::*;
 
 /// Describes a Configuration which can be built from its associated `::Partial` configuration.

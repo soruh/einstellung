@@ -172,7 +172,8 @@ fn generate_build_for_field(
     let validated = if let Some(validate_func) = &f.validate_func {
         quote_spanned!(validate_func.span() => {
             let #ident: #complete_type = #resolve;
-            if let Err(e) = (#validate_func)(&#ident) {
+            let validator = #validate_func;
+            if let Err(e) = validator(&#ident) {
                 return Err(#einstellung::ConfigError::Validation {
                     field: #einstellung::FieldPath::new(#complete_type_name, #ident_str),
                     reason: #einstellung::into_box_error(e),

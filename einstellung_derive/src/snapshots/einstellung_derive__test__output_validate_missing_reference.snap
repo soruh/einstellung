@@ -45,7 +45,8 @@ impl ::einstellung::PartialConfig for ServerConfigPartial {
                             ::einstellung::FieldPath::new("ServerConfig", "port"),
                         ),
                     )?;
-                if let Err(e) = (validate_port)(&port) {
+                let validator = validate_port;
+                if let Err(e) = validator(&port) {
                     return Err(::einstellung::ConfigError::Validation {
                         field: ::einstellung::FieldPath::new("ServerConfig", "port"),
                         reason: ::einstellung::into_box_error(e),

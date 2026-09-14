@@ -307,9 +307,11 @@ that omits a field never erases an earlier value and never forces its default.
 
 ## Customizability
 
-- **Validation**: Use `#[config(validate = path::to::func)]` to ensure fields
-  meet specific criteria before the final config is built. Normal reference
-  coercions apply, so `String` fields can use idiomatic `fn(&str)` validators.
+- **Validation**: Use `#[config(validate = path::to::func)]` or a closure expression to
+  ensure fields meet specific criteria before the final config is built. Normal reference
+  coercions apply, so `String` fields can use idiomatic `fn(&str)` validators. The
+  dependency-free `einstellung::validators` module includes `non_empty`, `non_blank`, and
+  `non_empty_slice`; closures are convenient for parameterized checks such as numeric ranges.
 - **Custom Merging**: Implement custom merge logic via
   `#[config(merge(function = "path"))]`.
 - **Attribute Forwarding**: Attributes like `#[config(partial(...))]` are

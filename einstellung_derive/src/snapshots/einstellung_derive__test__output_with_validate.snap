@@ -54,7 +54,8 @@ impl ::einstellung::PartialConfig for ListenConfigPartial {
                             ::einstellung::FieldPath::new("ListenConfig", "address"),
                         ),
                     )?;
-                if let Err(e) = (not_loopback)(&address) {
+                let validator = not_loopback;
+                if let Err(e) = validator(&address) {
                     return Err(::einstellung::ConfigError::Validation {
                         field: ::einstellung::FieldPath::new("ListenConfig", "address"),
                         reason: ::einstellung::into_box_error(e),

@@ -92,15 +92,15 @@ mod derive_config;
 ///   `einstellung::BoxError`. The error will be mapped to a `ConfigError::CustomMerge`.
 ///
 /// ### Data Integrity (`validate`, `freezable`)
-/// * `#[config(validate = path::to::function)]`
-///   Runs a custom validation function on the final, fully-merged value during the
-///   `.build()` phase. The function must be callable with a shared reference to the field and
-///   return `Result<(), E>`, where `E` is convertible into `einstellung::BoxError`. Normal Rust
-///   argument coercions apply, so a `String` field can use a validator taking `&str`, a `PathBuf`
-///   can use one taking `&Path`, and a `Vec<T>` can use one taking `&[T]`. If validation returns
-///   an `Err`, `.build()` halts and returns a `ConfigError::Validation`.
+/// * `#[config(validate = path::to::function)]` (or a closure expression)
+///   Runs custom validation on the final, fully-merged value during the `.build()` phase. The
+///   validator must be callable with a shared reference to the field and return `Result<(), E>`,
+///   where `E` is convertible into `einstellung::BoxError`. Normal Rust argument coercions apply,
+///   so a `String` field can use a validator taking `&str`, a `PathBuf` can use one taking `&Path`,
+///   and a `Vec<T>` can use one taking `&[T]`. Closures are useful for parameterized checks such as
+///   ranges. If validation returns an `Err`, `.build()` halts with `ConfigError::Validation`.
 /// * If you want a custom validation function for every instance of a
-///   given type it may be more practical to write a custom `serde::Deserialze` implementation.
+///   given type it may be more practical to write a custom `serde::Deserialize` implementation.
 /// * `#[config(freezable)]`
 ///   Marks an individual field as freezable. If a partial layer is `.freeze()`d, this field
 ///   will reject overwrite attempts from subsequent layers always keeping the frozen value.

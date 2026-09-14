@@ -107,6 +107,20 @@ impl<C: Config> ConfigBuilder<C> {
         })
     }
 
+    /// Merge multiple providers in iterator order.
+    ///
+    /// Each provider is the next higher-precedence layer. If one provider fails, later providers
+    /// are not loaded. Use [`Self::typed_providers`] for heterogeneous runtime-selected sources.
+    pub fn providers<'a, P, I>(self, providers: I) -> Self
+    where
+        P: ConfigProvider + 'a,
+        I: IntoIterator<Item = &'a P>,
+    {
+        providers
+            .into_iter()
+            .fold(self, |builder, provider| builder.provider(provider))
+    }
+
     /// Merge an object-safe provider for this specific configuration type.
     ///
     /// This is useful when the set of providers is selected at runtime and needs to be stored as
@@ -121,6 +135,21 @@ impl<C: Config> ConfigBuilder<C> {
             let next = provider.load_config_partial();
             (source, next)
         })
+    }
+
+    /// Merge multiple object-safe providers in iterator order.
+    ///
+    /// This is the heterogeneous counterpart to [`Self::providers`]. The iterator normally comes
+    /// from a collection of boxed providers, for example
+    /// `providers.iter().map(|provider| provider.as_ref())`.
+    pub fn typed_providers<'a, I>(self, providers: I) -> Self
+    where
+        C: 'a,
+        I: IntoIterator<Item = &'a dyn ConfigProviderFor<C>>,
+    {
+        providers
+            .into_iter()
+            .fold(self, |builder, provider| builder.typed_provider(provider))
     }
 
     fn provider_with<F>(self, load: F) -> Self

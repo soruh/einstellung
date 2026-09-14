@@ -270,11 +270,8 @@ fn typed_provider_trait_objects_support_runtime_composition() {
         )),
     ];
 
-    let tracked = providers
-        .iter()
-        .fold(AppConfig::builder(), |builder, provider| {
-            builder.typed_provider(provider.as_ref())
-        })
+    let tracked = AppConfig::builder()
+        .typed_providers(providers.iter().map(|provider| provider.as_ref()))
         .build_tracked()
         .unwrap();
 
@@ -659,6 +656,23 @@ fn config_builder_merges_providers_in_order() {
         config.network.listen.address,
         "192.168.0.1".parse::<IpAddr>().unwrap()
     );
+    assert_eq!(config.network.listen.port, 8443);
+}
+
+#[test]
+fn config_builder_merges_provider_iterators_in_order() {
+    let providers = [
+        JsonFileProvider::from_contents(
+            r#"{ "app_name": "base", "network": { "listen": { "address": "192.168.0.1" } } }"#,
+        ),
+        JsonFileProvider::from_contents(
+            r#"{ "app_name": "override", "network": { "listen": { "port": 8443 } } }"#,
+        ),
+    ];
+
+    let config = AppConfig::builder().providers(&providers).build().unwrap();
+
+    assert_eq!(config.app_name, "override");
     assert_eq!(config.network.listen.port, 8443);
 }
 

@@ -1168,6 +1168,34 @@ fn direct_load_attaches_source_to_validation_errors() {
 }
 
 #[test]
+fn missing_top_level_field_uses_successfully_loaded_layer_history() {
+    let error = AppConfig::builder()
+        .provider(&JsonFileProvider::from_contents("{}"))
+        .build()
+        .unwrap_err();
+
+    assert_eq!(error.logical_path().as_deref(), Some("app_name"));
+    assert_eq!(
+        error
+            .field_sources()
+            .into_iter()
+            .map(crate::ConfigSource::label)
+            .collect::<Vec<_>>(),
+        vec!["inline json"]
+    );
+    assert_eq!(
+        error
+            .provenance()
+            .unwrap()
+            .layers()
+            .iter()
+            .map(crate::ConfigSource::label)
+            .collect::<Vec<_>>(),
+        vec!["inline json"]
+    );
+}
+
+#[test]
 fn missing_nested_field_uses_nearest_supplied_subconfig_source() {
     let error = AppConfig::builder()
         .provider(&JsonFileProvider::from_contents(

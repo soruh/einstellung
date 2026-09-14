@@ -205,7 +205,7 @@ impl<C: Config> ConfigBuilder<C> {
         match current.merge(next) {
             Ok(merged) => {
                 let mut provenance = provenance;
-                provenance.record(source, fields);
+                provenance.record_layer(source, fields);
                 Self {
                     state: ConfigBuilderState::Ready(merged),
                     provenance,
@@ -237,7 +237,7 @@ impl<C: Config> ConfigBuilder<C> {
         match current.merge(next) {
             Ok(merged) => {
                 let mut provenance = provenance;
-                provenance.record(source, fields);
+                provenance.record_layer(source, fields);
                 Self {
                     state: ConfigBuilderState::Ready(merged),
                     provenance,
@@ -350,7 +350,7 @@ impl<C: Config> ConfigBuilder<C> {
             ConfigBuilderState::Failed(error) => return Err(error.with_provenance(provenance)),
         };
 
-        provenance.record(ConfigSource::defaults(), partial.defaulted_fields());
+        provenance.record_fields(ConfigSource::defaults(), partial.defaulted_fields());
 
         match partial.build() {
             Ok(config) => Ok(TrackedConfig { config, provenance }),
@@ -372,17 +372,24 @@ impl<C: Config> Default for ConfigBuilder<C> {
 /// no secret data.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ConfigProvenance {
+    layers: Vec<ConfigSource>,
     fields: std::collections::BTreeMap<String, Vec<ConfigSource>>,
 }
 
 impl ConfigProvenance {
-    fn record(&mut self, source: ConfigSource, fields: Vec<String>) {
+    fn record_layer(&mut self, source: ConfigSource, fields: Vec<String>) {
+        self.layers.push(source.clone());
+        self.record_fields(source, fields);
+    }
+
+    fn record_fields(&mut self, source: ConfigSource, fields: Vec<String>) {
         for field in fields {
             self.fields.entry(field).or_default().push(source.clone());
         }
     }
 
     fn extend(&mut self, other: Self) {
+        self.layers.extend(other.layers);
         for (field, mut sources) in other.fields {
             self.fields.entry(field).or_default().append(&mut sources);
         }
@@ -408,9 +415,20 @@ impl ConfigProvenance {
             if let Some(sources) = self.explain(path) {
                 return Some(sources);
             }
-            let (parent, _) = path.rsplit_once('.')?;
+            let Some((parent, _)) = path.rsplit_once('.') else {
+                return (!self.layers.is_empty()).then_some(self.layers.as_slice());
+            };
             path = parent;
         }
+    }
+
+    /// Return successfully merged configuration layers in merge order.
+    ///
+    /// Unlike [`Self::iter`], this includes layers that supplied no field values. That distinction
+    /// is useful when a successfully parsed empty layer still participates in a later missing-field
+    /// diagnostic. Field defaults are not configuration layers and therefore do not appear here.
+    pub fn layers(&self) -> &[ConfigSource] {
+        &self.layers
     }
 
     /// Return the most recent source that supplied `path`.
@@ -431,9 +449,9 @@ impl ConfigProvenance {
             .map(|(path, sources)| (path.as_str(), sources.as_slice()))
     }
 
-    /// Return whether no field provenance has been recorded.
+    /// Return whether no configuration layers or field provenance have been recorded.
     pub fn is_empty(&self) -> bool {
-        self.fields.is_empty()
+        self.layers.is_empty() && self.fields.is_empty()
     }
 }
 

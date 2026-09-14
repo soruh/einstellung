@@ -256,7 +256,12 @@ by `#[config(default ...)]` are attributed to `field default`.
 
 Builder errors retain the provenance accumulated before the failure, including
 `build_partial()` failures. Use `build_tracked_partial()` when a successfully
-composed partial must keep provenance for later transformation or merging.
+composed partial must keep provenance for later transformation or merging. Feed that
+result into another builder with `tracked_layer(...)` to preserve its original
+per-field source histories instead of collapsing the staged partial to one synthetic
+layer label. Nested/composite provider errors likewise merge their internal provenance
+with the caller's earlier layers in precedence order.
+
 This is particularly useful for final validation errors, where there is no single
 parser failure to identify the source directly:
 
@@ -384,6 +389,9 @@ that omits a field never erases an earlier value and never forces its default.
   names also become the canonical logical paths used by errors and provenance.
 - **Subconfigs**: Nest `Config` structs using the `#[config(subconfig)]`
   attribute to keep your data organized.
+- **Generic structs**: `#[derive(Config)]` currently requires a non-generic struct.
+  Generic derives are rejected explicitly rather than emitting invalid generated Rust;
+  supporting them correctly requires propagating deserialization and subconfig bounds.
 
 ---
 

@@ -13,6 +13,11 @@ mod derive_config;
 /// from multiple sources (like hardcoded defaults, JSON, YAML, or TOML), merge them
 /// together, and finally build the fully populated configuration struct.
 ///
+/// # Generic structs
+///
+/// Generic structs are not currently supported by this derive. The macro reports this
+/// directly instead of generating a partial type with incomplete generic bounds.
+///
 /// # The Generated `Partial` Type
 ///
 /// When you derive `Config` on a struct named `AppConfig`, the macro generates a

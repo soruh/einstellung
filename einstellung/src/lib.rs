@@ -186,22 +186,10 @@ impl<C: Config> ConfigBuilder<C> {
         self.provenance
             .record(ConfigSource::defaults(), partial.defaulted_fields());
 
-        match partial.build() {
-            Ok(config) => Ok(TrackedConfig {
-                config,
-                provenance: self.provenance,
-            }),
-            Err(error) => {
-                let source = error
-                    .field_path()
-                    .and_then(|field| self.provenance.latest(field.logical_path()))
-                    .cloned();
-                Err(match source {
-                    Some(source) => error.with_source(source),
-                    None => error,
-                })
-            }
-        }
+        partial.build().map(|config| TrackedConfig {
+            config,
+            provenance: self.provenance,
+        })
     }
 }
 
@@ -237,7 +225,11 @@ impl ConfigProvenance {
     }
 
     /// Return the most recent source that supplied `path`.
-    pub fn latest(&self, path: impl AsRef<str>) -> Option<&ConfigSource> {
+    ///
+    /// This is the winning source for the default replace strategy. Extend, custom-merge, and
+    /// frozen fields can retain values from earlier layers, so callers that need the full story
+    /// should use [`Self::explain`].
+    pub fn latest_supplier(&self, path: impl AsRef<str>) -> Option<&ConfigSource> {
         self.explain(path).and_then(|sources| sources.last())
     }
 }

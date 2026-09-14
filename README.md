@@ -201,6 +201,32 @@ independently. Environment providers remain allowlist-driven before
 deserialization, so unrelated process variables are never treated as config
 keys.
 
+### Provenance and diagnostics
+
+Use `build_tracked()` when you need to explain where a final setting came from:
+
+```rust
+let tracked = AppConfig::builder()
+    .provider(&TomlFileProvider::from_path(std::path::Path::new("config.toml")))
+    .provider(&EnvProvider::only(["API_KEY"]))
+    .build_tracked()?;
+
+for source in tracked.explain("api_key").unwrap_or_default() {
+    eprintln!("api_key was supplied by {source}");
+}
+```
+
+Provenance stores only logical field paths and source labels, never configuration
+values. Sources are listed in merge order. For normal replacement the last
+supplier is the winner; `extend`, custom merge functions, and frozen fields can
+retain data from earlier layers, so `explain()` deliberately preserves the full
+supply history rather than pretending there is always one winner. Values filled
+by `#[config(default ...)]` are attributed to `field default`.
+
+Provider parse errors and single-provider build errors include the provider
+source. File providers identify the path; inline providers identify only the
+format and never embed their contents in diagnostics.
+
 ### Mode-specific configuration views
 
 Keep settings that are not required by every command optional in the shared
@@ -256,6 +282,20 @@ all fields are optional.
 - `.freeze()`: Marks a partial configuration as frozen. Any fields tagged with
   `#[config(freezable)]` in a frozen layer cannot be modified by subsequent
   merges.
+
+### Optional subconfigs and defaults
+
+An `Option<SubConfig>` marked with `#[config(subconfig)]` stays `None` when no
+layer mentions that subconfig. Once any layer supplies the subconfig, its partial
+value is built normally: required nested fields must be present and nested
+defaults are applied. This distinction is useful for mode-specific sections:
+absence means “feature not configured,” while partial presence means “feature
+configured, so validate it completely.”
+
+Field defaults are a final construction fallback, not an implicit merge layer.
+Providers are merged first; only then does `.build()` fill still-missing fields
+from `#[config(default ...)]` and run validators. This is why a later provider
+that omits a field never erases an earlier value and never forces its default.
 
 ---
 

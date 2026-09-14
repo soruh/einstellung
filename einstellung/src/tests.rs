@@ -652,6 +652,14 @@ fn tracked_builder_explains_nested_sources_and_defaults() {
     );
     assert_eq!(
         tracked
+            .provenance()
+            .latest_supplier("app_name")
+            .unwrap()
+            .label(),
+        "local override"
+    );
+    assert_eq!(
+        tracked
             .explain("network.listen.port")
             .unwrap()
             .last()
@@ -662,16 +670,11 @@ fn tracked_builder_explains_nested_sources_and_defaults() {
 }
 
 #[test]
-fn builder_attaches_winning_source_to_validation_errors() {
-    let invalid = AppConfig::load_partial(&JsonFileProvider::from_contents(
+fn direct_load_attaches_source_to_validation_errors() {
+    let error = AppConfig::load_complete(&JsonFileProvider::from_contents(
         r#"{ "app_name": "bad", "network": { "listen": { "address": "127.0.0.1" } } }"#,
     ))
-    .unwrap();
-
-    let error = AppConfig::builder()
-        .layer_named("local config", invalid)
-        .build()
-        .unwrap_err();
+    .unwrap_err();
 
     assert_eq!(
         error.field_path().unwrap().logical_path(),
@@ -680,7 +683,7 @@ fn builder_attaches_winning_source_to_validation_errors() {
     assert!(
         error
             .to_string()
-            .starts_with("configuration source local config:")
+            .starts_with("configuration source inline json:")
     );
     assert!(matches!(error.root_cause(), ConfigError::Validation { .. }));
 }

@@ -100,9 +100,11 @@ impl<C: Config> ConfigBuilder<C> {
 
     /// Merge a provider as the next, higher-precedence layer.
     pub fn provider(self, provider: &impl ConfigProvider) -> Self {
-        let source = provider.source();
-        let next = provider.load_partial::<C::Partial>();
-        self.provider_result(source, next)
+        self.provider_with(|| {
+            let source = provider.source();
+            let next = provider.load_partial::<C::Partial>();
+            (source, next)
+        })
     }
 
     /// Merge an object-safe provider for this specific configuration type.
@@ -114,17 +116,23 @@ impl<C: Config> ConfigBuilder<C> {
     where
         P: ConfigProviderFor<C> + ?Sized,
     {
-        let source = provider.source();
-        let next = provider.load_config_partial();
-        self.provider_result(source, next)
+        self.provider_with(|| {
+            let source = provider.source();
+            let next = provider.load_config_partial();
+            (source, next)
+        })
     }
 
-    fn provider_result(self, source: ConfigSource, next: Result<C::Partial, ConfigError>) -> Self {
+    fn provider_with<F>(self, load: F) -> Self
+    where
+        F: FnOnce() -> (ConfigSource, Result<C::Partial, ConfigError>),
+    {
         let Self { state, provenance } = self;
         let ConfigBuilderState::Ready(current) = state else {
             return Self { state, provenance };
         };
 
+        let (source, next) = load();
         let next = match next {
             Ok(next) => next,
             Err(error) => {

@@ -692,6 +692,44 @@ fn config_builder_retains_first_provider_error() {
 }
 
 #[test]
+fn failed_builder_does_not_load_later_providers() {
+    use std::cell::Cell;
+
+    struct CountingProvider<'a> {
+        loads: &'a Cell<usize>,
+    }
+
+    impl crate::ConfigProvider for CountingProvider<'_> {
+        fn load_partial<T: serde::de::DeserializeOwned>(&self) -> Result<T, ConfigError> {
+            self.loads.set(self.loads.get() + 1);
+            Ok(serde_json::from_str(
+                r#"{ "app_name": "late", "network": { "listen": { "address": "192.168.0.1" } } }"#,
+            )?)
+        }
+    }
+
+    let invalid = JsonFileProvider::from_contents("{");
+    let loads = Cell::new(0);
+    let later = CountingProvider { loads: &loads };
+
+    let _ = AppConfig::builder()
+        .provider(&invalid)
+        .provider(&later)
+        .build()
+        .unwrap_err();
+    assert_eq!(loads.get(), 0);
+
+    let invalid: &dyn crate::ConfigProviderFor<AppConfig> = &invalid;
+    let later: &dyn crate::ConfigProviderFor<AppConfig> = &later;
+    let _ = AppConfig::builder()
+        .typed_provider(invalid)
+        .typed_provider(later)
+        .build()
+        .unwrap_err();
+    assert_eq!(loads.get(), 0);
+}
+
+#[test]
 fn custom_merge_works_for_optional_complete_fields() {
     let base = OptionalCustomMergeConfig::load_partial(&JsonFileProvider::from_contents(
         r#"{ "value": "base" }"#,

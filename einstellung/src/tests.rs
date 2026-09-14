@@ -109,9 +109,7 @@ struct RemoteMode {
 
 impl crate::ConfigView<ModeConfig> for RemoteMode {
     fn from_config(config: ModeConfig) -> Result<Self, ConfigError> {
-        let remote = config
-            .remote
-            .ok_or_else(|| ConfigError::missing_for_view::<Self>("remote"))?;
+        let remote = crate::require_for_view::<Self, _>(config.remote, "remote")?;
         Ok(Self {
             name: config.name,
             remote,
@@ -137,6 +135,19 @@ fn secret_values_require_explicit_unwrapping() {
     let secret = crate::Secret::new(String::from("token"));
     assert_eq!(secret.expose_secret(), "token");
     assert_eq!(secret.into_inner(), "token");
+}
+
+#[test]
+fn require_for_view_reports_target_and_logical_path() {
+    let error = crate::require_for_view::<RemoteMode, String>(None, "remote.api_url").unwrap_err();
+
+    match error {
+        ConfigError::MissingForView { view, field } => {
+            assert!(view.ends_with("RemoteMode"));
+            assert_eq!(field, "remote.api_url");
+        }
+        other => panic!("unexpected error: {other}"),
+    }
 }
 
 #[test]

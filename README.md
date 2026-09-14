@@ -290,7 +290,7 @@ an execution command uses `build_view::<RemoteMode>()` and rejects a missing
 remote section:
 
 ```rust
-use einstellung::{Config, ConfigError, ConfigView};
+use einstellung::{Config, ConfigError, ConfigView, require_for_view};
 
 #[derive(Config)]
 struct AppConfig {
@@ -309,9 +309,7 @@ struct RemoteMode {
 
 impl ConfigView<AppConfig> for RemoteMode {
     fn from_config(config: AppConfig) -> Result<Self, ConfigError> {
-        let remote = config
-            .remote
-            .ok_or_else(|| ConfigError::missing_for_view::<Self>("remote"))?;
+        let remote = require_for_view::<Self, _>(config.remote, "remote")?;
         Ok(Self { remote })
     }
 }

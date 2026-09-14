@@ -62,6 +62,18 @@ pub trait ConfigView<C>: Sized {
     fn from_config(config: C) -> Result<Self, ConfigError>;
 }
 
+/// Require an optional value while constructing a mode-specific [`ConfigView`].
+///
+/// This is a convenience for the common pattern where the shared configuration keeps a field
+/// optional, but one command/view requires it. The returned error records the target view type
+/// and logical dotted field path.
+pub fn require_for_view<V, T>(
+    value: Option<T>,
+    field: impl Into<String>,
+) -> Result<T, ConfigError> {
+    value.ok_or_else(|| ConfigError::missing_for_view::<V>(field))
+}
+
 /// Composes configuration layers before building a complete [`Config`].
 ///
 /// Providers are merged in call order. The builder records which sources supplied each field so

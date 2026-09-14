@@ -182,11 +182,13 @@ directly to lowercase field names; `EnvProvider::prefixed(...)` additionally
 supports `__` for nested fields. Treat these selections as a trust boundary:
 explicitly expose only the secrets and machine-local values that should enter
 the typed configuration.
-`einstellung` does not otherwise mark a field as secret or redact it from
-`Debug`; applications should keep secret fields private and avoid deriving or
-printing representations that expose them. `#[config(freezable)]` can prevent a
-value from being overwritten by later layers, but it is a merge policy rather
-than a secrecy mechanism.
+For secret-bearing fields, use `Secret<T>`. It deserializes transparently, redacts
+its `Debug` representation, deliberately does not implement `Serialize`, and
+requires an explicit `expose_secret()` call to borrow the value. Keep secret
+fields private as well if the complete config should not allow replacement after
+construction. `#[config(freezable)]` can prevent a value from being overwritten
+by later configuration layers, but it is a merge policy rather than a secrecy
+mechanism.
 
 When a JSON/TOML/YAML format is chosen at runtime, use `FormatProvider`. For a
 filesystem path, `FormatProvider::from_path_detect` recognizes enabled `json`,

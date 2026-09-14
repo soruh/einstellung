@@ -534,6 +534,55 @@ pub type ValidationFunction<T, E> = for<'a> fn(&'a T) -> Result<(), E>;
 /// [`derive@Config`] for more details on `merge`.
 pub type MergeFunction<T, E> = fn(T, T) -> Result<T, E>;
 
+/// Wrapper for secret configuration values.
+///
+/// `Secret<T>` deserializes transparently, but deliberately does not implement [`Serialize`] and
+/// redacts its [`Debug`](std::fmt::Debug) representation. Access to the wrapped value is explicit
+/// through [`Secret::expose_secret`], and no mutable accessor is provided.
+///
+/// This protects common logging and accidental-serialization paths. Parser errors produced before
+/// deserialization reaches the wrapper are controlled by the underlying format implementation and
+/// may still contain input context, so callers should avoid logging raw parser diagnostics from
+/// untrusted secret-bearing documents when that matters.
+#[derive(Clone, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct Secret<T>(T);
+
+impl<T> Secret<T> {
+    /// Wrap a secret value.
+    pub fn new(value: T) -> Self {
+        Self(value)
+    }
+
+    /// Borrow the secret value explicitly.
+    pub fn expose_secret(&self) -> &T {
+        &self.0
+    }
+
+    /// Consume the wrapper and return the secret value.
+    pub fn into_inner(self) -> T {
+        self.0
+    }
+}
+
+impl<T> From<T> for Secret<T> {
+    fn from(value: T) -> Self {
+        Self::new(value)
+    }
+}
+
+impl<T: Default> Default for Secret<T> {
+    fn default() -> Self {
+        Self::new(T::default())
+    }
+}
+
+impl<T> std::fmt::Debug for Secret<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Secret([REDACTED])")
+    }
+}
+
 /// Wraps a type to make it [`trait@Freezable`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Freeze<T> {

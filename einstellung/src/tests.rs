@@ -56,6 +56,32 @@ struct StrictConfig {
 
 #[derive(Config, Debug)]
 #[config(crate = crate)]
+struct SecretConfig {
+    api_key: crate::Secret<String>,
+}
+
+#[test]
+fn secret_values_deserialize_but_debug_is_redacted() {
+    let config = SecretConfig::load_complete(&JsonFileProvider::from_contents(
+        r#"{ "api_key": "super-secret-value" }"#,
+    ))
+    .unwrap();
+
+    assert_eq!(config.api_key.expose_secret(), "super-secret-value");
+    let debug = format!("{config:?}");
+    assert!(debug.contains("[REDACTED]"));
+    assert!(!debug.contains("super-secret-value"));
+}
+
+#[test]
+fn secret_values_require_explicit_unwrapping() {
+    let secret = crate::Secret::new(String::from("token"));
+    assert_eq!(secret.expose_secret(), "token");
+    assert_eq!(secret.into_inner(), "token");
+}
+
+#[derive(Config, Debug)]
+#[config(crate = crate)]
 struct AppConfig {
     app_name: String,
 

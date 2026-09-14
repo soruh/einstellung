@@ -1,10 +1,37 @@
 use std::path::{Path, PathBuf};
 
 use serde::de::DeserializeOwned;
+use thiserror::Error;
 
 use crate::{ConfigError, ConfigProvider, FileContentProvider, IntoFileContentProvider};
 
 use super::EnvProvider;
+
+#[derive(Debug, Error)]
+enum DotenvReadError {
+    #[error("dotenv syntax error at input index {index}")]
+    Syntax { index: usize },
+
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+
+    #[error(transparent)]
+    EnvVar(#[from] std::env::VarError),
+
+    #[error("dotenv parse error")]
+    Other,
+}
+
+impl From<dotenvy::Error> for DotenvReadError {
+    fn from(error: dotenvy::Error) -> Self {
+        match error {
+            dotenvy::Error::LineParse(_, index) => Self::Syntax { index },
+            dotenvy::Error::Io(error) => Self::Io(error),
+            dotenvy::Error::EnvVar(error) => Self::EnvVar(error),
+            _ => Self::Other,
+        }
+    }
+}
 
 /// Loads selected values from dotenv-formatted input without modifying the process environment.
 ///
@@ -93,7 +120,7 @@ impl ConfigProvider for DotenvProvider<'_> {
                 .map(|result| {
                     result
                         .map(|(key, value)| (key.into(), value.into()))
-                        .map_err(|err| ConfigError::provider("dotenv", err))
+                        .map_err(|err| ConfigError::provider("dotenv", DotenvReadError::from(err)))
                 })
                 .collect::<Result<Vec<_>, _>>()?;
 
@@ -132,6 +159,18 @@ mod tests {
         assert_eq!(config.api_key, "secret");
         assert_eq!(config.source_path, "/srv/project");
         assert_eq!(config.model, None);
+    }
+
+    #[test]
+    fn parse_errors_do_not_expose_dotenv_lines() {
+        let provider =
+            DotenvProvider::from_contents("API_KEY='super-secret\n").with_vars(["API_KEY"]);
+
+        let error = provider.load_partial::<LocalConfig>().unwrap_err();
+        let message = error.to_string();
+
+        assert!(!message.contains("super-secret"), "{message}");
+        assert!(message.contains("dotenv syntax error"), "{message}");
     }
 
     #[test]

@@ -201,11 +201,23 @@ where
     }
 }
 
-// Bridge for borrowing closures
+impl IntoFileContentProvider<'static> for Box<dyn ReaderFactory + 'static> {
+    fn into_provider(self) -> FileContentProvider<'static> {
+        FileContentProvider::CustomBoxed(self)
+    }
+}
+
+// Bridge for borrowing closures and concrete reader factories.
 impl<'i, F> IntoFileContentProvider<'i> for &'i F
 where
     F: ReaderFactory + 'i,
 {
+    fn into_provider(self) -> FileContentProvider<'i> {
+        FileContentProvider::CustomRef(self)
+    }
+}
+
+impl<'i> IntoFileContentProvider<'i> for &'i dyn ReaderFactory {
     fn into_provider(self) -> FileContentProvider<'i> {
         FileContentProvider::CustomRef(self)
     }
@@ -259,5 +271,31 @@ mod tests {
             })
             .expect("reader should work");
         assert_eq!(contents, "name = \"test\"");
+    }
+
+    #[test]
+    fn erased_reader_factories_convert_through_normal_source_api() {
+        let borrowed_factory = CloneableFactory;
+        let borrowed: &dyn ReaderFactory = &borrowed_factory;
+        let borrowed_provider = borrowed.into_provider();
+        let borrowed_contents = borrowed_provider
+            .with_reader(|reader| {
+                let mut contents = String::new();
+                reader.read_to_string(&mut contents)?;
+                Ok(contents)
+            })
+            .expect("borrowed reader should work");
+        assert_eq!(borrowed_contents, "name = \"test\"");
+
+        let owned: Box<dyn ReaderFactory> = Box::new(CloneableFactory);
+        let owned_provider = owned.into_provider();
+        let owned_contents = owned_provider
+            .with_reader(|reader| {
+                let mut contents = String::new();
+                reader.read_to_string(&mut contents)?;
+                Ok(contents)
+            })
+            .expect("owned reader should work");
+        assert_eq!(owned_contents, "name = \"test\"");
     }
 }

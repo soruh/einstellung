@@ -221,6 +221,49 @@ impl<C: Config> ConfigBuilder<C> {
         }
     }
 
+    /// Merge a previously tracked partial configuration as the next layer.
+    ///
+    /// Unlike [`Self::layer_named`], this preserves the partial's existing per-field provenance
+    /// instead of replacing it with one synthetic source label. This is useful when composition is
+    /// performed in stages and an intermediate [`Self::build_tracked_partial`] result is later
+    /// merged into another builder.
+    pub fn tracked_layer(self, tracked: TrackedConfig<C::Partial>) -> Self {
+        let Self { state, provenance } = self;
+        let ConfigBuilderState::Ready(current) = state else {
+            return Self { state, provenance };
+        };
+        let TrackedConfig {
+            config: next,
+            provenance: next_provenance,
+        } = tracked;
+
+        match current.merge(next) {
+            Ok(merged) => {
+                let mut provenance = provenance;
+                provenance.extend(next_provenance);
+                Self {
+                    state: ConfigBuilderState::Ready(merged),
+                    provenance,
+                }
+            }
+            Err(error) => {
+                let source = error
+                    .logical_path()
+                    .as_deref()
+                    .and_then(|path| next_provenance.latest_supplier(path))
+                    .cloned();
+                let error = match source {
+                    Some(source) => error.with_source(source),
+                    None => error,
+                };
+                Self {
+                    state: ConfigBuilderState::Failed(error),
+                    provenance,
+                }
+            }
+        }
+    }
+
     /// Return the merged partial configuration without applying field defaults or validation.
     pub fn build_partial(self) -> Result<C::Partial, ConfigError> {
         self.build_tracked_partial().map(TrackedConfig::into_inner)
@@ -307,6 +350,12 @@ impl ConfigProvenance {
     fn record(&mut self, source: ConfigSource, fields: Vec<String>) {
         for field in fields {
             self.fields.entry(field).or_default().push(source.clone());
+        }
+    }
+
+    fn extend(&mut self, other: Self) {
+        for (field, mut sources) in other.fields {
+            self.fields.entry(field).or_default().append(&mut sources);
         }
     }
 

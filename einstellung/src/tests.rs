@@ -1050,6 +1050,54 @@ fn tracked_partial_retains_sources_without_applying_defaults() {
 }
 
 #[test]
+fn tracked_partial_can_be_composed_without_losing_source_history() {
+    let base = AppConfig::load_partial(&JsonFileProvider::from_contents(
+        r#"{ "app_name": "base", "network": { "listen": { "address": "192.168.0.1" } } }"#,
+    ))
+    .unwrap();
+    let remote = AppConfig::load_partial(&JsonFileProvider::from_contents(
+        r#"{ "app_name": "remote" }"#,
+    ))
+    .unwrap();
+    let local = AppConfig::load_partial(&JsonFileProvider::from_contents(
+        r#"{ "app_name": "local" }"#,
+    ))
+    .unwrap();
+
+    let overlay = AppConfig::builder()
+        .layer_named("remote config", remote)
+        .layer_named("local env", local)
+        .build_tracked_partial()
+        .unwrap();
+
+    let tracked = AppConfig::builder()
+        .layer_named("base config", base)
+        .tracked_layer(overlay)
+        .build_tracked()
+        .unwrap();
+
+    assert_eq!(tracked.config().app_name, "local");
+    assert_eq!(
+        tracked
+            .explain("app_name")
+            .unwrap()
+            .iter()
+            .map(crate::ConfigSource::label)
+            .collect::<Vec<_>>(),
+        vec!["base config", "remote config", "local env"]
+    );
+    assert_eq!(
+        tracked
+            .explain("network.listen.address")
+            .unwrap()
+            .iter()
+            .map(crate::ConfigSource::label)
+            .collect::<Vec<_>>(),
+        vec!["base config"]
+    );
+}
+
+#[test]
 fn build_partial_errors_retain_prior_provenance() {
     let base = AppConfig::load_partial(&JsonFileProvider::from_contents(
         r#"{ "app_name": "base", "network": { "listen": { "address": "192.168.0.1" } } }"#,

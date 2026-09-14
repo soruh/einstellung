@@ -475,11 +475,8 @@ pub trait ConfigProvider {
 ///     Box::new(TomlFileProvider::from_owned_contents("name = \"toml\"".to_owned())),
 /// ];
 ///
-/// let config = providers
-///     .iter()
-///     .fold(AppConfig::builder(), |builder, provider| {
-///         builder.typed_provider(provider.as_ref())
-///     })
+/// let config = AppConfig::builder()
+///     .typed_providers(providers.iter().map(|provider| provider.as_ref()))
 ///     .build()
 ///     .unwrap();
 /// assert_eq!(config.name, "toml");
@@ -983,7 +980,7 @@ impl ConfigError {
 
     /// Attach the external configuration source responsible for this error.
     pub fn with_source(self, source: ConfigSource) -> Self {
-        if matches!(&self, Self::Source { source: current, .. } if current == &source) {
+        if self.config_source() == Some(&source) {
             self
         } else {
             Self::Source {

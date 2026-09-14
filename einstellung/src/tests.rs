@@ -311,9 +311,9 @@ fn repeated_diagnostic_context_is_idempotent() {
         "secret store",
         std::io::Error::new(std::io::ErrorKind::InvalidData, "lookup failed"),
     )
-    .with_logical_path("model.remote.api_key")
-    .with_logical_path("model.remote.api_key")
     .with_source(source.clone())
+    .with_logical_path("model.remote.api_key")
+    .with_logical_path("model.remote.api_key")
     .with_source(source);
 
     assert_eq!(

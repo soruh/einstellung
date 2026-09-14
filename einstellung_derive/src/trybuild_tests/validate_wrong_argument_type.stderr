@@ -8,7 +8,7 @@ error[E0308]: mismatched types
   |                         ^^^^^^^^^^^^^ expected fn pointer, found fn item
   |
   = note: expected fn pointer `for<'a> fn(&'a u16) -> Result<(), _>`
-                found fn item `for<'a> fn(&'a std::string::String) -> Result<(), Box<(dyn StdError + 'static)>> {validate_port}`
+                found fn item `for<'a> fn(&'a String) -> Result<(), Box<(dyn StdError + Send + Sync + 'static)>> {validate_port}`
 
 error[E0308]: mismatched types
  --> src/trybuild_tests/validate_wrong_argument_type.rs
@@ -21,10 +21,12 @@ error[E0308]: mismatched types
   | |     port: u16,
   | |________^ expected `&String`, found `&u16`
   |
-  = note: expected reference `&std::string::String`
+  = note: expected reference `&String`
              found reference `&u16`
 note: function defined here
  --> src/trybuild_tests/validate_wrong_argument_type.rs
   |
-  | pub fn validate_port(_: &String) -> Result<(), Box<dyn std::error::Error>> {
-  |        ^^^^^^^^^^^^^ ----------
+  | pub fn validate_port(
+  |        ^^^^^^^^^^^^^
+  |     _: &String,
+  |     ----------

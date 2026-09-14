@@ -4,8 +4,8 @@ error[E0308]: mismatched types
   | #[derive(Config)]
   |          ^^^^^^ expected fn pointer, found fn item
   |
-  = note: expected fn pointer `fn(std::option::Option<std::string::String>, std::option::Option<std::string::String>) -> Result<std::option::Option<std::string::String>, _>`
-                found fn item `fn(std::option::Option<u16>, std::option::Option<u16>) -> Result<std::option::Option<u16>, Box<(dyn StdError + 'static)>> {merge_hosts}`
+  = note: expected fn pointer `fn(std::option::Option<String>, std::option::Option<String>) -> Result<std::option::Option<String>, _>`
+                found fn item `fn(std::option::Option<u16>, std::option::Option<u16>) -> Result<std::option::Option<u16>, Box<(dyn StdError + Send + Sync + 'static)>> {merge_hosts}`
   = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0308]: arguments to this function are incorrect
@@ -18,9 +18,9 @@ error[E0308]: arguments to this function are incorrect
   |          expected `Option<u16>`, found `Option<String>`
   |
   = note: expected enum `std::option::Option<u16>`
-             found enum `std::option::Option<std::string::String>`
+             found enum `std::option::Option<String>`
   = note: expected enum `std::option::Option<u16>`
-             found enum `std::option::Option<std::string::String>`
+             found enum `std::option::Option<String>`
 note: function defined here
  --> src/trybuild_tests/custom_merge_type_mismatch.rs
   |
@@ -38,6 +38,6 @@ error[E0308]: mismatched types
   | #[derive(Config)]
   |          ^^^^^^ expected `Option<String>`, found `Result<Option<u16>, ConfigError>`
   |
-  = note: expected enum `std::option::Option<std::string::String>`
+  = note: expected enum `std::option::Option<String>`
              found enum `Result<std::option::Option<u16>, ConfigError>`
   = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)

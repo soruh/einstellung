@@ -8,7 +8,7 @@ error[E0308]: mismatched types
   |                         ^^^^^^^^^^^^^ expected fn pointer, found fn item
   |
   = note: expected fn pointer `for<'a> fn(&'a u16) -> Result<(), _>`
-                found fn item `fn(u16) -> Result<(), Box<(dyn StdError + 'static)>> {validate_port}`
+                found fn item `fn(u16) -> Result<(), Box<(dyn StdError + Send + Sync + 'static)>> {validate_port}`
 
 error[E0308]: mismatched types
   --> src/trybuild_tests/validate_missing_reference.rs
@@ -24,7 +24,7 @@ error[E0308]: mismatched types
 note: function defined here
   --> src/trybuild_tests/validate_missing_reference.rs
    |
-   | pub fn validate_port(_: u16) -> Result<(), Box<dyn std::error::Error>> {
+   | pub fn validate_port(_: u16) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
    |        ^^^^^^^^^^^^^ ------
 help: consider removing the borrow
    |

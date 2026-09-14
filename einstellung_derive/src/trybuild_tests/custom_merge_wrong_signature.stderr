@@ -4,37 +4,41 @@ error[E0308]: mismatched types
   | #[derive(Config)]
   |          ^^^^^^ expected fn pointer, found fn item
   |
-  = note: expected fn pointer `fn(std::option::Option<std::string::String>, std::option::Option<std::string::String>) -> Result<std::option::Option<std::string::String>, _>`
-                found fn item `fn(std::string::String, std::string::String) -> Result<std::string::String, Box<(dyn StdError + 'static)>> {merge_hosts}`
+  = note: expected fn pointer `fn(std::option::Option<String>, std::option::Option<String>) -> Result<std::option::Option<String>, _>`
+                found fn item `fn(String, String) -> Result<String, Box<(dyn StdError + Send + Sync + 'static)>> {merge_hosts}`
   = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0308]: arguments to this function are incorrect
- --> src/trybuild_tests/custom_merge_wrong_signature.rs
-  |
-  | #[derive(Config)]
-  |          ^^^^^^
-  |          |
-  |          expected `String`, found `Option<String>`
-  |          expected `String`, found `Option<String>`
-  |
-  = note: expected struct `std::string::String`
-               found enum `std::option::Option<std::string::String>`
-  = note: expected struct `std::string::String`
-               found enum `std::option::Option<std::string::String>`
+  --> src/trybuild_tests/custom_merge_wrong_signature.rs
+   |
+   | #[derive(Config)]
+   |          ^^^^^^
+   |          |
+   |          expected `String`, found `Option<String>`
+   |          expected `String`, found `Option<String>`
+   |
+   = note: expected struct `String`
+                found enum `std::option::Option<String>`
+   = note: expected struct `String`
+                found enum `std::option::Option<String>`
 note: function defined here
- --> src/trybuild_tests/custom_merge_wrong_signature.rs
-  |
-  | pub fn merge_hosts(_: String, b: String) -> Result<String, Box<dyn core::error::Error>> {
-  |        ^^^^^^^^^^^ ---------  ---------
-  = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)
-help: consider using `Option::expect` to unwrap the `std::option::Option<std::string::String>` value, panicking if the value is an `Option::None`
-  |
-7 | #[derive(Config.expect("REASON"))]
-  |                +++++++++++++++++
-help: consider using `Option::expect` to unwrap the `std::option::Option<std::string::String>` value, panicking if the value is an `Option::None`
-  |
-7 | #[derive(Config.expect("REASON"))]
-  |                +++++++++++++++++
+  --> src/trybuild_tests/custom_merge_wrong_signature.rs
+   |
+   | pub fn merge_hosts(
+   |        ^^^^^^^^^^^
+   |     _: String,
+   |     ---------
+   |     b: String,
+   |     ---------
+   = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: consider using `Option::expect` to unwrap the `std::option::Option<String>` value, panicking if the value is an `Option::None`
+   |
+10 | #[derive(Config.expect("REASON"))]
+   |                +++++++++++++++++
+help: consider using `Option::expect` to unwrap the `std::option::Option<String>` value, panicking if the value is an `Option::None`
+   |
+10 | #[derive(Config.expect("REASON"))]
+   |                +++++++++++++++++
 
 error[E0308]: mismatched types
  --> src/trybuild_tests/custom_merge_wrong_signature.rs
@@ -42,6 +46,6 @@ error[E0308]: mismatched types
   | #[derive(Config)]
   |          ^^^^^^ expected `Option<String>`, found `Result<String, ConfigError>`
   |
-  = note: expected enum `std::option::Option<std::string::String>`
-             found enum `Result<std::string::String, ConfigError>`
+  = note: expected enum `std::option::Option<String>`
+             found enum `Result<String, ConfigError>`
   = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)

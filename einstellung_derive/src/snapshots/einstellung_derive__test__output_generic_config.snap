@@ -1,0 +1,14 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- input ---
+#[derive(Config)]
+struct GenericConfig<T> {
+    value: T,
+}
+
+/// --- output ---
+::core::compile_error! {
+    "generic Config structs are not supported"
+}

@@ -11,6 +11,7 @@ pub fn parse(input: syn::DeriveInput) -> Result<ConfigStructReceiver, darling::E
 pub struct ConfigStructReceiver {
     pub ident: syn::Ident,
     pub vis: syn::Visibility,
+    pub generics: syn::Generics,
     pub data: ast::Data<darling::util::Ignored, ConfigFieldReceiver>,
 
     #[darling(default, multiple)]

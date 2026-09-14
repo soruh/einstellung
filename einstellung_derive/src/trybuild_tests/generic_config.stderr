@@ -1,0 +1,5 @@
+error: generic Config structs are not supported
+ --> src/trybuild_tests/generic_config.rs
+  |
+  | struct GenericConfig<T> {
+  |                     ^

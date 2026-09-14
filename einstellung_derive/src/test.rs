@@ -127,6 +127,13 @@ assert_macro_test!(FAIL, invalid: {
     struct ServerConfig(u16);
 });
 
+assert_macro_test!(FAIL, generic_config: {
+    #[derive(Config)]
+    struct GenericConfig<T> {
+        value: T,
+    }
+});
+
 assert_macro_test!(FAIL, invalid_merge_foo: {
     #[derive(Config)]
     struct ServerConfig {

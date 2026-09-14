@@ -246,6 +246,13 @@ fn extract_type_from_option(ty: &Type) -> Option<&Type> {
 
 /// Transform the parsed struct into a type describing the output types and impls
 pub fn transform_struct(mut receiver: ConfigStructReceiver) -> syn::Result<TransformedStruct> {
+    if !receiver.generics.params.is_empty() {
+        return Err(syn::Error::new(
+            receiver.generics.span(),
+            "generic Config structs are not supported",
+        ));
+    }
+
     let rename_rule = serde_rename_rule(&receiver.serde, &receiver.partial)?;
     let attrs = receiver.take_partial_attrs();
 

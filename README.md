@@ -218,8 +218,15 @@ by later configuration layers, but it is a merge policy rather than a secrecy
 mechanism.
 
 When a JSON/TOML/YAML format is chosen at runtime, use `FormatProvider`. For a
-filesystem path, `FormatProvider::from_path_detect` recognizes enabled `json`,
-`toml`, `yaml`, and `yml` extensions, avoiding an application-side format match.
+borrowed filesystem path, `FormatProvider::from_path_detect` recognizes enabled `json`,
+`toml`, `yaml`, and `yml` extensions; `from_path_buf_detect` provides the owned equivalent.
+`from_owned_contents` and `from_path_buf` mirror the explicit owned constructors on the
+format-specific providers.
+
+`ConfigProvider::load_partial_with_source(...)` is available when using a provider directly
+and source-aware diagnostics are desired without going through `Config::load_partial(...)` or a
+builder. The object-safe adapter provides the equivalent
+`ConfigProviderFor::load_config_partial_with_source(...)`.
 
 When the *provider set* itself is chosen at runtime, use `ConfigProviderFor<C>`.
 It is an object-safe adapter for one concrete config type, automatically implemented

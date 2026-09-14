@@ -75,7 +75,7 @@ fn config_dir() -> PathBuf {
 fn main() {
     let dir = config_dir();
 
-    match AppConfig::load_complete(&YamlFileProvider::new(dir.join("config.yaml"))) {
+    match AppConfig::load_complete(&YamlFileProvider::from_path_buf(dir.join("config.yaml"))) {
         Ok(config) => println!("loaded config: {config:#?}"),
         Err(err) => eprintln!("failed to load config: {err}"),
     }

@@ -78,10 +78,11 @@ fn load_config(dir: &Path) -> Result<AppConfig, ConfigError> {
     const LISTEN_CONFIG: &str = r#"{ "address": "127.0.0.1" }"#;
     const HARD_CODED_CONFIG: &str = r#"{ "users": ["root"], "max_open_files": 10 }"#;
 
-    let hard_coded = AppConfig::load_partial(&JsonFileProvider::new(HARD_CODED_CONFIG))?;
-    let user_config1 = YamlFileProvider::new(dir.join("config.yaml")).load_partial()?;
-    let user_config2 = TomlFileProvider::new(dir.join("config.toml")).load_partial()?;
-    let listen_config = ListenConfig::load_partial(&JsonFileProvider::new(LISTEN_CONFIG)).unwrap();
+    let hard_coded = AppConfig::load_partial(&JsonFileProvider::from_contents(HARD_CODED_CONFIG))?;
+    let user_config1 = YamlFileProvider::from_path_buf(dir.join("config.yaml")).load_partial()?;
+    let user_config2 = TomlFileProvider::from_path_buf(dir.join("config.toml")).load_partial()?;
+    let listen_config =
+        ListenConfig::load_partial(&JsonFileProvider::from_contents(LISTEN_CONFIG)).unwrap();
     let listen_config = AppConfigPartial {
         listen: Some(listen_config),
         ..Default::default()

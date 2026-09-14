@@ -167,7 +167,7 @@ fn config_view_reports_missing_mode_requirement() {
         .build_view::<RemoteMode>()
         .unwrap_err();
 
-    match error {
+    match error.root_cause() {
         ConfigError::MissingForView { view, field } => {
             assert!(view.ends_with("RemoteMode"));
             assert_eq!(field, "remote");
@@ -777,6 +777,54 @@ fn direct_load_attaches_source_to_validation_errors() {
             .starts_with("configuration source inline json:")
     );
     assert!(matches!(error.root_cause(), ConfigError::Validation { .. }));
+}
+
+#[test]
+fn builder_errors_retain_provenance_for_failed_values() {
+    let error = AppConfig::builder()
+        .provider(&JsonFileProvider::from_contents(
+            r#"{ "app_name": "bad", "network": { "listen": { "address": "127.0.0.1" } } }"#,
+        ))
+        .build()
+        .unwrap_err();
+
+    assert_eq!(
+        error.logical_path().as_deref(),
+        Some("network.listen.address")
+    );
+    assert_eq!(
+        error
+            .provenance()
+            .unwrap()
+            .latest_supplier("network.listen.address")
+            .unwrap()
+            .label(),
+        "inline json"
+    );
+    assert!(matches!(error.root_cause(), ConfigError::Validation { .. }));
+}
+
+#[test]
+fn view_errors_retain_composed_provenance() {
+    let error = ModeConfig::builder()
+        .provider(&JsonFileProvider::from_contents(r#"{ "name": "run" }"#))
+        .build_view::<RemoteMode>()
+        .unwrap_err();
+
+    assert_eq!(error.logical_path().as_deref(), Some("remote"));
+    assert_eq!(
+        error
+            .provenance()
+            .unwrap()
+            .latest_supplier("name")
+            .unwrap()
+            .label(),
+        "inline json"
+    );
+    assert!(matches!(
+        error.root_cause(),
+        ConfigError::MissingForView { .. }
+    ));
 }
 
 #[test]

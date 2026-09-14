@@ -166,7 +166,9 @@ impl<C: Config> ConfigBuilder<C> {
     where
         V: ConfigView<C>,
     {
-        V::from_config(self.build()?)
+        let tracked = self.finish()?;
+        let TrackedConfig { config, provenance } = tracked;
+        V::from_config(config).map_err(|error| error.with_provenance(provenance))
     }
 
     /// Build a mode-specific typed view while retaining field provenance.
@@ -179,7 +181,7 @@ impl<C: Config> ConfigBuilder<C> {
 
     fn finish(mut self) -> Result<TrackedConfig<C>, ConfigError> {
         if let Some(error) = self.error {
-            return Err(error);
+            return Err(error.with_provenance(self.provenance));
         }
 
         let partial = self
@@ -189,10 +191,13 @@ impl<C: Config> ConfigBuilder<C> {
         self.provenance
             .record(ConfigSource::defaults(), partial.defaulted_fields());
 
-        partial.build().map(|config| TrackedConfig {
-            config,
-            provenance: self.provenance,
-        })
+        match partial.build() {
+            Ok(config) => Ok(TrackedConfig {
+                config,
+                provenance: self.provenance,
+            }),
+            Err(error) => Err(error.with_provenance(self.provenance)),
+        }
     }
 }
 
@@ -279,10 +284,11 @@ impl<C> TrackedConfig<C> {
     where
         V: ConfigView<C>,
     {
-        Ok(TrackedConfig {
-            config: V::from_config(self.config)?,
-            provenance: self.provenance,
-        })
+        let Self { config, provenance } = self;
+        match V::from_config(config) {
+            Ok(config) => Ok(TrackedConfig { config, provenance }),
+            Err(error) => Err(error.with_provenance(provenance)),
+        }
     }
 
     /// Consume the wrapper and return the configuration.
@@ -471,6 +477,10 @@ fn context(error: ConfigError, complete: &'static str, segment: &'static str) ->
             source,
             error: Box::new(context(*error, complete, segment)),
         },
+        ConfigError::Composition { provenance, error } => ConfigError::Composition {
+            provenance,
+            error: Box::new(context(*error, complete, segment)),
+        },
         x => x,
     }
 }
@@ -529,6 +539,13 @@ pub enum ConfigError {
         error: Box<ConfigError>,
     },
 
+    #[error("{error}")]
+    Composition {
+        provenance: ConfigProvenance,
+        #[source]
+        error: Box<ConfigError>,
+    },
+
     #[error("Missing configuration field '{field}' required by view '{view}'")]
     MissingForView { view: &'static str, field: String },
 
@@ -578,12 +595,19 @@ impl ConfigError {
         }
     }
 
+    fn with_provenance(self, provenance: ConfigProvenance) -> Self {
+        Self::Composition {
+            provenance,
+            error: Box::new(self),
+        }
+    }
+
     /// Return the field associated with a build or merge error, if any.
     pub fn field_path(&self) -> Option<&FieldPath> {
         match self {
             Self::MissingField(field) | Self::FreezeCollision(field) => Some(field),
             Self::Validation { field, .. } | Self::CustomMerge { field, .. } => Some(field),
-            Self::Source { error, .. } => error.field_path(),
+            Self::Source { error, .. } | Self::Composition { error, .. } => error.field_path(),
             _ => None,
         }
     }
@@ -592,6 +616,16 @@ impl ConfigError {
     pub fn config_source(&self) -> Option<&ConfigSource> {
         match self {
             Self::Source { source, .. } => Some(source),
+            Self::Composition { error, .. } => error.config_source(),
+            _ => None,
+        }
+    }
+
+    /// Return provenance retained by a failed multi-layer build, if any.
+    pub fn provenance(&self) -> Option<&ConfigProvenance> {
+        match self {
+            Self::Composition { provenance, .. } => Some(provenance),
+            Self::Source { error, .. } => error.provenance(),
             _ => None,
         }
     }
@@ -603,7 +637,7 @@ impl ConfigError {
     pub fn logical_path(&self) -> Option<String> {
         match self {
             Self::MissingForView { field, .. } => Some(field.clone()),
-            Self::Source { error, .. } => error.logical_path(),
+            Self::Source { error, .. } | Self::Composition { error, .. } => error.logical_path(),
             _ => self.field_path().map(FieldPath::logical_path),
         }
     }
@@ -611,7 +645,7 @@ impl ConfigError {
     /// Return the underlying configuration error beneath any source context wrappers.
     pub fn root_cause(&self) -> &ConfigError {
         match self {
-            Self::Source { error, .. } => error.root_cause(),
+            Self::Source { error, .. } | Self::Composition { error, .. } => error.root_cause(),
             error => error,
         }
     }

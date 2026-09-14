@@ -1,0 +1,16 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- input ---
+#[derive(Config)]
+struct ServerConfig {
+    #[config(serde(rename = "port"))]
+    http_port: u16,
+    port: u16,
+}
+
+/// --- output ---
+::core::compile_error! {
+    "configuration key \"port\" is also used by field `http_port`"
+}

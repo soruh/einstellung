@@ -1,0 +1,5 @@
+error: configuration key "port" is also used by field `http_port`
+ --> src/trybuild_tests/duplicate_deserialize_name.rs
+  |
+  |     port: u16,
+  |     ^^^^

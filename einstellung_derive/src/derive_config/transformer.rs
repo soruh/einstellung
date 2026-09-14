@@ -303,6 +303,27 @@ pub fn transform_struct(mut receiver: ConfigStructReceiver) -> syn::Result<Trans
         }
     }
 
+    let mut logical_names = std::collections::BTreeMap::<&str, &syn::Ident>::new();
+    for field in &fields {
+        if field.flattened_subconfig {
+            continue;
+        }
+        if let Some(previous) = logical_names.insert(&field.logical_name, &field.ident) {
+            let error = syn::Error::new(
+                field.ident.span(),
+                format!(
+                    "configuration key {:?} is also used by field `{previous}`",
+                    field.logical_name
+                ),
+            );
+            if let Some(ref mut errors) = errors {
+                errors.combine(error);
+            } else {
+                errors = Some(error);
+            }
+        }
+    }
+
     if let Some(err) = errors {
         Err(err)
     } else {

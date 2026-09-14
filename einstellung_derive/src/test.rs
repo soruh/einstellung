@@ -302,6 +302,15 @@ assert_macro_test!(PASS, serde_attribute_forwarding: {
     }
 });
 
+assert_macro_test!(FAIL, duplicate_deserialize_name: {
+    #[derive(Config)]
+    struct ServerConfig {
+        #[config(serde(rename = "port"))]
+        http_port: u16,
+        port: u16,
+    }
+});
+
 assert_macro_test!(PASS, validation_functions:
     helper {
         pub mod validators {

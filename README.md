@@ -201,6 +201,46 @@ independently. Environment providers remain allowlist-driven before
 deserialization, so unrelated process variables are never treated as config
 keys.
 
+### Mode-specific configuration views
+
+Keep settings that are not required by every command optional in the shared
+configuration, then convert to a stricter typed view for modes that require them.
+For example, a validation command can build `AppConfig` with `remote: None`, while
+an execution command uses `build_view::<RemoteMode>()` and rejects a missing
+remote section:
+
+```rust
+use einstellung::{Config, ConfigError, ConfigView};
+
+#[derive(Config)]
+struct AppConfig {
+    #[config(subconfig)]
+    remote: Option<RemoteConfig>,
+}
+
+#[derive(Config)]
+struct RemoteConfig {
+    api_url: String,
+}
+
+struct RemoteMode {
+    remote: RemoteConfig,
+}
+
+impl ConfigView<AppConfig> for RemoteMode {
+    fn from_config(config: AppConfig) -> Result<Self, ConfigError> {
+        let remote = config
+            .remote
+            .ok_or_else(|| ConfigError::missing_for_view::<Self>("remote"))?;
+        Ok(Self { remote })
+    }
+}
+```
+
+`build_tracked_view()` performs the same conversion while retaining source
+provenance. Views operate after normal defaults and validators, so they add
+mode-specific requirements without changing the shared merge semantics.
+
 ---
 
 ## Layering Features

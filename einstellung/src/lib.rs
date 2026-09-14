@@ -49,6 +49,16 @@ pub trait Config: Sized {
     }
 }
 
+/// A mode-specific typed view of a complete configuration.
+///
+/// Views let applications keep fields optional in the shared configuration while requiring them
+/// for a particular command or operating mode. Implementations receive an already built and
+/// validated base config and may move values into a stricter target type.
+pub trait ConfigView<C>: Sized {
+    /// Convert a complete base config into this view.
+    fn from_config(config: C) -> Result<Self, ConfigError>;
+}
+
 /// Composes configuration layers before building a complete [`Config`].
 ///
 /// Providers are merged in call order. The builder records which sources supplied each field so
@@ -148,6 +158,22 @@ impl<C: Config> ConfigBuilder<C> {
         self.finish()
     }
 
+    /// Build a mode-specific typed view of this configuration.
+    pub fn build_view<V>(self) -> Result<V, ConfigError>
+    where
+        V: ConfigView<C>,
+    {
+        V::from_config(self.build()?)
+    }
+
+    /// Build a mode-specific typed view while retaining field provenance.
+    pub fn build_tracked_view<V>(self) -> Result<TrackedConfig<V>, ConfigError>
+    where
+        V: ConfigView<C>,
+    {
+        self.finish()?.into_view()
+    }
+
     fn finish(mut self) -> Result<TrackedConfig<C>, ConfigError> {
         if let Some(error) = self.error {
             return Err(error);
@@ -237,6 +263,17 @@ impl<C> TrackedConfig<C> {
     /// Return the source history for a logical dotted field path.
     pub fn explain(&self, path: impl AsRef<str>) -> Option<&[ConfigSource]> {
         self.provenance.explain(path)
+    }
+
+    /// Convert the configuration into a mode-specific typed view while retaining provenance.
+    pub fn into_view<V>(self) -> Result<TrackedConfig<V>, ConfigError>
+    where
+        V: ConfigView<C>,
+    {
+        Ok(TrackedConfig {
+            config: V::from_config(self.config)?,
+            provenance: self.provenance,
+        })
     }
 
     /// Consume the wrapper and return the configuration.
@@ -464,6 +501,9 @@ pub enum ConfigError {
         error: Box<ConfigError>,
     },
 
+    #[error("Missing configuration field '{field}' required by view '{view}'")]
+    MissingForView { view: &'static str, field: String },
+
     #[error("Missing required configuration field: '{0}'")]
     MissingField(FieldPath),
 
@@ -491,6 +531,14 @@ impl ConfigError {
         Self::Provider {
             provider,
             source: Box::new(source),
+        }
+    }
+
+    /// Construct a mode-specific requirement error for a logical dotted field path.
+    pub fn missing_for_view<V>(field: impl Into<String>) -> Self {
+        Self::MissingForView {
+            view: ::core::any::type_name::<V>(),
+            field: field.into(),
         }
     }
 

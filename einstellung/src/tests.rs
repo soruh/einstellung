@@ -60,6 +60,38 @@ struct SecretConfig {
     api_key: crate::Secret<String>,
 }
 
+#[derive(Config, Debug)]
+#[config(crate = crate)]
+struct ModeConfig {
+    name: String,
+    #[config(subconfig)]
+    remote: Option<RemoteConfig>,
+}
+
+#[derive(Config, Debug)]
+#[config(crate = crate)]
+struct RemoteConfig {
+    api_url: String,
+}
+
+#[derive(Debug)]
+struct RemoteMode {
+    name: String,
+    remote: RemoteConfig,
+}
+
+impl crate::ConfigView<ModeConfig> for RemoteMode {
+    fn from_config(config: ModeConfig) -> Result<Self, ConfigError> {
+        let remote = config
+            .remote
+            .ok_or_else(|| ConfigError::missing_for_view::<Self>("remote"))?;
+        Ok(Self {
+            name: config.name,
+            remote,
+        })
+    }
+}
+
 #[test]
 fn secret_values_deserialize_but_debug_is_redacted() {
     let config = SecretConfig::load_complete(&JsonFileProvider::from_contents(
@@ -78,6 +110,64 @@ fn secret_values_require_explicit_unwrapping() {
     let secret = crate::Secret::new(String::from("token"));
     assert_eq!(secret.expose_secret(), "token");
     assert_eq!(secret.into_inner(), "token");
+}
+
+#[test]
+fn optional_config_can_build_without_mode_specific_fields() {
+    let config =
+        ModeConfig::load_complete(&JsonFileProvider::from_contents(r#"{ "name": "lint" }"#))
+            .unwrap();
+    assert!(config.remote.is_none());
+}
+
+#[test]
+fn config_view_can_require_optional_mode_specific_fields() {
+    let mode = ModeConfig::builder()
+        .provider(&JsonFileProvider::from_contents(
+            r#"{ "name": "run", "remote": { "api_url": "https://example.test" } }"#,
+        ))
+        .build_view::<RemoteMode>()
+        .unwrap();
+
+    assert_eq!(mode.name, "run");
+    assert_eq!(mode.remote.api_url, "https://example.test");
+}
+
+#[test]
+fn config_view_reports_missing_mode_requirement() {
+    let error = ModeConfig::builder()
+        .provider(&JsonFileProvider::from_contents(r#"{ "name": "run" }"#))
+        .build_view::<RemoteMode>()
+        .unwrap_err();
+
+    match error {
+        ConfigError::MissingForView { view, field } => {
+            assert!(view.ends_with("RemoteMode"));
+            assert_eq!(field, "remote");
+        }
+        other => panic!("unexpected error: {other}"),
+    }
+}
+
+#[test]
+fn tracked_config_preserves_provenance_through_view_conversion() {
+    let tracked = ModeConfig::builder()
+        .provider(&JsonFileProvider::from_contents(
+            r#"{ "name": "run", "remote": { "api_url": "https://example.test" } }"#,
+        ))
+        .build_tracked_view::<RemoteMode>()
+        .unwrap();
+
+    assert_eq!(
+        tracked
+            .explain("remote.api_url")
+            .unwrap()
+            .last()
+            .unwrap()
+            .label(),
+        "inline json"
+    );
+    assert_eq!(tracked.config().remote.api_url, "https://example.test");
 }
 
 #[derive(Config, Debug)]

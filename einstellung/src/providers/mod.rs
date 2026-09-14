@@ -8,6 +8,8 @@ use std::{
 mod dotenv;
 #[cfg(feature = "env")]
 mod env;
+#[cfg(any(feature = "json", feature = "toml", feature = "yaml"))]
+mod format;
 #[cfg(feature = "json")]
 mod json;
 #[cfg(feature = "toml")]
@@ -19,6 +21,8 @@ mod yaml;
 pub use dotenv::DotenvProvider;
 #[cfg(feature = "env")]
 pub use env::{EnvProvider, EnvProviderError};
+#[cfg(any(feature = "json", feature = "toml", feature = "yaml"))]
+pub use format::{ConfigFormat, FormatProvider};
 #[cfg(feature = "json")]
 pub use json::JsonFileProvider;
 #[cfg(feature = "toml")]

@@ -100,17 +100,36 @@ impl<C: Config> ConfigBuilder<C> {
 
     /// Merge a provider as the next, higher-precedence layer.
     pub fn provider(self, provider: &impl ConfigProvider) -> Self {
+        let source = provider.source();
+        let next = provider.load_partial::<C::Partial>();
+        self.provider_result(source, next)
+    }
+
+    /// Merge an object-safe provider for this specific configuration type.
+    ///
+    /// This is useful when the set of providers is selected at runtime and needs to be stored as
+    /// heterogeneous trait objects. Ordinary providers automatically implement
+    /// [`ConfigProviderFor<C>`], so they can be boxed without writing an application-level enum.
+    pub fn typed_provider<P>(self, provider: &P) -> Self
+    where
+        P: ConfigProviderFor<C> + ?Sized,
+    {
+        let source = provider.source();
+        let next = provider.load_config_partial();
+        self.provider_result(source, next)
+    }
+
+    fn provider_result(self, source: ConfigSource, next: Result<C::Partial, ConfigError>) -> Self {
         let Self { state, provenance } = self;
         let ConfigBuilderState::Ready(current) = state else {
             return Self { state, provenance };
         };
 
-        let source = provider.source();
-        let next = match C::load_partial(provider) {
+        let next = match next {
             Ok(next) => next,
             Err(error) => {
                 return Self {
-                    state: ConfigBuilderState::Failed(error),
+                    state: ConfigBuilderState::Failed(error.with_source(source)),
                     provenance,
                 };
             }
@@ -376,9 +395,10 @@ pub trait Freezable {
 /// Generic provider for loading a partial configuration.
 ///
 /// This can be any type which can produce a `T: DeserializeOwned`. The generic
-/// [`ConfigProvider::load_partial`] method intentionally makes this trait non-object-safe; use
-/// [`FormatProvider`] when JSON/TOML/YAML selection is only known at runtime, or define a concrete
-/// application-level provider enum when dispatching custom providers.
+/// [`ConfigProvider::load_partial`] method intentionally makes this trait non-object-safe. Use
+/// [`ConfigProviderFor<C>`] when heterogeneous providers need to be stored behind trait objects for
+/// a specific configuration type, or [`FormatProvider`] when only the structured file format is
+/// selected at runtime.
 ///
 /// See the `json`, `yaml` and `toml` features and the associated [`JsonFileProvider`],
 /// [`YamlFileProvider`] and [`TomlFileProvider`] types for the built-in implementations. The
@@ -394,6 +414,59 @@ pub trait ConfigProvider {
     /// providers, for example, should include the path but never inline source text.
     fn source(&self) -> ConfigSource {
         ConfigSource::new(::core::any::type_name::<Self>())
+    }
+}
+
+/// Object-safe provider adapter for one concrete [`Config`] type.
+///
+/// Every [`ConfigProvider`] automatically implements this trait for every compatible config type.
+/// Fixing the target config at the trait level removes the generic method that prevents
+/// [`ConfigProvider`] itself from being used as a trait object. This makes runtime composition
+/// possible without changing the flexible generic provider API.
+///
+/// ```
+/// # #[cfg(all(feature = "derive", feature = "json", feature = "toml"))] {
+/// use einstellung::{Config, ConfigProviderFor, JsonFileProvider, TomlFileProvider};
+///
+/// #[derive(Config)]
+/// struct AppConfig {
+///     name: String,
+/// }
+///
+/// let providers: Vec<Box<dyn ConfigProviderFor<AppConfig>>> = vec![
+///     Box::new(JsonFileProvider::from_owned_contents(r#"{"name":"json"}"#.to_owned())),
+///     Box::new(TomlFileProvider::from_owned_contents("name = \"toml\"".to_owned())),
+/// ];
+///
+/// let config = providers
+///     .iter()
+///     .fold(AppConfig::builder(), |builder, provider| {
+///         builder.typed_provider(provider.as_ref())
+///     })
+///     .build()
+///     .unwrap();
+/// assert_eq!(config.name, "toml");
+/// # }
+/// ```
+pub trait ConfigProviderFor<C: Config> {
+    /// Load the partial associated with `C`.
+    fn load_config_partial(&self) -> Result<C::Partial, ConfigError>;
+
+    /// Describe this provider for diagnostics and provenance.
+    fn source(&self) -> ConfigSource;
+}
+
+impl<C, P> ConfigProviderFor<C> for P
+where
+    C: Config,
+    P: ConfigProvider,
+{
+    fn load_config_partial(&self) -> Result<C::Partial, ConfigError> {
+        self.load_partial::<C::Partial>()
+    }
+
+    fn source(&self) -> ConfigSource {
+        ConfigProvider::source(self)
     }
 }
 

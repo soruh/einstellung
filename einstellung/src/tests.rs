@@ -248,6 +248,49 @@ fn config_error_is_send_sync() {
 }
 
 #[test]
+fn typed_provider_trait_objects_support_runtime_composition() {
+    struct RuntimeJsonProvider(&'static str);
+
+    impl crate::ConfigProvider for RuntimeJsonProvider {
+        fn load_partial<T: serde::de::DeserializeOwned>(&self) -> Result<T, ConfigError> {
+            Ok(serde_json::from_str(self.0)?)
+        }
+
+        fn source(&self) -> crate::ConfigSource {
+            crate::ConfigSource::new("runtime json provider")
+        }
+    }
+
+    let providers: Vec<Box<dyn crate::ConfigProviderFor<AppConfig>>> = vec![
+        Box::new(JsonFileProvider::from_owned_contents(
+            r#"{ "app_name": "base" }"#.to_owned(),
+        )),
+        Box::new(RuntimeJsonProvider(
+            r#"{ "app_name": "runtime", "network": { "listen": { "address": "192.168.0.1" } } }"#,
+        )),
+    ];
+
+    let tracked = providers
+        .iter()
+        .fold(AppConfig::builder(), |builder, provider| {
+            builder.typed_provider(provider.as_ref())
+        })
+        .build_tracked()
+        .unwrap();
+
+    assert_eq!(tracked.config().app_name, "runtime");
+    assert_eq!(
+        tracked
+            .explain("app_name")
+            .unwrap()
+            .iter()
+            .map(crate::ConfigSource::label)
+            .collect::<Vec<_>>(),
+        vec!["inline json", "runtime json provider"]
+    );
+}
+
+#[test]
 fn provider_error_preserves_source() {
     use std::error::Error;
 

@@ -1,0 +1,5 @@
+error: #[config(serde(flatten))] is only supported on #[config(subconfig)] fields
+ --> src/trybuild_tests/flatten_without_subconfig.rs
+  |
+  |     metadata: std::collections::HashMap<String, String>,
+  |     ^^^^^^^^

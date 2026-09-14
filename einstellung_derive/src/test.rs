@@ -253,6 +253,32 @@ assert_macro_test!(FAIL, default_on_flattened_subconfig:
     }
 );
 
+assert_macro_test!(FAIL, flatten_without_subconfig: {
+    #[derive(Config)]
+    struct AppConfig {
+        #[config(serde(flatten))]
+        metadata: std::collections::HashMap<String, String>,
+    }
+});
+
+assert_macro_test!(FAIL, deny_unknown_fields_with_flatten:
+    {
+        #[derive(Config)]
+        #[config(deny_unknown_fields)]
+        struct AppConfig {
+            #[config(subconfig)]
+            #[config(serde(flatten))]
+            credentials: CredentialsConfig,
+        }
+    },
+    {
+        #[derive(Config)]
+        struct CredentialsConfig {
+            api_key: String,
+        }
+    }
+);
+
 assert_macro_test!(PASS, merge_strategies: {
     #[derive(Config)]
     struct LoggerConfig {

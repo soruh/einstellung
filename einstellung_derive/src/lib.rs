@@ -85,7 +85,9 @@ mod derive_config;
 ///   Flattens the nested partial through Serde while keeping merge/build diagnostics and
 ///   provenance aligned with the external flattened keys. Optional flattened subconfigs remain
 ///   `None` when none of their nested fields are supplied. Outer `#[config(default)]` is not
-///   supported on flattened subconfigs; place defaults on the nested fields instead.
+///   supported on flattened subconfigs; place defaults on the nested fields instead. `flatten`
+///   is only supported on subconfigs, and it cannot be combined with
+///   `#[config(deny_unknown_fields)]` because Serde does not support that combination.
 ///
 /// ### Merging Strategies (`merge`)
 /// Defines how values from a newer configuration layer interact with values from an

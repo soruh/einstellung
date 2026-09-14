@@ -1,0 +1,15 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- input ---
+#[derive(Config)]
+struct AppConfig {
+    #[config(serde(flatten))]
+    metadata: std::collections::HashMap<String, String>,
+}
+
+/// --- output ---
+::core::compile_error! {
+    "#[config(serde(flatten))] is only supported on #[config(subconfig)] fields"
+}

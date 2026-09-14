@@ -1,0 +1,5 @@
+error: #[config(deny_unknown_fields)] cannot be combined with #[config(serde(flatten))]
+ --> src/trybuild_tests/deny_unknown_fields_with_flatten.rs
+  |
+  |     credentials: CredentialsConfig,
+  |     ^^^^^^^^^^^

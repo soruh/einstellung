@@ -286,7 +286,12 @@ pub fn transform_struct(mut receiver: ConfigStructReceiver) -> syn::Result<Trans
     let mut errors: Option<syn::Error> = None;
 
     for field in struct_data {
-        match transform_field(field, receiver.freezable, rename_rule) {
+        match transform_field(
+            field,
+            receiver.freezable,
+            receiver.deny_unknown_fields,
+            rename_rule,
+        ) {
             Ok(f) => fields.push(f),
             Err(e) => {
                 if let Some(ref mut errs) = errors {
@@ -318,6 +323,7 @@ pub fn transform_struct(mut receiver: ConfigStructReceiver) -> syn::Result<Trans
 fn transform_field(
     mut field: ConfigFieldReceiver,
     all_freezeable: bool,
+    deny_unknown_fields: bool,
     rename_rule: SerdeRenameRule,
 ) -> syn::Result<TransformedField> {
     let ident = field
@@ -325,8 +331,20 @@ fn transform_field(
         .clone()
         .ok_or_else(|| syn::Error::new(field.ty.span(), "Config fields must be named"))?;
     let logical_name = serde_field_name(&field, &ident, rename_rule)?;
-    let flattened_subconfig =
-        field.subconfig && serde_has_flag(&field.serde, &field.partial, "flatten")?;
+    let flattened = serde_has_flag(&field.serde, &field.partial, "flatten")?;
+    if flattened && !field.subconfig {
+        return Err(syn::Error::new(
+            ident.span(),
+            "#[config(serde(flatten))] is only supported on #[config(subconfig)] fields",
+        ));
+    }
+    if flattened && deny_unknown_fields {
+        return Err(syn::Error::new(
+            ident.span(),
+            "#[config(deny_unknown_fields)] cannot be combined with #[config(serde(flatten))]",
+        ));
+    }
+    let flattened_subconfig = field.subconfig && flattened;
     let attrs = field.take_partial_attrs();
     let complete_type = field.ty;
 

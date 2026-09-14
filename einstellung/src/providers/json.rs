@@ -70,6 +70,16 @@ mod tests {
     }
 
     #[test]
+    fn io_errors_do_not_report_zero_source_locations() {
+        let error = crate::JsonError::from(serde_json::Error::io(std::io::Error::other(
+            "reader failed",
+        )));
+
+        assert_eq!(error.location(), None);
+        assert_eq!(error.to_string(), "I/O error");
+    }
+
+    #[test]
     fn data_errors_do_not_render_offending_values() {
         let err = JsonFileProvider::from_contents(r#"{ "retries": "super-secret" }"#)
             .load_partial::<Config>()

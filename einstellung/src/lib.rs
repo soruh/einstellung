@@ -731,9 +731,15 @@ pub struct JsonError(serde_json::Error);
 
 #[cfg(feature = "json")]
 impl JsonError {
-    /// Return the safe line/column location reported by the JSON parser.
-    pub fn location(&self) -> SourceLocation {
-        SourceLocation::new(self.0.line() as u64, self.0.column() as u64)
+    /// Return the safe line/column location reported by the JSON parser, when available.
+    ///
+    /// `serde_json` uses zero line/column values for errors that are not tied to an input
+    /// position, such as reader I/O failures. Those are represented as `None` rather than an
+    /// invalid one-based [`SourceLocation`].
+    pub fn location(&self) -> Option<SourceLocation> {
+        let line = self.0.line() as u64;
+        let column = self.0.column() as u64;
+        (line != 0 && column != 0).then(|| SourceLocation::new(line, column))
     }
 
     /// Borrow the backend parser error for explicitly requested detailed diagnostics.
@@ -751,12 +757,15 @@ impl Display for JsonError {
             serde_json::error::Category::Data => "data error",
             serde_json::error::Category::Eof => "unexpected end of input",
         };
-        write!(
-            f,
-            "{kind} at line {}, column {}",
-            self.0.line(),
-            self.0.column()
-        )
+        match self.location() {
+            Some(location) => write!(
+                f,
+                "{kind} at line {}, column {}",
+                location.line(),
+                location.column()
+            ),
+            None => f.write_str(kind),
+        }
     }
 }
 
@@ -1103,7 +1112,7 @@ impl ConfigError {
     pub fn source_location(&self) -> Option<SourceLocation> {
         match self {
             #[cfg(feature = "json")]
-            Self::Json(error) => Some(error.location()),
+            Self::Json(error) => error.location(),
             #[cfg(feature = "yaml")]
             Self::Yaml(error) => error.location(),
             #[cfg(feature = "toml")]

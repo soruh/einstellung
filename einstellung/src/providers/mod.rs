@@ -20,7 +20,7 @@ mod yaml;
 #[cfg(feature = "dotenv")]
 pub use dotenv::DotenvProvider;
 #[cfg(feature = "env")]
-pub use env::{EnvProvider, EnvProviderError};
+pub use env::{EnvProvider, EnvProviderError, KeyValueProvider};
 #[cfg(any(feature = "json", feature = "toml", feature = "yaml"))]
 pub use format::{ConfigFormat, FormatProvider, FormatProviderError};
 #[cfg(feature = "json")]

@@ -182,6 +182,11 @@ directly to lowercase field names; `EnvProvider::prefixed(...)` additionally
 supports `__` for nested fields. Treat these selections as a trust boundary:
 explicitly expose only the secrets and machine-local values that should enter
 the typed configuration.
+
+For CLI flags, secret stores, or other already-selected string key/value inputs,
+`KeyValueProvider` accepts dotted logical paths directly and uses the same typed
+decoding as environment providers. Give it a non-secret source label when
+provenance matters, for example `KeyValueProvider::named("CLI overrides")`.
 For secret-bearing fields, use `Secret<T>`. It deserializes transparently, redacts
 its `Debug` representation, deliberately does not implement `Serialize`, and
 requires an explicit `expose_secret()` call to borrow the value. Keep secret

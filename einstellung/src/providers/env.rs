@@ -20,7 +20,7 @@ pub enum EnvProviderError {
     #[error("environment mapping for {path:?} conflicts with another mapped value")]
     ConflictingPath { path: String },
 
-    #[error("invalid value for environment variable {variable:?}: {message}")]
+    #[error("invalid value for configuration input {variable:?}: {message}")]
     InvalidValue { variable: String, message: String },
 }
 
@@ -44,6 +44,95 @@ pub struct EnvProvider {
 struct EnvBinding {
     variable: String,
     path: String,
+}
+
+/// Loads dotted-path string values into a partial configuration.
+///
+/// This is useful for CLI overrides, secret-store adapters, and other external key/value
+/// sources. Values use the same typed decoding as [`EnvProvider`]: scalar fields parse from
+/// their string representation, while sequences and maps use JSON syntax. Later duplicate
+/// paths replace earlier ones.
+#[derive(Clone, Debug)]
+pub struct KeyValueProvider {
+    source: crate::ConfigSource,
+    values: Vec<KeyValueBinding>,
+}
+
+#[derive(Clone, Debug)]
+struct KeyValueBinding {
+    path: String,
+    value: String,
+}
+
+impl Default for KeyValueProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl KeyValueProvider {
+    /// Create an empty provider with a generic provenance label.
+    pub fn new() -> Self {
+        Self::named("key/value overrides")
+    }
+
+    /// Create an empty provider with a custom provenance label.
+    ///
+    /// The label should identify the source without including secret values.
+    pub fn named(source: impl Into<String>) -> Self {
+        Self {
+            source: crate::ConfigSource::new(source),
+            values: Vec::new(),
+        }
+    }
+
+    /// Add a dotted configuration path and its string value.
+    pub fn with(mut self, path: impl Into<String>, value: impl Into<String>) -> Self {
+        self.values.push(KeyValueBinding {
+            path: path.into(),
+            value: value.into(),
+        });
+        self
+    }
+
+    /// Add multiple dotted configuration paths and string values.
+    pub fn with_pairs<I, K, V>(mut self, values: I) -> Self
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: Into<String>,
+        V: Into<String>,
+    {
+        self.values
+            .extend(values.into_iter().map(|(path, value)| KeyValueBinding {
+                path: path.into(),
+                value: value.into(),
+            }));
+        self
+    }
+}
+
+impl ConfigProvider for KeyValueProvider {
+    fn load_partial<T: DeserializeOwned>(&self) -> Result<T, ConfigError> {
+        load_mapped_values(
+            "key/value",
+            self.values.iter().map(|binding| MappedValue {
+                path: binding.path.split('.').map(str::to_owned).collect(),
+                variable: binding.path.clone(),
+                value: binding.value.clone(),
+            }),
+        )
+    }
+
+    fn source(&self) -> crate::ConfigSource {
+        self.source.clone()
+    }
+}
+
+#[derive(Clone, Debug)]
+struct MappedValue {
+    path: Vec<String>,
+    variable: String,
+    value: String,
 }
 
 impl EnvProvider {
@@ -117,7 +206,7 @@ impl EnvProvider {
         T: DeserializeOwned,
     {
         let vars: Vec<_> = vars.into_iter().collect();
-        let mut root = EnvNode::Branch(BTreeMap::new());
+        let mut mapped = Vec::new();
 
         if let Some(prefix) = &self.prefix {
             for (key, value) in &vars {
@@ -131,8 +220,12 @@ impl EnvProvider {
                     continue;
                 }
 
-                let path = env_key_path(suffix);
-                insert_env_value(provider_name, &mut root, &path, key, value)?;
+                mapped.push(mapped_env_value(
+                    provider_name,
+                    env_key_path(suffix),
+                    key,
+                    value,
+                )?);
             }
         }
 
@@ -144,16 +237,15 @@ impl EnvProvider {
                 continue;
             };
 
-            let path = binding
-                .path
-                .split('.')
-                .map(str::to_owned)
-                .collect::<Vec<_>>();
-            insert_env_value(provider_name, &mut root, &path, &binding.variable, value)?;
+            mapped.push(mapped_env_value(
+                provider_name,
+                binding.path.split('.').map(str::to_owned).collect(),
+                &binding.variable,
+                value,
+            )?);
         }
 
-        T::deserialize(EnvNodeDeserializer::new(&root))
-            .map_err(|err| ConfigError::provider(provider_name, err))
+        load_mapped_values(provider_name, mapped)
     }
 }
 
@@ -179,22 +271,12 @@ enum EnvNode {
     Leaf { variable: String, value: String },
 }
 
-fn insert_env_value(
+fn mapped_env_value(
     provider_name: &'static str,
-    root: &mut EnvNode,
-    path: &[String],
+    path: Vec<String>,
     variable: &str,
     value: &OsStr,
-) -> Result<(), ConfigError> {
-    if path.is_empty() || path.iter().any(String::is_empty) {
-        return Err(ConfigError::provider(
-            provider_name,
-            EnvProviderError::ConflictingPath {
-                path: path.join("."),
-            },
-        ));
-    }
-
+) -> Result<MappedValue, ConfigError> {
     let value = value
         .to_str()
         .ok_or_else(|| {
@@ -206,6 +288,49 @@ fn insert_env_value(
             )
         })?
         .to_owned();
+
+    Ok(MappedValue {
+        path,
+        variable: variable.to_owned(),
+        value,
+    })
+}
+
+fn load_mapped_values<T>(
+    provider_name: &'static str,
+    values: impl IntoIterator<Item = MappedValue>,
+) -> Result<T, ConfigError>
+where
+    T: DeserializeOwned,
+{
+    let mut root = EnvNode::Branch(BTreeMap::new());
+    for value in values {
+        insert_mapped_value(provider_name, &mut root, value)?;
+    }
+
+    T::deserialize(EnvNodeDeserializer::new(&root))
+        .map_err(|err| ConfigError::provider(provider_name, err))
+}
+
+fn insert_mapped_value(
+    provider_name: &'static str,
+    root: &mut EnvNode,
+    mapped: MappedValue,
+) -> Result<(), ConfigError> {
+    let MappedValue {
+        path,
+        variable,
+        value,
+    } = mapped;
+
+    if path.is_empty() || path.iter().any(String::is_empty) {
+        return Err(ConfigError::provider(
+            provider_name,
+            EnvProviderError::ConflictingPath {
+                path: path.join("."),
+            },
+        ));
+    }
 
     let mut node = root;
     for (index, segment) in path.iter().enumerate() {
@@ -223,7 +348,7 @@ fn insert_env_value(
             children.insert(
                 segment.clone(),
                 EnvNode::Leaf {
-                    variable: variable.to_owned(),
+                    variable: variable.clone(),
                     value: value.clone(),
                 },
             );
@@ -687,5 +812,36 @@ mod tests {
             .unwrap();
 
         assert_eq!(config.port, 8443);
+    }
+
+    #[test]
+    fn key_value_provider_decodes_nested_typed_values() {
+        let provider = KeyValueProvider::named("CLI overrides").with_pairs([
+            ("api_key", "secret"),
+            ("source_path", "/srv/app"),
+            ("port", "8443"),
+            ("enabled", "true"),
+            ("database.url", "postgres://db/app"),
+            ("tags", r#"["cli","worker"]"#),
+        ]);
+
+        let config = provider.load_partial::<TestConfig>().unwrap();
+
+        assert_eq!(config.port, 8443);
+        assert!(config.enabled);
+        assert_eq!(config.database.url, "postgres://db/app");
+        assert_eq!(config.tags, ["cli", "worker"]);
+        assert_eq!(provider.source().label(), "CLI overrides");
+    }
+
+    #[test]
+    fn key_value_provider_rejects_conflicting_paths() {
+        let provider = KeyValueProvider::new()
+            .with("database", "scalar")
+            .with("database.url", "postgres://db/app");
+
+        let error = provider.load_partial::<TestConfig>().unwrap_err();
+
+        assert!(error.to_string().contains("database.url"));
     }
 }

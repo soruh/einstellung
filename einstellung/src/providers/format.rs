@@ -94,25 +94,7 @@ impl<'i> FormatProvider<'i> {
     ///
     /// Only formats enabled by the crate's Cargo features are recognized.
     pub fn from_path_detect(path: &'i Path) -> Result<Self, ConfigError> {
-        let extension = path.extension().ok_or_else(|| {
-            ConfigError::provider(
-                "format",
-                FormatProviderError::MissingExtension {
-                    path: path.to_path_buf(),
-                },
-            )
-        })?;
-
-        let format = ConfigFormat::from_extension(extension).ok_or_else(|| {
-            ConfigError::provider(
-                "format",
-                FormatProviderError::UnsupportedExtension {
-                    extension: extension.to_string_lossy().into_owned(),
-                },
-            )
-        })?;
-
-        Ok(Self::from_path(format, path))
+        Ok(Self::from_path(detect_format(path)?, path))
     }
 
     /// Convert borrowed source data to owned data.
@@ -122,6 +104,44 @@ impl<'i> FormatProvider<'i> {
             source: self.source.into_owned()?,
         })
     }
+}
+
+impl FormatProvider<'static> {
+    /// Build an owned provider from inline configuration contents.
+    pub fn from_owned_contents(format: ConfigFormat, source: String) -> Self {
+        Self::new(format, FileContentProvider::InlineOwned(source))
+    }
+
+    /// Build an owned provider from a filesystem path and an explicitly selected format.
+    pub fn from_path_buf(format: ConfigFormat, path: PathBuf) -> Self {
+        Self::new(format, FileContentProvider::PathOwned(path))
+    }
+
+    /// Build an owned provider from a filesystem path, detecting the format from its extension.
+    pub fn from_path_buf_detect(path: PathBuf) -> Result<Self, ConfigError> {
+        let format = detect_format(&path)?;
+        Ok(Self::from_path_buf(format, path))
+    }
+}
+
+fn detect_format(path: &Path) -> Result<ConfigFormat, ConfigError> {
+    let extension = path.extension().ok_or_else(|| {
+        ConfigError::provider(
+            "format",
+            FormatProviderError::MissingExtension {
+                path: path.to_path_buf(),
+            },
+        )
+    })?;
+
+    ConfigFormat::from_extension(extension).ok_or_else(|| {
+        ConfigError::provider(
+            "format",
+            FormatProviderError::UnsupportedExtension {
+                extension: extension.to_string_lossy().into_owned(),
+            },
+        )
+    })
 }
 
 impl ConfigProvider for FormatProvider<'_> {
@@ -241,5 +261,21 @@ mod tests {
             .expect("extensionless path should fail");
 
         assert!(err.to_string().contains("has no file extension"));
+    }
+
+    #[cfg(feature = "json")]
+    #[test]
+    fn owned_constructors_preserve_runtime_format_and_source_kind() {
+        let provider = FormatProvider::from_owned_contents(
+            ConfigFormat::Json,
+            r#"{"name":"api","port":8080}"#.to_owned(),
+        );
+        let config = provider.load_partial::<TestConfig>().unwrap();
+        assert_eq!(config.port, 8080);
+        assert_eq!(provider.source().label(), "inline json");
+
+        let provider = FormatProvider::from_path_buf_detect(PathBuf::from("config.JSON")).unwrap();
+        assert_eq!(provider.format, ConfigFormat::Json);
+        assert_eq!(provider.source().label(), "json file config.JSON");
     }
 }

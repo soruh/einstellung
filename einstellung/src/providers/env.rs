@@ -99,7 +99,9 @@ impl EnvProvider {
 
     /// Add an explicit environment variable to configuration-field mapping.
     ///
-    /// `config_path` uses `.` to address nested fields, such as `database.url`.
+    /// `config_path` uses `.` to address nested fields, such as `database.url`. If a supplied
+    /// input contains the same variable more than once (as a dotenv file can), the last value is
+    /// used. Process environments themselves normally contain unique variable names.
     pub fn with_var(mut self, variable: impl Into<String>, config_path: impl Into<String>) -> Self {
         self.vars.push(EnvBinding {
             variable: variable.into(),
@@ -151,6 +153,7 @@ impl EnvProvider {
         for binding in &self.vars {
             let Some((_, value)) = vars
                 .iter()
+                .rev()
                 .find(|(key, _)| key.as_os_str() == OsStr::new(&binding.variable))
             else {
                 continue;

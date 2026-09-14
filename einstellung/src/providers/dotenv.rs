@@ -162,6 +162,18 @@ mod tests {
     }
 
     #[test]
+    fn repeated_selected_variables_use_the_last_value() {
+        let provider = DotenvProvider::from_contents(
+            "API_KEY=first\nAPI_KEY=second\nSOURCE_PATH=/srv/project\n",
+        )
+        .with_vars(["API_KEY", "SOURCE_PATH"]);
+
+        let config = provider.load_partial::<LocalConfig>().unwrap();
+
+        assert_eq!(config.api_key, "second");
+    }
+
+    #[test]
     fn parse_errors_do_not_expose_dotenv_lines() {
         let provider =
             DotenvProvider::from_contents("API_KEY='super-secret\n").with_vars(["API_KEY"]);

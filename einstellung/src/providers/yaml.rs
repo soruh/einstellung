@@ -46,3 +46,95 @@ impl<'i> ConfigProvider for YamlFileProvider<'i> {
             .with_reader(|reader| Ok(serde_yaml::from_reader(reader)?))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use serde::Deserialize;
+
+    use super::*;
+
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct TypedConfig {
+        enabled: bool,
+        retries: u16,
+        ratio: f64,
+        label: String,
+        items: Vec<String>,
+    }
+
+    #[test]
+    fn preserves_yaml_scalar_and_collection_types() {
+        let provider = YamlFileProvider::from_contents(
+            "enabled: true\nretries: 3\nratio: 0.5\nlabel: api\nitems:\n  - one\n  - two\n",
+        );
+
+        let config = provider.load_partial::<TypedConfig>().unwrap();
+
+        assert_eq!(
+            config,
+            TypedConfig {
+                enabled: true,
+                retries: 3,
+                ratio: 0.5,
+                label: "api".to_owned(),
+                items: vec!["one".to_owned(), "two".to_owned()],
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_mapping_keys() {
+        let err = YamlFileProvider::from_contents("---\nthing: true\nthing: false\n")
+            .load_partial::<serde_yaml::Value>()
+            .unwrap_err();
+        let message = err.to_string();
+
+        assert!(message.contains("duplicate entry with key \"thing\""));
+        assert!(message.contains("line 2 column 1"));
+    }
+
+    #[test]
+    fn deserializes_yaml_enum_tags() {
+        #[derive(Debug, Deserialize, PartialEq)]
+        enum Profile {
+            ClassValidator { class_name: String },
+        }
+
+        #[derive(Debug, Deserialize, PartialEq)]
+        struct Config {
+            profile: Profile,
+        }
+
+        let config = YamlFileProvider::from_contents(
+            "profile: !ClassValidator\n  class_name: ApplicationConfig\n",
+        )
+        .load_partial::<Config>()
+        .unwrap();
+
+        assert_eq!(
+            config,
+            Config {
+                profile: Profile::ClassValidator {
+                    class_name: "ApplicationConfig".to_owned(),
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn parse_errors_retain_location_context() {
+        #[derive(Debug, Deserialize)]
+        #[allow(dead_code)]
+        struct Config {
+            retries: u16,
+        }
+
+        let err = YamlFileProvider::from_contents("retries: [\n")
+            .load_partial::<Config>()
+            .unwrap_err();
+        let message = err.to_string();
+
+        assert!(message.starts_with("YAML Parse Error:"));
+        assert!(message.contains("line 1 column 10"));
+    }
+}

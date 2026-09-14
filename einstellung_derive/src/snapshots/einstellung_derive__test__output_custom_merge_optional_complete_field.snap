@@ -1,0 +1,66 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- helper ---
+pub fn merge_hosts(
+    _: Option<String>,
+    b: Option<String>,
+) -> Result<Option<String>, &'static str> {
+    Ok(b)
+}
+
+// ---------------------------------
+
+/// --- input ---
+#[derive(Config)]
+struct ServerConfig {
+    #[config(merge(function = "merge_hosts"))]
+    host: Option<String>,
+}
+
+/// --- output ---
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+struct ServerConfigPartial {
+    host: ::core::option::Option<String>,
+}
+#[automatically_derived]
+impl ::einstellung::PartialConfig for ServerConfigPartial {
+    type Complete = ServerConfig;
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
+            host: {
+                let _: ::einstellung::MergeFunction<::core::option::Option<String>, _> = merge_hosts;
+                merge_hosts(self.host, next.host)
+                    .map_err(|reason| ::einstellung::ConfigError::CustomMerge {
+                        field: ::einstellung::FieldPath::new("ServerConfig", "host"),
+                        reason: ::einstellung::into_box_error(reason),
+                    })?
+            },
+        })
+    }
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(ServerConfig { host: self.host })
+    }
+    fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let mut fields = ::std::vec::Vec::new();
+        if (&self.host).is_some() {
+            fields.push(::std::string::String::from("host"));
+        }
+        fields
+    }
+    fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
+        let fields = ::std::vec::Vec::new();
+        fields
+    }
+}
+#[automatically_derived]
+impl ::einstellung::Config for ServerConfig {
+    type Partial = ServerConfigPartial;
+}

@@ -49,6 +49,13 @@ struct CustomMergeConfig {
 }
 
 #[derive(Config, Debug)]
+#[config(crate = crate)]
+struct OptionalCustomMergeConfig {
+    #[config(merge(function = "merge_nonempty"))]
+    value: Option<String>,
+}
+
+#[derive(Config, Debug)]
 #[config(crate = crate, deny_unknown_fields)]
 struct StrictConfig {
     value: String,
@@ -548,6 +555,22 @@ fn config_builder_retains_first_provider_error() {
         .unwrap_err();
 
     assert!(matches!(error.root_cause(), ConfigError::Json(_)));
+}
+
+#[test]
+fn custom_merge_works_for_optional_complete_fields() {
+    let base = OptionalCustomMergeConfig::load_partial(&JsonFileProvider::from_contents(
+        r#"{ "value": "base" }"#,
+    ))
+    .unwrap();
+    let next = OptionalCustomMergeConfig::load_partial(&JsonFileProvider::from_contents(
+        r#"{ "value": "next" }"#,
+    ))
+    .unwrap();
+
+    let merged = base.merge(next).unwrap().build().unwrap();
+
+    assert_eq!(merged.value.as_deref(), Some("next"));
 }
 
 #[test]

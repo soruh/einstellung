@@ -18,8 +18,11 @@ enum DotenvReadError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
-    #[error(transparent)]
-    EnvVar(#[from] std::env::VarError),
+    #[error("dotenv environment lookup failed: variable is not present")]
+    EnvVarNotPresent,
+
+    #[error("dotenv environment lookup failed: variable contains non-Unicode data")]
+    EnvVarNotUnicode,
 
     #[error("dotenv variable substitution is disabled at input index {index}")]
     SubstitutionDisabled { index: usize },
@@ -33,7 +36,8 @@ impl From<dotenvy::Error> for DotenvReadError {
         match error {
             dotenvy::Error::LineParse(_, index) => Self::Syntax { index },
             dotenvy::Error::Io(error) => Self::Io(error),
-            dotenvy::Error::EnvVar(error) => Self::EnvVar(error),
+            dotenvy::Error::EnvVar(std::env::VarError::NotPresent) => Self::EnvVarNotPresent,
+            dotenvy::Error::EnvVar(std::env::VarError::NotUnicode(_)) => Self::EnvVarNotUnicode,
             _ => Self::Other,
         }
     }
@@ -351,6 +355,19 @@ mod tests {
         .unwrap();
 
         assert_eq!(config.api_key, "secret");
+    }
+
+    #[test]
+    fn environment_lookup_errors_do_not_expose_values() {
+        let error = DotenvReadError::from(dotenvy::Error::EnvVar(std::env::VarError::NotUnicode(
+            std::ffi::OsString::from("super-secret-value"),
+        )));
+        let display = error.to_string();
+        let debug = format!("{error:?}");
+
+        assert!(!display.contains("super-secret-value"), "{display}");
+        assert!(!debug.contains("super-secret-value"), "{debug}");
+        assert!(display.contains("non-Unicode"), "{display}");
     }
 
     #[test]

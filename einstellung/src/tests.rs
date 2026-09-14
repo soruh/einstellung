@@ -892,6 +892,43 @@ fn view_errors_retain_composed_provenance() {
 }
 
 #[test]
+fn field_source_accessors_combine_provenance_and_failed_layer() {
+    let base = NestedCustomMergeConfig::load_partial(&JsonFileProvider::from_contents(
+        r#"{ "nested": { "value": "base" } }"#,
+    ))
+    .unwrap();
+    let override_layer = NestedCustomMergeConfig::load_partial(&JsonFileProvider::from_contents(
+        r#"{ "nested": { "value": "" } }"#,
+    ))
+    .unwrap();
+
+    let error = NestedCustomMergeConfig::builder()
+        .layer_named("base config", base)
+        .layer_named("CLI override", override_layer)
+        .build()
+        .unwrap_err();
+
+    assert_eq!(
+        error
+            .field_provenance()
+            .unwrap()
+            .iter()
+            .map(crate::ConfigSource::label)
+            .collect::<Vec<_>>(),
+        vec!["base config"]
+    );
+    assert_eq!(
+        error
+            .field_sources()
+            .into_iter()
+            .map(crate::ConfigSource::label)
+            .collect::<Vec<_>>(),
+        vec!["base config", "CLI override"]
+    );
+    assert_eq!(error.latest_field_source().unwrap().label(), "CLI override");
+}
+
+#[test]
 fn diagnostic_accessors_expose_paths_and_sources_without_values() {
     let error = AppConfig::load_complete(&JsonFileProvider::from_contents(
         r#"{ "app_name": "bad", "network": { "listen": { "address": "127.0.0.1" } } }"#,

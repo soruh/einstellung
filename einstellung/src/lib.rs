@@ -642,6 +642,42 @@ impl ConfigError {
         }
     }
 
+    /// Return the successfully merged source history for the field associated with this error.
+    ///
+    /// A provider that triggered a merge failure is not part of this slice because its layer was
+    /// never merged. Use [`Self::field_sources`] when that attempted source should be included.
+    pub fn field_provenance(&self) -> Option<&[ConfigSource]> {
+        let path = self.logical_path()?;
+        self.provenance()?.explain(path)
+    }
+
+    /// Return every source associated with the field that failed, in precedence order.
+    ///
+    /// This combines successfully merged provenance with an attached provider source. For merge
+    /// failures that means the final entry is the provider whose attempted layer caused the
+    /// failure, even though that layer was not committed to provenance.
+    pub fn field_sources(&self) -> Vec<&ConfigSource> {
+        if self.logical_path().is_none() {
+            return Vec::new();
+        }
+
+        let mut sources = self
+            .field_provenance()
+            .map(|sources| sources.iter().collect::<Vec<_>>())
+            .unwrap_or_default();
+        if let Some(source) = self.config_source() {
+            sources.push(source);
+        }
+        sources
+    }
+
+    /// Return the highest-precedence source associated with the field that failed.
+    pub fn latest_field_source(&self) -> Option<&ConfigSource> {
+        self.logical_path()?;
+        self.config_source()
+            .or_else(|| self.field_provenance().and_then(|sources| sources.last()))
+    }
+
     /// Return the underlying configuration error beneath any source context wrappers.
     pub fn root_cause(&self) -> &ConfigError {
         match self {

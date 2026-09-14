@@ -40,10 +40,15 @@ impl YamlFileProvider<'static> {
     }
 }
 
+pub(super) fn load_yaml<T: serde::de::DeserializeOwned>(
+    source: &FileContentProvider<'_>,
+) -> Result<T, ConfigError> {
+    source.with_reader(|reader| Ok(serde_saphyr::from_reader(reader)?))
+}
+
 impl<'i> ConfigProvider for YamlFileProvider<'i> {
     fn load_partial<T: serde::de::DeserializeOwned>(&self) -> Result<T, ConfigError> {
-        self.0
-            .with_reader(|reader| Ok(serde_saphyr::from_reader(reader)?))
+        load_yaml(&self.0)
     }
 
     fn source(&self) -> crate::ConfigSource {

@@ -40,14 +40,20 @@ impl TomlFileProvider<'static> {
     }
 }
 
+pub(super) fn load_toml<T: serde::de::DeserializeOwned>(
+    source: &FileContentProvider<'_>,
+) -> Result<T, ConfigError> {
+    source.with_reader(|reader| {
+        let mut buffer = String::new();
+        reader.read_to_string(&mut buffer)?;
+        ::toml::from_str(&buffer)
+            .map_err(|error| crate::TomlError::with_input(error, &buffer).into())
+    })
+}
+
 impl<'i> ConfigProvider for TomlFileProvider<'i> {
     fn load_partial<T: serde::de::DeserializeOwned>(&self) -> Result<T, ConfigError> {
-        self.0.with_reader(|reader| {
-            let mut buffer = String::new();
-            reader.read_to_string(&mut buffer)?;
-            ::toml::from_str(&buffer)
-                .map_err(|error| crate::TomlError::with_input(error, &buffer).into())
-        })
+        load_toml(&self.0)
     }
 
     fn source(&self) -> crate::ConfigSource {

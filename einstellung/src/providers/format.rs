@@ -128,20 +128,11 @@ impl ConfigProvider for FormatProvider<'_> {
     fn load_partial<T: DeserializeOwned>(&self) -> Result<T, ConfigError> {
         match self.format {
             #[cfg(feature = "json")]
-            ConfigFormat::Json => self
-                .source
-                .with_reader(|reader| Ok(serde_json::from_reader(reader)?)),
+            ConfigFormat::Json => super::json::load_json(&self.source),
             #[cfg(feature = "toml")]
-            ConfigFormat::Toml => self.source.with_reader(|reader| {
-                let mut buffer = String::new();
-                reader.read_to_string(&mut buffer)?;
-                ::toml::from_str(&buffer)
-                    .map_err(|error| crate::TomlError::with_input(error, &buffer).into())
-            }),
+            ConfigFormat::Toml => super::toml::load_toml(&self.source),
             #[cfg(feature = "yaml")]
-            ConfigFormat::Yaml => self
-                .source
-                .with_reader(|reader| Ok(serde_saphyr::from_reader(reader)?)),
+            ConfigFormat::Yaml => super::yaml::load_yaml(&self.source),
         }
     }
 

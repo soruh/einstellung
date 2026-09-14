@@ -41,10 +41,15 @@ impl JsonFileProvider<'static> {
     }
 }
 
+pub(super) fn load_json<T: serde::de::DeserializeOwned>(
+    source: &FileContentProvider<'_>,
+) -> Result<T, ConfigError> {
+    source.with_reader(|reader| Ok(serde_json::from_reader(reader)?))
+}
+
 impl<'i> ConfigProvider for JsonFileProvider<'i> {
     fn load_partial<T: serde::de::DeserializeOwned>(&self) -> Result<T, ConfigError> {
-        self.0
-            .with_reader(|reader| Ok(serde_json::from_reader(reader)?))
+        load_json(&self.0)
     }
 
     fn source(&self) -> crate::ConfigSource {

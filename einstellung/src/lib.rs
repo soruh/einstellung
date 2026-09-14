@@ -117,7 +117,7 @@ impl<C: Config> ConfigBuilder<C> {
         P: ConfigProviderFor<C> + ?Sized,
     {
         self.provider_with(|| {
-            let source = provider.source();
+            let source = provider.config_source();
             let next = provider.load_config_partial();
             (source, next)
         })
@@ -461,7 +461,7 @@ pub trait ConfigProviderFor<C: Config> {
     fn load_config_partial(&self) -> Result<C::Partial, ConfigError>;
 
     /// Describe this provider for diagnostics and provenance.
-    fn source(&self) -> ConfigSource;
+    fn config_source(&self) -> ConfigSource;
 }
 
 impl<C, P> ConfigProviderFor<C> for P
@@ -473,7 +473,7 @@ where
         self.load_partial::<C::Partial>()
     }
 
-    fn source(&self) -> ConfigSource {
+    fn config_source(&self) -> ConfigSource {
         ConfigProvider::source(self)
     }
 }

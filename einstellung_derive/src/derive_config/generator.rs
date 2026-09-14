@@ -119,7 +119,7 @@ fn generate_field_merge(
             }
         },
         MergeStrategy::Custom(func_path) => {
-            let ident_str = f.ident.to_string();
+            let ident_str = &f.logical_name;
             let partial_type = render_partial_value_type(&f.partial_type, einstellung);
 
             quote_spanned!(func_path.span() => {
@@ -131,7 +131,7 @@ fn generate_field_merge(
             })
         }
         MergeStrategy::MergeSubconfig => {
-            let ident_str = f.ident.to_string();
+            let ident_str = &f.logical_name;
             quote! {
                 match (#left, #right) {
                     (Some(a), Some(b)) => Some(#einstellung::merge_with_context(
@@ -154,7 +154,7 @@ fn generate_build_for_field(
     f: &TransformedField,
 ) -> TokenStream {
     let ident = &f.ident;
-    let ident_str = ident.to_string();
+    let ident_str = &f.logical_name;
     let complete_type = &f.complete_type;
 
     let unfreeze = if f.freeze == FreezeStrategy::Wrapped {
@@ -219,7 +219,7 @@ fn generate_merge_for_field(
             quote!(next.#ident),
         ),
         FreezeStrategy::Wrapped => {
-            let ident_str = ident.to_string();
+            let ident_str = &f.logical_name;
             let merge = generate_field_merge(
                 f,
                 einstellung,
@@ -237,7 +237,7 @@ fn generate_merge_for_field(
             }
         }
         FreezeStrategy::IntrinsicallyFreezable => {
-            let ident_str = ident.to_string();
+            let ident_str = &f.logical_name;
             let merge = generate_field_merge(
                 f,
                 einstellung,
@@ -273,7 +273,7 @@ fn partial_option_ref(f: &TransformedField, einstellung: &syn::Path) -> TokenStr
 }
 
 fn generate_provided_field(f: &TransformedField, einstellung: &syn::Path) -> TokenStream {
-    let ident_str = f.ident.to_string();
+    let ident_str = &f.logical_name;
     let field = partial_option_ref(f, einstellung);
 
     if f.build.build {
@@ -294,7 +294,7 @@ fn generate_provided_field(f: &TransformedField, einstellung: &syn::Path) -> Tok
 }
 
 fn generate_defaulted_field(f: &TransformedField, einstellung: &syn::Path) -> TokenStream {
-    let ident_str = f.ident.to_string();
+    let ident_str = &f.logical_name;
     let field = partial_option_ref(f, einstellung);
     let has_default = matches!(f.build.unwrap, UnwrapStrategy::UnwrapWithDefault(_));
 

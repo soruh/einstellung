@@ -33,7 +33,7 @@ impl ::einstellung::PartialConfig for ConfigPartial {
                 .x
                 .ok_or(
                     ::einstellung::ConfigError::MissingField(
-                        ::einstellung::FieldPath::new("Config", "x"),
+                        ::einstellung::FieldPath::new("Config", "field"),
                     ),
                 )?,
         })
@@ -41,7 +41,7 @@ impl ::einstellung::PartialConfig for ConfigPartial {
     fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
         let mut fields = ::std::vec::Vec::new();
         if (&self.x).is_some() {
-            fields.push(::std::string::String::from("x"));
+            fields.push(::std::string::String::from("field"));
         }
         fields
     }

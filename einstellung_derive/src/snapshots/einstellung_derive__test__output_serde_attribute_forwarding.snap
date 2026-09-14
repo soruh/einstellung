@@ -45,7 +45,7 @@ impl ::einstellung::PartialConfig for ApiConfigPartial {
                 .key
                 .ok_or(
                     ::einstellung::ConfigError::MissingField(
-                        ::einstellung::FieldPath::new("ApiConfig", "key"),
+                        ::einstellung::FieldPath::new("ApiConfig", "API_KEY"),
                     ),
                 )?,
             retries: self
@@ -61,7 +61,7 @@ impl ::einstellung::PartialConfig for ApiConfigPartial {
     fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
         let mut fields = ::std::vec::Vec::new();
         if (&self.key).is_some() {
-            fields.push(::std::string::String::from("key"));
+            fields.push(::std::string::String::from("API_KEY"));
         }
         if (&self.retries).is_some() {
             fields.push(::std::string::String::from("retries"));

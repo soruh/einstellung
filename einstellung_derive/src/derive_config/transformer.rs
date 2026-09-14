@@ -1,6 +1,9 @@
 use super::parser::{ConfigFieldReceiver, ConfigStructReceiver};
 use crate::derive_config::parser::{DefaultStrategy, MergeStrategyReceiver};
-use syn::{GenericArgument, PathArguments, Type, spanned::Spanned};
+use syn::{
+    GenericArgument, Meta, PathArguments, Token, Type, parse::Parser, punctuated::Punctuated,
+    spanned::Spanned,
+};
 
 #[derive(Debug)]
 pub struct TransformedStruct {
@@ -17,6 +20,7 @@ pub struct TransformedStruct {
 #[derive(Debug)]
 pub struct TransformedField {
     pub ident: syn::Ident,
+    pub logical_name: String,
     pub vis: syn::Visibility,
     pub complete_type: syn::Type,
     pub partial_type: PartialType,
@@ -63,6 +67,165 @@ pub struct PartialType {
     pub wrap_freeze: bool,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+enum SerdeRenameRule {
+    #[default]
+    None,
+    LowerCase,
+    UpperCase,
+    PascalCase,
+    CamelCase,
+    SnakeCase,
+    ScreamingSnakeCase,
+    KebabCase,
+    ScreamingKebabCase,
+}
+
+impl SerdeRenameRule {
+    fn parse(value: &str, span: proc_macro2::Span) -> syn::Result<Self> {
+        let rule = match value {
+            "lowercase" => Self::LowerCase,
+            "UPPERCASE" => Self::UpperCase,
+            "PascalCase" => Self::PascalCase,
+            "camelCase" => Self::CamelCase,
+            "snake_case" => Self::SnakeCase,
+            "SCREAMING_SNAKE_CASE" => Self::ScreamingSnakeCase,
+            "kebab-case" => Self::KebabCase,
+            "SCREAMING-KEBAB-CASE" => Self::ScreamingKebabCase,
+            _ => {
+                return Err(syn::Error::new(
+                    span,
+                    format!("unknown serde rename rule {value:?}"),
+                ));
+            }
+        };
+        Ok(rule)
+    }
+
+    fn apply_to_field(self, field: &str) -> String {
+        match self {
+            Self::None | Self::LowerCase | Self::SnakeCase => field.to_owned(),
+            Self::UpperCase => field.to_ascii_uppercase(),
+            Self::PascalCase => {
+                let mut pascal = String::new();
+                let mut capitalize = true;
+                for ch in field.chars() {
+                    if ch == '_' {
+                        capitalize = true;
+                    } else if capitalize {
+                        pascal.push(ch.to_ascii_uppercase());
+                        capitalize = false;
+                    } else {
+                        pascal.push(ch);
+                    }
+                }
+                pascal
+            }
+            Self::CamelCase => {
+                let pascal = Self::PascalCase.apply_to_field(field);
+                let mut chars = pascal.chars();
+                match chars.next() {
+                    Some(first) => first.to_ascii_lowercase().to_string() + chars.as_str(),
+                    None => pascal,
+                }
+            }
+            Self::ScreamingSnakeCase => field.to_ascii_uppercase(),
+            Self::KebabCase => field.replace('_', "-"),
+            Self::ScreamingKebabCase => field.to_ascii_uppercase().replace('_', "-"),
+        }
+    }
+}
+
+fn forwarded_serde_metas(
+    direct: &[Meta],
+    partial: &[super::parser::PartialReceiver],
+) -> syn::Result<Vec<Meta>> {
+    let mut metas = Vec::new();
+    let parser = Punctuated::<Meta, Token![,]>::parse_terminated;
+    for meta in direct {
+        if let Meta::List(list) = meta
+            && list.path.is_ident("serde")
+        {
+            metas.extend(parser.parse2(list.tokens.clone())?);
+        } else {
+            metas.push(meta.clone());
+        }
+    }
+    for receiver in partial {
+        for nested in &receiver.0 {
+            let darling::ast::NestedMeta::Meta(Meta::List(list)) = nested else {
+                continue;
+            };
+            if !list.path.is_ident("serde") {
+                continue;
+            }
+            metas.extend(parser.parse2(list.tokens.clone())?);
+        }
+    }
+    Ok(metas)
+}
+
+fn serde_deserialize_setting(metas: &[Meta], name: &str) -> syn::Result<Option<syn::LitStr>> {
+    for meta in metas {
+        match meta {
+            Meta::NameValue(value) if value.path.is_ident(name) => {
+                let syn::Expr::Lit(expr) = &value.value else {
+                    continue;
+                };
+                let syn::Lit::Str(value) = &expr.lit else {
+                    continue;
+                };
+                return Ok(Some(value.clone()));
+            }
+            Meta::List(list) if list.path.is_ident(name) => {
+                let parser = Punctuated::<Meta, Token![,]>::parse_terminated;
+                let nested = parser.parse2(list.tokens.clone())?;
+                for nested in nested {
+                    let Meta::NameValue(value) = nested else {
+                        continue;
+                    };
+                    if !value.path.is_ident("deserialize") {
+                        continue;
+                    }
+                    let syn::Expr::Lit(expr) = value.value else {
+                        continue;
+                    };
+                    let syn::Lit::Str(value) = expr.lit else {
+                        continue;
+                    };
+                    return Ok(Some(value));
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(None)
+}
+
+fn serde_rename_rule(
+    direct: &[Meta],
+    partial: &[super::parser::PartialReceiver],
+) -> syn::Result<SerdeRenameRule> {
+    let metas = forwarded_serde_metas(direct, partial)?;
+    let Some(value) = serde_deserialize_setting(&metas, "rename_all")? else {
+        return Ok(SerdeRenameRule::None);
+    };
+    SerdeRenameRule::parse(&value.value(), value.span())
+}
+
+fn serde_field_name(
+    field: &ConfigFieldReceiver,
+    ident: &syn::Ident,
+    rename_rule: SerdeRenameRule,
+) -> syn::Result<String> {
+    let metas = forwarded_serde_metas(&field.serde, &field.partial)?;
+    if let Some(rename) = serde_deserialize_setting(&metas, "rename")? {
+        Ok(rename.value())
+    } else {
+        Ok(rename_rule.apply_to_field(&ident.to_string()))
+    }
+}
+
 /// Helper to extract inner type of an `Option`.
 /// For `Option<T>` return `Some(T)`
 /// For anything else return `None`
@@ -81,6 +244,7 @@ fn extract_type_from_option(ty: &Type) -> Option<&Type> {
 
 /// Transform the parsed struct into a type describing the output types and impls
 pub fn transform_struct(mut receiver: ConfigStructReceiver) -> syn::Result<TransformedStruct> {
+    let rename_rule = serde_rename_rule(&receiver.serde, &receiver.partial)?;
     let attrs = receiver.take_partial_attrs();
 
     let complete_ident = receiver.ident.clone();
@@ -102,7 +266,7 @@ pub fn transform_struct(mut receiver: ConfigStructReceiver) -> syn::Result<Trans
     let mut errors: Option<syn::Error> = None;
 
     for field in struct_data {
-        match transform_field(field, receiver.freezable) {
+        match transform_field(field, receiver.freezable, rename_rule) {
             Ok(f) => fields.push(f),
             Err(e) => {
                 if let Some(ref mut errs) = errors {
@@ -134,13 +298,14 @@ pub fn transform_struct(mut receiver: ConfigStructReceiver) -> syn::Result<Trans
 fn transform_field(
     mut field: ConfigFieldReceiver,
     all_freezeable: bool,
+    rename_rule: SerdeRenameRule,
 ) -> syn::Result<TransformedField> {
-    let attrs = field.take_partial_attrs();
-
     let ident = field
         .ident
         .clone()
         .ok_or_else(|| syn::Error::new(field.ty.span(), "Config fields must be named"))?;
+    let logical_name = serde_field_name(&field, &ident, rename_rule)?;
+    let attrs = field.take_partial_attrs();
     let complete_type = field.ty;
 
     let inner_type_if_optional = extract_type_from_option(&complete_type);
@@ -219,6 +384,7 @@ fn transform_field(
 
     Ok(TransformedField {
         ident,
+        logical_name,
         vis: field.vis,
         freeze,
         partial_type,

@@ -109,6 +109,8 @@ mod derive_config;
 /// ### Attribute Forwarding
 /// * `#[config(partial(...))]` attributes are forwarded to the fields of the partial struct as `#[...]`
 /// * `#[config(serde(...))]` is available as a shorthand for `#[config(partial(serde(...)))]`
+/// * Serde deserialization names from `rename` and `rename_all` are also used as the logical
+///   field names in configuration errors and provenance.
 ///
 /// # Example
 ///

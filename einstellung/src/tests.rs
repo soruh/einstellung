@@ -1193,3 +1193,44 @@ fn providers_describe_sources_without_inline_contents() {
         "inline json"
     );
 }
+
+#[derive(Config, Debug)]
+#[config(crate = crate, serde(rename_all(deserialize = "kebab-case", serialize = "camelCase")))]
+struct RenamedPathConfig {
+    service_port: u16,
+    #[config(serde(rename(deserialize = "API_KEY", serialize = "apiKey")))]
+    api_key: String,
+}
+
+#[test]
+fn serde_renames_define_logical_diagnostic_and_provenance_paths() {
+    let tracked = RenamedPathConfig::builder()
+        .provider(&JsonFileProvider::from_contents(
+            r#"{ "service-port": 8080, "API_KEY": "secret" }"#,
+        ))
+        .build_tracked()
+        .unwrap();
+
+    assert_eq!(tracked.config().service_port, 8080);
+    assert_eq!(
+        tracked
+            .provenance()
+            .latest_supplier("service-port")
+            .unwrap()
+            .label(),
+        "inline json"
+    );
+    assert_eq!(
+        tracked
+            .provenance()
+            .latest_supplier("API_KEY")
+            .unwrap()
+            .label(),
+        "inline json"
+    );
+    assert!(tracked.provenance().explain("service_port").is_none());
+    assert!(tracked.provenance().explain("api_key").is_none());
+
+    let error = RenamedPathConfig::builder().build().unwrap_err();
+    assert_eq!(error.logical_path().as_deref(), Some("service-port"));
+}

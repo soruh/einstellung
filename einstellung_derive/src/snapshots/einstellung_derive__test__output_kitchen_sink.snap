@@ -159,7 +159,7 @@ impl ::einstellung::PartialConfig for FullSystemConfigPartial {
     fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
         let mut fields = ::std::vec::Vec::new();
         if (&self.name).is_some() {
-            fields.push(::std::string::String::from("name"));
+            fields.push(::std::string::String::from("sys_name"));
         }
         if (&self.port).is_some() {
             fields.push(::std::string::String::from("port"));
@@ -185,7 +185,7 @@ impl ::einstellung::PartialConfig for FullSystemConfigPartial {
     fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
         let mut fields = ::std::vec::Vec::new();
         if (&self.name).is_none() {
-            fields.push(::std::string::String::from("name"));
+            fields.push(::std::string::String::from("sys_name"));
         }
         if let ::core::option::Option::Some(value) = (&self.database).as_ref() {
             for nested in ::einstellung::PartialConfig::defaulted_fields(value) {

@@ -378,7 +378,8 @@ that omits a field never erases an earlier value and never forces its default.
 - **Attribute Forwarding**: Attributes like `#[config(partial(...))]` are
   forwarded to the generated partial struct. There is a shorthand syntax
   `#[config(serde(...))]` which is interpreted as
-  `#[config(partial(serde(...)))]`
+  `#[config(partial(serde(...)))]`. Serde deserialization `rename`/`rename_all`
+  names also become the canonical logical paths used by errors and provenance.
 - **Subconfigs**: Nest `Config` structs using the `#[config(subconfig)]`
   attribute to keep your data organized.
 

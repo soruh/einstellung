@@ -73,8 +73,9 @@ impl EnvProvider {
         self
     }
 
-    fn load_from_vars<T>(
+    pub(crate) fn load_from_vars<T>(
         &self,
+        provider_name: &'static str,
         vars: impl IntoIterator<Item = (OsString, OsString)>,
     ) -> Result<T, ConfigError>
     where
@@ -99,7 +100,7 @@ impl EnvProvider {
                     .split(NESTED_SEPARATOR)
                     .map(str::to_ascii_lowercase)
                     .collect::<Vec<_>>();
-                insert_env_value(&mut root, &path, key, value)?;
+                insert_env_value(provider_name, &mut root, &path, key, value)?;
             }
         }
 
@@ -116,17 +117,17 @@ impl EnvProvider {
                 .split('.')
                 .map(str::to_owned)
                 .collect::<Vec<_>>();
-            insert_env_value(&mut root, &path, &binding.variable, value)?;
+            insert_env_value(provider_name, &mut root, &path, &binding.variable, value)?;
         }
 
         T::deserialize(EnvNodeDeserializer::new(&root))
-            .map_err(|err| ConfigError::provider("environment", err))
+            .map_err(|err| ConfigError::provider(provider_name, err))
     }
 }
 
 impl ConfigProvider for EnvProvider {
     fn load_partial<T: DeserializeOwned>(&self) -> Result<T, ConfigError> {
-        self.load_from_vars(std::env::vars_os())
+        self.load_from_vars("environment", std::env::vars_os())
     }
 }
 
@@ -137,6 +138,7 @@ enum EnvNode {
 }
 
 fn insert_env_value(
+    provider_name: &'static str,
     root: &mut EnvNode,
     path: &[String],
     variable: &str,
@@ -144,7 +146,7 @@ fn insert_env_value(
 ) -> Result<(), ConfigError> {
     if path.is_empty() || path.iter().any(String::is_empty) {
         return Err(ConfigError::provider(
-            "environment",
+            provider_name,
             EnvProviderError::ConflictingPath {
                 path: path.join("."),
             },
@@ -155,7 +157,7 @@ fn insert_env_value(
         .to_str()
         .ok_or_else(|| {
             ConfigError::provider(
-                "environment",
+                provider_name,
                 EnvProviderError::NonUnicode {
                     variable: variable.to_owned(),
                 },
@@ -168,7 +170,7 @@ fn insert_env_value(
         let is_leaf = index + 1 == path.len();
         let EnvNode::Branch(children) = node else {
             return Err(ConfigError::provider(
-                "environment",
+                provider_name,
                 EnvProviderError::ConflictingPath {
                     path: path.join("."),
                 },
@@ -546,15 +548,18 @@ mod tests {
             .with_var("TAGS", "tags");
 
         let config = provider
-            .load_from_vars::<TestConfig>(vars(&[
-                ("API_KEY", "123"),
-                ("SOURCE_PATH", "/tmp/project"),
-                ("PORT", "8080"),
-                ("ENABLED", "true"),
-                ("DATABASE_URL", "postgres://localhost/app"),
-                ("TAGS", r#"["api","worker"]"#),
-                ("IGNORED", "does-not-load"),
-            ]))
+            .load_from_vars::<TestConfig>(
+                "environment",
+                vars(&[
+                    ("API_KEY", "123"),
+                    ("SOURCE_PATH", "/tmp/project"),
+                    ("PORT", "8080"),
+                    ("ENABLED", "true"),
+                    ("DATABASE_URL", "postgres://localhost/app"),
+                    ("TAGS", r#"["api","worker"]"#),
+                    ("IGNORED", "does-not-load"),
+                ]),
+            )
             .unwrap();
 
         assert_eq!(config.api_key, "123");
@@ -569,15 +574,18 @@ mod tests {
     fn prefix_maps_nested_fields() {
         let provider = EnvProvider::new().with_prefix("APP_");
         let config = provider
-            .load_from_vars::<TestConfig>(vars(&[
-                ("APP_API_KEY", "secret"),
-                ("APP_SOURCE_PATH", "/srv/app"),
-                ("APP_PORT", "443"),
-                ("APP_ENABLED", "false"),
-                ("APP_DATABASE__URL", "postgres://db/app"),
-                ("APP_TAGS", r#"["one"]"#),
-                ("OTHER_PORT", "80"),
-            ]))
+            .load_from_vars::<TestConfig>(
+                "environment",
+                vars(&[
+                    ("APP_API_KEY", "secret"),
+                    ("APP_SOURCE_PATH", "/srv/app"),
+                    ("APP_PORT", "443"),
+                    ("APP_ENABLED", "false"),
+                    ("APP_DATABASE__URL", "postgres://db/app"),
+                    ("APP_TAGS", r#"["one"]"#),
+                    ("OTHER_PORT", "80"),
+                ]),
+            )
             .unwrap();
 
         assert_eq!(config.api_key, "secret");
@@ -592,15 +600,18 @@ mod tests {
             .with_prefix("APP_")
             .with_var("SPECIAL_PORT", "port");
         let config = provider
-            .load_from_vars::<TestConfig>(vars(&[
-                ("APP_API_KEY", "secret"),
-                ("APP_SOURCE_PATH", "/srv/app"),
-                ("APP_PORT", "443"),
-                ("APP_ENABLED", "true"),
-                ("APP_DATABASE__URL", "postgres://db/app"),
-                ("APP_TAGS", "[]"),
-                ("SPECIAL_PORT", "8443"),
-            ]))
+            .load_from_vars::<TestConfig>(
+                "environment",
+                vars(&[
+                    ("APP_API_KEY", "secret"),
+                    ("APP_SOURCE_PATH", "/srv/app"),
+                    ("APP_PORT", "443"),
+                    ("APP_ENABLED", "true"),
+                    ("APP_DATABASE__URL", "postgres://db/app"),
+                    ("APP_TAGS", "[]"),
+                    ("SPECIAL_PORT", "8443"),
+                ]),
+            )
             .unwrap();
 
         assert_eq!(config.port, 8443);

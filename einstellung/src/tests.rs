@@ -90,6 +90,12 @@ struct StrictConfig {
 
 #[derive(Config, Debug)]
 #[config(crate = crate)]
+struct RawIdentifierConfig {
+    r#type: String,
+}
+
+#[derive(Config, Debug)]
+#[config(crate = crate)]
 struct SecretConfig {
     api_key: crate::Secret<String>,
 }
@@ -821,6 +827,21 @@ fn custom_merge_accepts_convertible_error_types() {
         }
         other => panic!("unexpected error: {other}"),
     }
+}
+
+#[test]
+fn raw_identifiers_use_serde_field_names_in_provenance() {
+    let tracked = RawIdentifierConfig::builder()
+        .provider(&JsonFileProvider::from_contents(r#"{ "type": "worker" }"#))
+        .build_tracked()
+        .unwrap();
+
+    assert_eq!(tracked.config().r#type, "worker");
+    assert!(tracked.explain("r#type").is_none());
+    assert_eq!(
+        tracked.explain("type").unwrap().last().unwrap().label(),
+        "inline json"
+    );
 }
 
 #[test]

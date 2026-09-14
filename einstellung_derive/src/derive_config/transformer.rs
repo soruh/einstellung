@@ -222,7 +222,9 @@ fn serde_field_name(
     if let Some(rename) = serde_deserialize_setting(&metas, "rename")? {
         Ok(rename.value())
     } else {
-        Ok(rename_rule.apply_to_field(&ident.to_string()))
+        let rust_name = ident.to_string();
+        let rust_name = rust_name.strip_prefix("r#").unwrap_or(&rust_name);
+        Ok(rename_rule.apply_to_field(rust_name))
     }
 }
 

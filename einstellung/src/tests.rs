@@ -692,6 +692,59 @@ fn config_builder_merges_providers_in_order() {
 }
 
 #[test]
+fn config_builder_can_override_provider_source_labels() {
+    let base = JsonFileProvider::from_contents(r#"{ "app_name": "base" }"#);
+    let local = JsonFileProvider::from_contents(
+        r#"{ "app_name": "local", "network": { "listen": { "address": "192.168.0.1" } } }"#,
+    );
+
+    let tracked = AppConfig::builder()
+        .provider_named("base configuration", &base)
+        .provider_named("local overrides", &local)
+        .build_tracked()
+        .unwrap();
+
+    assert_eq!(tracked.config().app_name, "local");
+    assert_eq!(
+        tracked
+            .explain("app_name")
+            .unwrap()
+            .iter()
+            .map(crate::ConfigSource::label)
+            .collect::<Vec<_>>(),
+        vec!["base configuration", "local overrides"]
+    );
+
+    let invalid = JsonFileProvider::from_contents("{");
+    let error = AppConfig::builder()
+        .provider_named("broken local config", &invalid)
+        .build()
+        .unwrap_err();
+    assert_eq!(
+        error.config_source().unwrap().label(),
+        "broken local config"
+    );
+}
+
+#[test]
+fn typed_provider_can_override_source_label() {
+    let provider = JsonFileProvider::from_contents(
+        r#"{ "app_name": "typed", "network": { "listen": { "address": "192.168.0.1" } } }"#,
+    );
+    let provider: &dyn crate::ConfigProviderFor<AppConfig> = &provider;
+
+    let tracked = AppConfig::builder()
+        .typed_provider_named("runtime override", provider)
+        .build_tracked()
+        .unwrap();
+
+    assert_eq!(
+        tracked.explain("app_name").unwrap().last().unwrap().label(),
+        "runtime override"
+    );
+}
+
+#[test]
 fn config_builder_merges_provider_iterators_in_order() {
     let providers = [
         JsonFileProvider::from_contents(

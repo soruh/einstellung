@@ -107,6 +107,16 @@ impl<C: Config> ConfigBuilder<C> {
         })
     }
 
+    /// Merge a provider as the next layer using an explicit diagnostic/provenance label.
+    ///
+    /// This is useful when several providers have the same generic source identity, for example
+    /// multiple inline JSON documents. The supplied label replaces the provider's default source
+    /// label for this composition step and should not contain configuration values or secrets.
+    pub fn provider_named(self, source: impl Into<String>, provider: &impl ConfigProvider) -> Self {
+        let source = ConfigSource::new(source);
+        self.provider_with(|| (source, provider.load_partial::<C::Partial>()))
+    }
+
     /// Merge multiple providers in iterator order.
     ///
     /// Each provider is the next higher-precedence layer. If one provider fails, later providers
@@ -141,6 +151,15 @@ impl<C: Config> ConfigBuilder<C> {
             let next = provider.load_config_partial();
             (source, next)
         })
+    }
+
+    /// Merge an object-safe provider using an explicit diagnostic/provenance label.
+    pub fn typed_provider_named<P>(self, source: impl Into<String>, provider: &P) -> Self
+    where
+        P: ConfigProviderFor<C> + ?Sized,
+    {
+        let source = ConfigSource::new(source);
+        self.provider_with(|| (source, provider.load_config_partial()))
     }
 
     /// Merge multiple object-safe providers in iterator order.

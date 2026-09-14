@@ -1131,6 +1131,21 @@ fn provenance_can_be_enumerated_without_configuration_values() {
 }
 
 #[test]
+fn structured_errors_expose_safe_source_locations_through_context() {
+    let error = AppConfig::load_complete(&JsonFileProvider::from_contents(
+        r#"{ "app_name": 7, "network": { "listen": { "address": "127.0.0.1" } } }"#,
+    ))
+    .unwrap_err();
+
+    let location = error
+        .source_location()
+        .expect("JSON data error should include a source location");
+    assert_eq!(location.line(), 1);
+    assert!(location.column() > 0);
+    assert_eq!(error.config_source().unwrap().label(), "inline json");
+}
+
+#[test]
 fn providers_describe_sources_without_inline_contents() {
     let provider = JsonFileProvider::from_contents(r#"{ "api_key": "do-not-leak" }"#);
     assert_eq!(

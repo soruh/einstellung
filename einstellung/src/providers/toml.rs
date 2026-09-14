@@ -85,5 +85,10 @@ mod tests {
         assert!(!debug.contains("super-secret"), "{debug}");
         assert!(message.contains("line 1"), "{message}");
         assert!(message.contains("column"), "{message}");
+        let location = err
+            .source_location()
+            .expect("TOML parse error should retain a source location");
+        assert_eq!(location.line(), 1);
+        assert!(location.column() > 0);
     }
 }

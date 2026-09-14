@@ -166,5 +166,9 @@ mod tests {
 
         assert!(message.starts_with("YAML Parse Error:"));
         assert!(message.contains("line 1, column 10"), "{message}");
+        assert_eq!(
+            err.source_location(),
+            Some(crate::SourceLocation::new(1, 10))
+        );
     }
 }

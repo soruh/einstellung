@@ -611,6 +611,30 @@ impl Display for FieldPath {
     }
 }
 
+/// One-based location in a structured configuration source.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SourceLocation {
+    line: u64,
+    column: u64,
+}
+
+impl SourceLocation {
+    /// Create a source location. Line and column numbers are one-based.
+    pub const fn new(line: u64, column: u64) -> Self {
+        Self { line, column }
+    }
+
+    /// Return the one-based line number.
+    pub const fn line(self) -> u64 {
+        self.line
+    }
+
+    /// Return the one-based column number.
+    pub const fn column(self) -> u64 {
+        self.column
+    }
+}
+
 /// Thread-safe boxed error used by configuration callbacks and providers.
 pub type BoxError = Box<dyn StdError + Send + Sync + 'static>;
 
@@ -628,6 +652,11 @@ pub struct JsonError(serde_json::Error);
 
 #[cfg(feature = "json")]
 impl JsonError {
+    /// Return the safe line/column location reported by the JSON parser.
+    pub fn location(&self) -> SourceLocation {
+        SourceLocation::new(self.0.line() as u64, self.0.column() as u64)
+    }
+
     /// Borrow the backend parser error for explicitly requested detailed diagnostics.
     pub fn parser_error(&self) -> &serde_json::Error {
         &self.0
@@ -704,6 +733,13 @@ impl std::fmt::Debug for YamlError {
 
 #[cfg(feature = "yaml")]
 impl YamlError {
+    /// Return the safe line/column location reported by the YAML parser, when available.
+    pub fn location(&self) -> Option<SourceLocation> {
+        self.0
+            .location()
+            .map(|location| SourceLocation::new(location.line(), location.column()))
+    }
+
     /// Borrow the backend parser error for explicitly requested detailed diagnostics.
     pub fn parser_error(&self) -> &serde_saphyr::Error {
         &self.0
@@ -732,6 +768,12 @@ impl TomlError {
     pub(crate) fn with_input(error: ::toml::de::Error, input: &str) -> Self {
         let location = error.span().map(|span| line_column(input, span.start));
         Self { error, location }
+    }
+
+    /// Return the safe line/column location derived from the TOML parser span, when available.
+    pub fn location(&self) -> Option<SourceLocation> {
+        self.location
+            .map(|(line, column)| SourceLocation::new(line as u64, column as u64))
     }
 
     /// Borrow the backend parser error for explicitly requested detailed diagnostics.
@@ -945,6 +987,24 @@ impl ConfigError {
             Self::Source { error, .. }
             | Self::Path { error, .. }
             | Self::Composition { error, .. } => error.field_path(),
+            _ => None,
+        }
+    }
+
+    /// Return the safe structured-source location associated with this error, if any.
+    ///
+    /// This traverses source, path, and composition wrappers without exposing raw parser input.
+    pub fn source_location(&self) -> Option<SourceLocation> {
+        match self {
+            #[cfg(feature = "json")]
+            Self::Json(error) => Some(error.location()),
+            #[cfg(feature = "yaml")]
+            Self::Yaml(error) => error.location(),
+            #[cfg(feature = "toml")]
+            Self::Toml(error) => error.location(),
+            Self::Source { error, .. }
+            | Self::Path { error, .. }
+            | Self::Composition { error, .. } => error.source_location(),
             _ => None,
         }
     }

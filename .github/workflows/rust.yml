@@ -38,7 +38,7 @@ jobs:
         run: |
           set -euo pipefail
           cargo check -p einstellung --no-default-features
-          for feature in derive json toml yaml env dotenv; do
+          for feature in derive json toml yaml key-value env dotenv; do
             cargo check -p einstellung --no-default-features --features "$feature"
             cargo test -p einstellung --lib --no-default-features --features "$feature"
           done

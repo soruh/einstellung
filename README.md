@@ -49,7 +49,8 @@ You can customize enabled features to reduce compilation time or binary size:
 - `json` (default): Enables `JsonFileProvider`.
 - `toml` (default): Enables `TomlFileProvider`.
 - `yaml` (default): Enables `YamlFileProvider`, backed by the maintained `serde_yaml_ng` fork.
-- `env`: Enables the allowlist-first `EnvProvider`.
+- `key-value`: Enables `KeyValueProvider` for dotted-path string overrides.
+- `env`: Enables the allowlist-first `EnvProvider` and `key-value`.
 - `dotenv`: Enables `DotenvProvider` and `env`. Dotenv files are parsed without
   mutating the process environment.
 - `full`: Enables every provider and the derive macro.

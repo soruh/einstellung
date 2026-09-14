@@ -12,7 +12,7 @@ mod env;
 mod format;
 #[cfg(feature = "json")]
 mod json;
-#[cfg(feature = "env")]
+#[cfg(feature = "key-value")]
 mod key_value;
 #[cfg(feature = "toml")]
 mod toml;
@@ -27,7 +27,7 @@ pub use env::{EnvProvider, EnvProviderError};
 pub use format::{ConfigFormat, FormatProvider, FormatProviderError};
 #[cfg(feature = "json")]
 pub use json::JsonFileProvider;
-#[cfg(feature = "env")]
+#[cfg(feature = "key-value")]
 pub use key_value::{KeyValueProvider, KeyValueProviderError};
 #[cfg(feature = "toml")]
 pub use toml::TomlFileProvider;

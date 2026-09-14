@@ -34,7 +34,8 @@ insta = "1.46.3"
 derive = ["dep:einstellung_derive"]
 
 dotenv = ["env", "dep:dotenvy"]
-env = ["dep:serde_json"]
+env = ["key-value"]
+key-value = ["dep:serde_json"]
 json = ["dep:serde_json"]
 toml = ["dep:toml"]
 yaml = ["dep:serde_yaml"]

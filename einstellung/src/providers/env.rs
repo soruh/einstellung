@@ -1,13 +1,11 @@
-use std::{
-    collections::BTreeMap,
-    ffi::{OsStr, OsString},
-    fmt,
-};
+use std::ffi::{OsStr, OsString};
 
-use serde::de::{self, DeserializeOwned, DeserializeSeed, IntoDeserializer, MapAccess, Visitor};
+use serde::de::DeserializeOwned;
 use thiserror::Error;
 
 use crate::{ConfigError, ConfigProvider};
+
+use super::key_value::{KeyValueProviderError, MappedValue, load_mapped_values};
 
 const NESTED_SEPARATOR: &str = "__";
 
@@ -20,8 +18,20 @@ pub enum EnvProviderError {
     #[error("environment mapping for {path:?} conflicts with another mapped value")]
     ConflictingPath { path: String },
 
-    #[error("invalid value for configuration input {variable:?}: {message}")]
+    #[error("invalid value for environment variable {variable:?}: {message}")]
     InvalidValue { variable: String, message: String },
+}
+
+impl From<KeyValueProviderError> for EnvProviderError {
+    fn from(error: KeyValueProviderError) -> Self {
+        match error {
+            KeyValueProviderError::ConflictingPath { path } => Self::ConflictingPath { path },
+            KeyValueProviderError::InvalidValue { input, message } => Self::InvalidValue {
+                variable: input,
+                message,
+            },
+        }
+    }
 }
 
 /// Loads explicitly selected process environment variables into a partial configuration.
@@ -44,95 +54,6 @@ pub struct EnvProvider {
 struct EnvBinding {
     variable: String,
     path: String,
-}
-
-/// Loads dotted-path string values into a partial configuration.
-///
-/// This is useful for CLI overrides, secret-store adapters, and other external key/value
-/// sources. Values use the same typed decoding as [`EnvProvider`]: scalar fields parse from
-/// their string representation, while sequences and maps use JSON syntax. Later duplicate
-/// paths replace earlier ones.
-#[derive(Clone, Debug)]
-pub struct KeyValueProvider {
-    source: crate::ConfigSource,
-    values: Vec<KeyValueBinding>,
-}
-
-#[derive(Clone, Debug)]
-struct KeyValueBinding {
-    path: String,
-    value: String,
-}
-
-impl Default for KeyValueProvider {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl KeyValueProvider {
-    /// Create an empty provider with a generic provenance label.
-    pub fn new() -> Self {
-        Self::named("key/value overrides")
-    }
-
-    /// Create an empty provider with a custom provenance label.
-    ///
-    /// The label should identify the source without including secret values.
-    pub fn named(source: impl Into<String>) -> Self {
-        Self {
-            source: crate::ConfigSource::new(source),
-            values: Vec::new(),
-        }
-    }
-
-    /// Add a dotted configuration path and its string value.
-    pub fn with(mut self, path: impl Into<String>, value: impl Into<String>) -> Self {
-        self.values.push(KeyValueBinding {
-            path: path.into(),
-            value: value.into(),
-        });
-        self
-    }
-
-    /// Add multiple dotted configuration paths and string values.
-    pub fn with_pairs<I, K, V>(mut self, values: I) -> Self
-    where
-        I: IntoIterator<Item = (K, V)>,
-        K: Into<String>,
-        V: Into<String>,
-    {
-        self.values
-            .extend(values.into_iter().map(|(path, value)| KeyValueBinding {
-                path: path.into(),
-                value: value.into(),
-            }));
-        self
-    }
-}
-
-impl ConfigProvider for KeyValueProvider {
-    fn load_partial<T: DeserializeOwned>(&self) -> Result<T, ConfigError> {
-        load_mapped_values(
-            "key/value",
-            self.values.iter().map(|binding| MappedValue {
-                path: binding.path.split('.').map(str::to_owned).collect(),
-                variable: binding.path.clone(),
-                value: binding.value.clone(),
-            }),
-        )
-    }
-
-    fn source(&self) -> crate::ConfigSource {
-        self.source.clone()
-    }
-}
-
-#[derive(Clone, Debug)]
-struct MappedValue {
-    path: Vec<String>,
-    variable: String,
-    value: String,
 }
 
 impl EnvProvider {
@@ -245,7 +166,9 @@ impl EnvProvider {
             )?);
         }
 
-        load_mapped_values(provider_name, mapped)
+        load_mapped_values(mapped)
+            .map_err(EnvProviderError::from)
+            .map_err(|error| ConfigError::provider(provider_name, error))
     }
 }
 
@@ -263,12 +186,6 @@ fn env_key_path(key: &str) -> Vec<String> {
     key.split(NESTED_SEPARATOR)
         .map(str::to_ascii_lowercase)
         .collect()
-}
-
-#[derive(Debug)]
-enum EnvNode {
-    Branch(BTreeMap<String, EnvNode>),
-    Leaf { variable: String, value: String },
 }
 
 fn mapped_env_value(
@@ -289,389 +206,7 @@ fn mapped_env_value(
         })?
         .to_owned();
 
-    Ok(MappedValue {
-        path,
-        variable: variable.to_owned(),
-        value,
-    })
-}
-
-fn load_mapped_values<T>(
-    provider_name: &'static str,
-    values: impl IntoIterator<Item = MappedValue>,
-) -> Result<T, ConfigError>
-where
-    T: DeserializeOwned,
-{
-    let mut root = EnvNode::Branch(BTreeMap::new());
-    for value in values {
-        insert_mapped_value(provider_name, &mut root, value)?;
-    }
-
-    T::deserialize(EnvNodeDeserializer::new(&root))
-        .map_err(|err| ConfigError::provider(provider_name, err))
-}
-
-fn insert_mapped_value(
-    provider_name: &'static str,
-    root: &mut EnvNode,
-    mapped: MappedValue,
-) -> Result<(), ConfigError> {
-    let MappedValue {
-        path,
-        variable,
-        value,
-    } = mapped;
-
-    if path.is_empty() || path.iter().any(String::is_empty) {
-        return Err(ConfigError::provider(
-            provider_name,
-            EnvProviderError::ConflictingPath {
-                path: path.join("."),
-            },
-        ));
-    }
-
-    let mut node = root;
-    for (index, segment) in path.iter().enumerate() {
-        let is_leaf = index + 1 == path.len();
-        let EnvNode::Branch(children) = node else {
-            return Err(ConfigError::provider(
-                provider_name,
-                EnvProviderError::ConflictingPath {
-                    path: path.join("."),
-                },
-            ));
-        };
-
-        if is_leaf {
-            children.insert(
-                segment.clone(),
-                EnvNode::Leaf {
-                    variable: variable.clone(),
-                    value: value.clone(),
-                },
-            );
-            return Ok(());
-        }
-
-        node = children
-            .entry(segment.clone())
-            .or_insert_with(|| EnvNode::Branch(BTreeMap::new()));
-    }
-
-    Ok(())
-}
-
-struct EnvNodeDeserializer<'a> {
-    node: &'a EnvNode,
-}
-
-impl<'a> EnvNodeDeserializer<'a> {
-    fn new(node: &'a EnvNode) -> Self {
-        Self { node }
-    }
-
-    fn leaf(&self) -> Result<(&'a str, &'a str), EnvProviderError> {
-        match self.node {
-            EnvNode::Leaf { variable, value } => Ok((variable, value)),
-            EnvNode::Branch(_) => Err(EnvProviderError::InvalidValue {
-                variable: "<nested environment mapping>".to_owned(),
-                message: "expected a scalar value".to_owned(),
-            }),
-        }
-    }
-
-    fn invalid(variable: &str, message: impl fmt::Display) -> EnvProviderError {
-        EnvProviderError::InvalidValue {
-            variable: variable.to_owned(),
-            message: message.to_string(),
-        }
-    }
-
-    fn json_value(&self) -> Result<(&'a str, serde_json::Value), EnvProviderError> {
-        let (variable, value) = self.leaf()?;
-        let value = serde_json::from_str(value).map_err(|err| Self::invalid(variable, err))?;
-        Ok((variable, value))
-    }
-}
-
-macro_rules! deserialize_number {
-    ($method:ident, $visit:ident, $ty:ty) => {
-        fn $method<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-        where
-            V: Visitor<'de>,
-        {
-            let (variable, value) = self.leaf()?;
-            let parsed = value
-                .parse::<$ty>()
-                .map_err(|err| Self::invalid(variable, err))?;
-            visitor.$visit(parsed)
-        }
-    };
-}
-
-impl<'de> de::Deserializer<'de> for EnvNodeDeserializer<'de> {
-    type Error = EnvProviderError;
-
-    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        match self.node {
-            EnvNode::Branch(children) => visitor.visit_map(EnvMapAccess::new(children)),
-            EnvNode::Leaf { value, .. } => visitor.visit_borrowed_str(value),
-        }
-    }
-
-    fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        let (variable, value) = self.leaf()?;
-        let parsed = value
-            .parse::<bool>()
-            .map_err(|err| Self::invalid(variable, err))?;
-        visitor.visit_bool(parsed)
-    }
-
-    deserialize_number!(deserialize_i8, visit_i8, i8);
-    deserialize_number!(deserialize_i16, visit_i16, i16);
-    deserialize_number!(deserialize_i32, visit_i32, i32);
-    deserialize_number!(deserialize_i64, visit_i64, i64);
-    deserialize_number!(deserialize_i128, visit_i128, i128);
-    deserialize_number!(deserialize_u8, visit_u8, u8);
-    deserialize_number!(deserialize_u16, visit_u16, u16);
-    deserialize_number!(deserialize_u32, visit_u32, u32);
-    deserialize_number!(deserialize_u64, visit_u64, u64);
-    deserialize_number!(deserialize_u128, visit_u128, u128);
-    deserialize_number!(deserialize_f32, visit_f32, f32);
-    deserialize_number!(deserialize_f64, visit_f64, f64);
-
-    fn deserialize_char<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        let (variable, value) = self.leaf()?;
-        let mut chars = value.chars();
-        let Some(value) = chars.next() else {
-            return Err(Self::invalid(variable, "expected one character"));
-        };
-        if chars.next().is_some() {
-            return Err(Self::invalid(variable, "expected one character"));
-        }
-        visitor.visit_char(value)
-    }
-
-    fn deserialize_str<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        let (_, value) = self.leaf()?;
-        visitor.visit_borrowed_str(value)
-    }
-
-    fn deserialize_string<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        let (_, value) = self.leaf()?;
-        visitor.visit_string(value.to_owned())
-    }
-
-    fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        let (_, value) = self.leaf()?;
-        visitor.visit_borrowed_bytes(value.as_bytes())
-    }
-
-    fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        let (_, value) = self.leaf()?;
-        visitor.visit_byte_buf(value.as_bytes().to_vec())
-    }
-
-    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        visitor.visit_some(self)
-    }
-
-    fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        let (variable, value) = self.leaf()?;
-        if value.is_empty() || value == "null" {
-            visitor.visit_unit()
-        } else {
-            Err(Self::invalid(variable, "expected an empty value or `null`"))
-        }
-    }
-
-    fn deserialize_unit_struct<V>(
-        self,
-        _name: &'static str,
-        visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        self.deserialize_unit(visitor)
-    }
-
-    fn deserialize_newtype_struct<V>(
-        self,
-        _name: &'static str,
-        visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        visitor.visit_newtype_struct(self)
-    }
-
-    fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        let (variable, value) = self.json_value()?;
-        de::Deserializer::deserialize_seq(value, visitor)
-            .map_err(|err| Self::invalid(variable, err))
-    }
-
-    fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        let (variable, value) = self.json_value()?;
-        de::Deserializer::deserialize_seq(value, visitor)
-            .map_err(|err| Self::invalid(variable, err))
-    }
-
-    fn deserialize_tuple_struct<V>(
-        self,
-        _name: &'static str,
-        _len: usize,
-        visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        let (variable, value) = self.json_value()?;
-        de::Deserializer::deserialize_seq(value, visitor)
-            .map_err(|err| Self::invalid(variable, err))
-    }
-
-    fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        match self.node {
-            EnvNode::Branch(children) => visitor.visit_map(EnvMapAccess::new(children)),
-            EnvNode::Leaf { .. } => {
-                let (variable, value) = self.json_value()?;
-                de::Deserializer::deserialize_map(value, visitor)
-                    .map_err(|err| Self::invalid(variable, err))
-            }
-        }
-    }
-
-    fn deserialize_struct<V>(
-        self,
-        _name: &'static str,
-        _fields: &'static [&'static str],
-        visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        self.deserialize_map(visitor)
-    }
-
-    fn deserialize_enum<V>(
-        self,
-        _name: &'static str,
-        _variants: &'static [&'static str],
-        visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        let (_, value) = self.leaf()?;
-        visitor.visit_enum(value.into_deserializer())
-    }
-
-    fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        self.deserialize_str(visitor)
-    }
-
-    fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        visitor.visit_unit()
-    }
-}
-
-struct EnvMapAccess<'a> {
-    iter: std::collections::btree_map::Iter<'a, String, EnvNode>,
-    value: Option<&'a EnvNode>,
-}
-
-impl<'a> EnvMapAccess<'a> {
-    fn new(children: &'a BTreeMap<String, EnvNode>) -> Self {
-        Self {
-            iter: children.iter(),
-            value: None,
-        }
-    }
-}
-
-impl<'de> MapAccess<'de> for EnvMapAccess<'de> {
-    type Error = EnvProviderError;
-
-    fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
-    where
-        K: DeserializeSeed<'de>,
-    {
-        let Some((key, value)) = self.iter.next() else {
-            return Ok(None);
-        };
-        self.value = Some(value);
-        seed.deserialize(key.as_str().into_deserializer()).map(Some)
-    }
-
-    fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
-    where
-        V: DeserializeSeed<'de>,
-    {
-        let value = self
-            .value
-            .take()
-            .expect("serde requested a map value before a map key");
-        seed.deserialize(EnvNodeDeserializer::new(value))
-    }
-}
-
-impl de::Error for EnvProviderError {
-    fn custom<T>(message: T) -> Self
-    where
-        T: fmt::Display,
-    {
-        Self::InvalidValue {
-            variable: "<environment>".to_owned(),
-            message: message.to_string(),
-        }
-    }
+    Ok(MappedValue::new(path, variable.to_owned(), value))
 }
 
 #[cfg(test)]
@@ -812,36 +347,5 @@ mod tests {
             .unwrap();
 
         assert_eq!(config.port, 8443);
-    }
-
-    #[test]
-    fn key_value_provider_decodes_nested_typed_values() {
-        let provider = KeyValueProvider::named("CLI overrides").with_pairs([
-            ("api_key", "secret"),
-            ("source_path", "/srv/app"),
-            ("port", "8443"),
-            ("enabled", "true"),
-            ("database.url", "postgres://db/app"),
-            ("tags", r#"["cli","worker"]"#),
-        ]);
-
-        let config = provider.load_partial::<TestConfig>().unwrap();
-
-        assert_eq!(config.port, 8443);
-        assert!(config.enabled);
-        assert_eq!(config.database.url, "postgres://db/app");
-        assert_eq!(config.tags, ["cli", "worker"]);
-        assert_eq!(provider.source().label(), "CLI overrides");
-    }
-
-    #[test]
-    fn key_value_provider_rejects_conflicting_paths() {
-        let provider = KeyValueProvider::new()
-            .with("database", "scalar")
-            .with("database.url", "postgres://db/app");
-
-        let error = provider.load_partial::<TestConfig>().unwrap_err();
-
-        assert!(error.to_string().contains("database.url"));
     }
 }

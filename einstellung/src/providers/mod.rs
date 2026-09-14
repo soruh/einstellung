@@ -12,6 +12,8 @@ mod env;
 mod format;
 #[cfg(feature = "json")]
 mod json;
+#[cfg(feature = "env")]
+mod key_value;
 #[cfg(feature = "toml")]
 mod toml;
 #[cfg(feature = "yaml")]
@@ -20,11 +22,13 @@ mod yaml;
 #[cfg(feature = "dotenv")]
 pub use dotenv::DotenvProvider;
 #[cfg(feature = "env")]
-pub use env::{EnvProvider, EnvProviderError, KeyValueProvider};
+pub use env::{EnvProvider, EnvProviderError};
 #[cfg(any(feature = "json", feature = "toml", feature = "yaml"))]
 pub use format::{ConfigFormat, FormatProvider, FormatProviderError};
 #[cfg(feature = "json")]
 pub use json::JsonFileProvider;
+#[cfg(feature = "env")]
+pub use key_value::{KeyValueProvider, KeyValueProviderError};
 #[cfg(feature = "toml")]
 pub use toml::TomlFileProvider;
 #[cfg(feature = "yaml")]

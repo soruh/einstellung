@@ -45,11 +45,37 @@ impl<'i> ConfigProvider for TomlFileProvider<'i> {
         self.0.with_reader(|reader| {
             let mut buffer = String::new();
             reader.read_to_string(&mut buffer)?;
-            Ok(::toml::from_str(&buffer)?)
+            ::toml::from_str(&buffer)
+                .map_err(|error| crate::TomlError::with_input(error, &buffer).into())
         })
     }
 
     fn source(&self) -> crate::ConfigSource {
         crate::ConfigSource::new(self.0.source_label("toml"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde::Deserialize;
+
+    use super::*;
+
+    #[test]
+    fn parse_errors_do_not_render_source_lines() {
+        #[derive(Debug, Deserialize)]
+        #[allow(dead_code)]
+        struct Config {
+            api_key: String,
+        }
+
+        let err = TomlFileProvider::from_contents("api_key = \"super-secret\n")
+            .load_partial::<Config>()
+            .unwrap_err();
+        let message = err.to_string();
+
+        assert!(!message.contains("super-secret"), "{message}");
+        assert!(message.contains("line 1"), "{message}");
+        assert!(message.contains("column"), "{message}");
     }
 }

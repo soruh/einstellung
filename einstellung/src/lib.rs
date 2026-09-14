@@ -525,9 +525,11 @@ where
 #[cfg(feature = "yaml")]
 /// YAML parser error with source snippets suppressed in its default display.
 ///
-/// The underlying [`serde_saphyr::Error`] remains available through [`std::error::Error::source`]
-/// so applications can opt into richer parser-specific diagnostics explicitly. Suppressing
-/// snippets by default avoids logging unrelated secret-bearing lines surrounding a syntax error.
+/// The underlying [`serde_saphyr::Error`] remains available through [`YamlError::parser_error`]
+/// so applications can opt into richer parser-specific diagnostics explicitly. It is not exposed
+/// through the normal error source chain because generic error reporters commonly print that chain.
+/// Suppressing snippets by default avoids logging unrelated secret-bearing lines surrounding a
+/// syntax error.
 #[derive(Debug)]
 pub struct YamlError(serde_saphyr::Error);
 
@@ -542,17 +544,90 @@ impl Display for YamlError {
 }
 
 #[cfg(feature = "yaml")]
-impl StdError for YamlError {
-    fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        Some(&self.0)
+impl YamlError {
+    /// Borrow the backend parser error for explicitly requested detailed diagnostics.
+    pub fn parser_error(&self) -> &serde_saphyr::Error {
+        &self.0
     }
 }
+
+#[cfg(feature = "yaml")]
+impl StdError for YamlError {}
 
 #[cfg(feature = "yaml")]
 impl From<serde_saphyr::Error> for YamlError {
     fn from(error: serde_saphyr::Error) -> Self {
         Self(error)
     }
+}
+
+#[cfg(feature = "toml")]
+/// TOML parser error with source text suppressed in its default display.
+#[derive(Debug)]
+pub struct TomlError {
+    error: ::toml::de::Error,
+    location: Option<(usize, usize)>,
+}
+
+#[cfg(feature = "toml")]
+impl TomlError {
+    pub(crate) fn with_input(error: ::toml::de::Error, input: &str) -> Self {
+        let location = error.span().map(|span| line_column(input, span.start));
+        Self { error, location }
+    }
+
+    /// Borrow the backend parser error for explicitly requested detailed diagnostics.
+    pub fn parser_error(&self) -> &::toml::de::Error {
+        &self.error
+    }
+}
+
+#[cfg(feature = "toml")]
+impl Display for TomlError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some((line, column)) = self.location {
+            write!(
+                f,
+                "{} at line {line}, column {column}",
+                self.error.message()
+            )
+        } else {
+            let mut safe = self.error.clone();
+            safe.set_input(None);
+            f.write_str(safe.to_string().trim_end())
+        }
+    }
+}
+
+#[cfg(feature = "toml")]
+impl StdError for TomlError {}
+
+#[cfg(feature = "toml")]
+impl From<::toml::de::Error> for TomlError {
+    fn from(error: ::toml::de::Error) -> Self {
+        Self {
+            error,
+            location: None,
+        }
+    }
+}
+
+#[cfg(feature = "toml")]
+fn line_column(input: &str, offset: usize) -> (usize, usize) {
+    let mut line = 1;
+    let mut column = 1;
+    for (index, ch) in input.char_indices() {
+        if index >= offset {
+            break;
+        }
+        if ch == '\n' {
+            line += 1;
+            column = 1;
+        } else {
+            column += 1;
+        }
+    }
+    (line, column)
 }
 
 /// Errors which can be produced while loading, merging, or building a configuration.
@@ -572,7 +647,7 @@ pub enum ConfigError {
 
     #[cfg(feature = "toml")]
     #[error("TOML Parse Error: {0}")]
-    Toml(#[from] ::toml::de::Error),
+    Toml(#[from] TomlError),
 
     #[error("{provider} provider error: {source}")]
     Provider {
@@ -623,6 +698,13 @@ pub enum ConfigError {
 impl From<serde_saphyr::Error> for ConfigError {
     fn from(error: serde_saphyr::Error) -> Self {
         Self::Yaml(error.into())
+    }
+}
+
+#[cfg(feature = "toml")]
+impl From<::toml::de::Error> for ConfigError {
+    fn from(error: ::toml::de::Error) -> Self {
+        Self::Toml(error.into())
     }
 }
 

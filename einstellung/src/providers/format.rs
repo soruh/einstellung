@@ -135,7 +135,8 @@ impl ConfigProvider for FormatProvider<'_> {
             ConfigFormat::Toml => self.source.with_reader(|reader| {
                 let mut buffer = String::new();
                 reader.read_to_string(&mut buffer)?;
-                Ok(::toml::from_str(&buffer)?)
+                ::toml::from_str(&buffer)
+                    .map_err(|error| crate::TomlError::with_input(error, &buffer).into())
             }),
             #[cfg(feature = "yaml")]
             ConfigFormat::Yaml => self

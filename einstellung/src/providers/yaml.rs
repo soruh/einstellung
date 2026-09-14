@@ -97,7 +97,7 @@ mod tests {
             message.contains("duplicate mapping key: thing"),
             "{message}"
         );
-        assert!(message.contains("line 3 column 1"), "{message}");
+        assert!(message.contains("line 3, column 1"), "{message}");
     }
 
     #[test]
@@ -161,6 +161,6 @@ mod tests {
         let message = err.to_string();
 
         assert!(message.starts_with("YAML Parse Error:"));
-        assert!(message.contains("line 1 column 10"));
+        assert!(message.contains("line 1, column 10"), "{message}");
     }
 }

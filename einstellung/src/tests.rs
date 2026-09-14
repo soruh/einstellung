@@ -1118,6 +1118,63 @@ fn tracked_partial_can_be_composed_without_losing_source_history() {
     );
 }
 
+struct NestedCompositionFailureProvider;
+
+impl crate::ConfigProvider for NestedCompositionFailureProvider {
+    fn load_partial<T: serde::de::DeserializeOwned>(&self) -> Result<T, ConfigError> {
+        let inner = AppConfig::load_partial(&JsonFileProvider::from_contents(
+            r#"{ "app_name": "inner", "network": { "listen": { "address": "10.0.0.1" } } }"#,
+        ))
+        .unwrap();
+        let error = match AppConfig::builder()
+            .layer_named("inner base", inner)
+            .provider(&JsonFileProvider::from_contents("{"))
+            .build_partial()
+        {
+            Ok(_) => panic!("invalid nested provider unexpectedly produced a partial config"),
+            Err(error) => error,
+        };
+        Err(error)
+    }
+
+    fn source(&self) -> crate::ConfigSource {
+        crate::ConfigSource::new("delegating provider")
+    }
+}
+
+#[test]
+fn nested_composition_errors_merge_provenance_histories() {
+    let outer = AppConfig::load_partial(&JsonFileProvider::from_contents(
+        r#"{ "app_name": "outer", "network": { "listen": { "address": "192.168.0.1" } } }"#,
+    ))
+    .unwrap();
+
+    let error = match AppConfig::builder()
+        .layer_named("outer base", outer)
+        .provider(&NestedCompositionFailureProvider)
+        .build_partial()
+    {
+        Ok(_) => panic!("nested composition unexpectedly produced a partial config"),
+        Err(error) => error,
+    };
+
+    assert_eq!(
+        error
+            .provenance()
+            .unwrap()
+            .explain("app_name")
+            .unwrap()
+            .iter()
+            .map(crate::ConfigSource::label)
+            .collect::<Vec<_>>(),
+        vec!["outer base", "inner base"]
+    );
+    assert_eq!(
+        error.config_source().unwrap().label(),
+        "delegating provider"
+    );
+}
+
 #[test]
 fn build_partial_errors_retain_prior_provenance() {
     let base = AppConfig::load_partial(&JsonFileProvider::from_contents(

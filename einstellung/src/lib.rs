@@ -1061,9 +1061,27 @@ impl ConfigError {
     }
 
     fn with_provenance(self, provenance: ConfigProvenance) -> Self {
-        Self::Composition {
-            provenance,
-            error: Box::new(self),
+        match self {
+            Self::Source { source, error } => Self::Source {
+                source,
+                error: Box::new(error.with_provenance(provenance)),
+            },
+            Self::Path { path, error } => Self::Path {
+                path,
+                error: Box::new(error.with_provenance(provenance)),
+            },
+            Self::Composition {
+                provenance: inner,
+                error,
+            } => {
+                let mut provenance = provenance;
+                provenance.extend(inner);
+                Self::Composition { provenance, error }
+            }
+            error => Self::Composition {
+                provenance,
+                error: Box::new(error),
+            },
         }
     }
 

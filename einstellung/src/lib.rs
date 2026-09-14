@@ -1252,8 +1252,9 @@ pub type MergeFunction<T, E> = fn(T, T) -> Result<T, E>;
 /// Wrapper for secret configuration values.
 ///
 /// `Secret<T>` deserializes transparently, but deliberately does not implement [`Serialize`] and
-/// redacts its [`Debug`](std::fmt::Debug) representation. Access to the wrapped value is explicit
-/// through [`Secret::expose_secret`], and no mutable accessor is provided.
+/// redacts both its [`Debug`](std::fmt::Debug) and [`Display`] representations. Access to the
+/// wrapped value is explicit through [`Secret::expose_secret`], and no mutable accessor is
+/// provided.
 ///
 /// This protects common logging and accidental-serialization paths. Built-in TOML, YAML, and
 /// dotenv providers suppress raw source lines in their normal parse diagnostics. Callers that
@@ -1295,6 +1296,12 @@ impl<T: Default> Default for Secret<T> {
 impl<T> std::fmt::Debug for Secret<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("Secret([REDACTED])")
+    }
+}
+
+impl<T> Display for Secret<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("[REDACTED]")
     }
 }
 

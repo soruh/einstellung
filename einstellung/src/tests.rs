@@ -139,8 +139,11 @@ fn secret_values_deserialize_but_debug_is_redacted() {
 
     assert_eq!(config.api_key.expose_secret(), "super-secret-value");
     let debug = format!("{config:?}");
+    let display = format!("{}", config.api_key);
     assert!(debug.contains("[REDACTED]"));
+    assert_eq!(display, "[REDACTED]");
     assert!(!debug.contains("super-secret-value"));
+    assert!(!display.contains("super-secret-value"));
 }
 
 #[test]

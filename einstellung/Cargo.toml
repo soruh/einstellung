@@ -23,10 +23,11 @@ insta = "1.46.3"
 [features]
 derive = ["dep:einstellung_derive"]
 
+env = ["dep:serde_json"]
 json = ["dep:serde_json"]
 toml = ["dep:toml"]
 yaml = ["dep:serde_yaml"]
 
-full = ["json", "toml", "yaml", "derive"]
+full = ["env", "json", "toml", "yaml", "derive"]
 
 default = ["full"]

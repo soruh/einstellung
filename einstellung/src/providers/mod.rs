@@ -4,6 +4,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[cfg(feature = "env")]
+mod env;
 #[cfg(feature = "json")]
 mod json;
 #[cfg(feature = "toml")]
@@ -11,6 +13,8 @@ mod toml;
 #[cfg(feature = "yaml")]
 mod yaml;
 
+#[cfg(feature = "env")]
+pub use env::{EnvProvider, EnvProviderError};
 #[cfg(feature = "json")]
 pub use json::JsonFileProvider;
 #[cfg(feature = "toml")]

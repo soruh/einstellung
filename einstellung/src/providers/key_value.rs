@@ -469,7 +469,10 @@ impl<'de> MapAccess<'de> for ValueMapAccess<'de> {
         let value = self
             .value
             .take()
-            .expect("serde requested a map value before a map key");
+            .ok_or_else(|| KeyValueProviderError::InvalidValue {
+                input: "<nested mapping>".to_owned(),
+                message: "map value requested before map key".to_owned(),
+            })?;
         seed.deserialize(ValueNodeDeserializer::new(value))
     }
 }

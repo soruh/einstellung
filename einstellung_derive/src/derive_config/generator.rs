@@ -5,7 +5,6 @@ use super::transformer::{
 };
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote, quote_spanned};
-use std::fmt::Write;
 use syn::{parse_quote_spanned, spanned::Spanned};
 
 impl ToTokens for TransformedStruct {
@@ -27,9 +26,10 @@ fn path_to_litstr(path: &syn::Path) -> syn::LitStr {
     }
 
     if let Some(first) = iter.next() {
-        write!(&mut s, "{}", first.ident).unwrap();
+        s.push_str(&first.ident.to_string());
         for seg in iter {
-            write!(&mut s, "::{}", seg.ident).unwrap();
+            s.push_str("::");
+            s.push_str(&seg.ident.to_string());
         }
     }
 

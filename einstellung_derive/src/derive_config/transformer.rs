@@ -1,6 +1,6 @@
 use super::parser::{ConfigFieldReceiver, ConfigStructReceiver};
 use crate::derive_config::parser::{DefaultStrategy, MergeStrategyReceiver};
-use syn::{GenericArgument, PathArguments, Type};
+use syn::{GenericArgument, PathArguments, Type, spanned::Spanned};
 
 #[derive(Debug)]
 pub struct TransformedStruct {
@@ -88,10 +88,12 @@ pub fn transform_struct(mut receiver: ConfigStructReceiver) -> syn::Result<Trans
     let vis = receiver.vis;
     let einstellung = receiver.einstellung;
 
-    let struct_data = receiver
-        .data
-        .take_struct()
-        .expect("Only named structs supported");
+    let struct_data = receiver.data.take_struct().ok_or_else(|| {
+        syn::Error::new(
+            complete_ident.span(),
+            "Config can only be derived for structs with named fields",
+        )
+    })?;
 
     let any_freezable = receiver.freezable || struct_data.iter().any(|field| field.freezable);
     let deny_unknown_fields = receiver.deny_unknown_fields;
@@ -135,7 +137,10 @@ fn transform_field(
 ) -> syn::Result<TransformedField> {
     let attrs = field.take_partial_attrs();
 
-    let ident = field.ident.unwrap();
+    let ident = field
+        .ident
+        .clone()
+        .ok_or_else(|| syn::Error::new(field.ty.span(), "Config fields must be named"))?;
     let complete_type = field.ty;
 
     let inner_type_if_optional = extract_type_from_option(&complete_type);

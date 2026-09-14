@@ -109,6 +109,12 @@ mod derive_config;
 ///
 /// #[derive(Config, Debug)]
 /// #[config(partial(derive(Clone)))]
+/// pub struct TlsConfig {
+///     pub cert_path: String,
+/// }
+///
+/// #[derive(Config, Debug)]
+/// #[config(partial(derive(Clone)))]
 /// pub struct ServerConfig {
 ///     // Required field: will fail at .build() if not provided by any layer.
 ///     pub host: String,

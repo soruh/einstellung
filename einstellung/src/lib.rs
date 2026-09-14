@@ -983,9 +983,13 @@ impl ConfigError {
 
     /// Attach the external configuration source responsible for this error.
     pub fn with_source(self, source: ConfigSource) -> Self {
-        Self::Source {
-            source,
-            error: Box::new(self),
+        if matches!(&self, Self::Source { source: current, .. } if current == &source) {
+            self
+        } else {
+            Self::Source {
+                source,
+                error: Box::new(self),
+            }
         }
     }
 
@@ -995,9 +999,14 @@ impl ConfigError {
     /// with a conversion or lookup failure. The path is metadata only; it does not alter the
     /// displayed error text.
     pub fn with_logical_path(self, path: impl Into<String>) -> Self {
-        Self::Path {
-            path: path.into(),
-            error: Box::new(self),
+        let path = path.into();
+        if self.logical_path().as_deref() == Some(path.as_str()) {
+            self
+        } else {
+            Self::Path {
+                path,
+                error: Box::new(self),
+            }
         }
     }
 
@@ -1093,7 +1102,9 @@ impl ConfigError {
             .field_provenance()
             .map(|sources| sources.iter().collect::<Vec<_>>())
             .unwrap_or_default();
-        if let Some(source) = self.config_source() {
+        if let Some(source) = self.config_source()
+            && sources.last() != Some(&source)
+        {
             sources.push(source);
         }
         sources

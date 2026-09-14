@@ -305,6 +305,32 @@ fn custom_errors_can_attach_logical_paths() {
 }
 
 #[test]
+fn repeated_diagnostic_context_is_idempotent() {
+    let source = crate::ConfigSource::new("vault");
+    let error = ConfigError::provider(
+        "secret store",
+        std::io::Error::new(std::io::ErrorKind::InvalidData, "lookup failed"),
+    )
+    .with_logical_path("model.remote.api_key")
+    .with_logical_path("model.remote.api_key")
+    .with_source(source.clone())
+    .with_source(source);
+
+    assert_eq!(
+        error.logical_path().as_deref(),
+        Some("model.remote.api_key")
+    );
+    assert_eq!(error.config_source().unwrap().label(), "vault");
+    assert_eq!(
+        error
+            .to_string()
+            .matches("configuration source vault")
+            .count(),
+        1
+    );
+}
+
+#[test]
 fn provider_error_preserves_source() {
     use std::error::Error;
 

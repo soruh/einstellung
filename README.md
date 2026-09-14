@@ -48,7 +48,7 @@ You can customize enabled features to reduce compilation time or binary size:
 - `derive` (default): Enables the `#[derive(Config)]` macro.
 - `json` (default): Enables `JsonFileProvider`.
 - `toml` (default): Enables `TomlFileProvider`.
-- `yaml` (default): Enables `YamlFileProvider`.
+- `yaml` (default): Enables `YamlFileProvider`, backed by the maintained `serde_yaml_ng` fork.
 - `env`: Enables the allowlist-first `EnvProvider`.
 - `dotenv`: Enables `DotenvProvider` and `env`. Dotenv files are parsed without
   mutating the process environment.

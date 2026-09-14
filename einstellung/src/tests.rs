@@ -423,6 +423,13 @@ struct ConfigFreezable2 {
     private_key: String,
 }
 
+#[derive(Config, Debug)]
+#[config(crate = crate)]
+struct NestedFreezableConfig {
+    #[config(subconfig)]
+    nested: ConfigFreezable1,
+}
+
 const KEY: &str = "uILfaXH0dj9qUGV71O/Wyg==";
 
 #[test]
@@ -491,6 +498,35 @@ fn config_freeze_complete() {
         expected
     );
     assert_eq!(overwrite.merge(frozen).unwrap().build().unwrap(), expected);
+}
+
+#[test]
+fn nested_freeze_collision_includes_outer_field_context() {
+    let mut first = NestedFreezableConfig::load_partial(&JsonFileProvider::from_contents(
+        &format!("{{ \"nested\": {{ \"private_key\": {KEY:?} }} }}"),
+    ))
+    .unwrap();
+    first.nested = first.nested.map(Freezable::freeze);
+
+    let mut second = NestedFreezableConfig::load_partial(&JsonFileProvider::from_contents(
+        r#"{ "nested": { "private_key": "overwritten key" } }"#,
+    ))
+    .unwrap();
+    second.nested = second.nested.map(Freezable::freeze);
+
+    let error = match first.merge(second) {
+        Ok(_) => panic!("nested frozen merge unexpectedly succeeded"),
+        Err(error) => error,
+    };
+    assert_eq!(error.logical_path().as_deref(), Some("nested.private_key"));
+    assert_eq!(
+        error.field_path().unwrap().to_string(),
+        "NestedFreezableConfig::nested::private_key"
+    );
+    assert!(matches!(
+        error.root_cause(),
+        ConfigError::FreezeCollision(_)
+    ));
 }
 
 #[test]

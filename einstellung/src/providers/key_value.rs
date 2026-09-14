@@ -217,16 +217,17 @@ impl<'a> ValueNodeDeserializer<'a> {
         }
     }
 
-    fn invalid(input: &str, message: impl fmt::Display) -> KeyValueProviderError {
+    fn invalid(input: &str, message: &'static str) -> KeyValueProviderError {
         KeyValueProviderError::InvalidValue {
             input: input.to_owned(),
-            message: message.to_string(),
+            message: message.to_owned(),
         }
     }
 
     fn json_value(&self) -> Result<(&'a str, serde_json::Value), KeyValueProviderError> {
         let (input, value) = self.leaf()?;
-        let value = serde_json::from_str(value).map_err(|err| Self::invalid(input, err))?;
+        let value =
+            serde_json::from_str(value).map_err(|_| Self::invalid(input, "invalid JSON value"))?;
         Ok((input, value))
     }
 }
@@ -240,7 +241,7 @@ macro_rules! deserialize_number {
             let (input, value) = self.leaf()?;
             let parsed = value
                 .parse::<$ty>()
-                .map_err(|err| Self::invalid(input, err))?;
+                .map_err(|_| Self::invalid(input, concat!("expected ", stringify!($ty))))?;
             visitor.$visit(parsed)
         }
     };
@@ -266,7 +267,7 @@ impl<'de> de::Deserializer<'de> for ValueNodeDeserializer<'de> {
         let (input, value) = self.leaf()?;
         let parsed = value
             .parse::<bool>()
-            .map_err(|err| Self::invalid(input, err))?;
+            .map_err(|_| Self::invalid(input, "expected a boolean"))?;
         visitor.visit_bool(parsed)
     }
 
@@ -376,7 +377,8 @@ impl<'de> de::Deserializer<'de> for ValueNodeDeserializer<'de> {
         V: Visitor<'de>,
     {
         let (input, value) = self.json_value()?;
-        de::Deserializer::deserialize_seq(value, visitor).map_err(|err| Self::invalid(input, err))
+        de::Deserializer::deserialize_seq(value, visitor)
+            .map_err(|_| Self::invalid(input, "value does not match expected sequence"))
     }
 
     fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
@@ -384,7 +386,8 @@ impl<'de> de::Deserializer<'de> for ValueNodeDeserializer<'de> {
         V: Visitor<'de>,
     {
         let (input, value) = self.json_value()?;
-        de::Deserializer::deserialize_seq(value, visitor).map_err(|err| Self::invalid(input, err))
+        de::Deserializer::deserialize_seq(value, visitor)
+            .map_err(|_| Self::invalid(input, "value does not match expected sequence"))
     }
 
     fn deserialize_tuple_struct<V>(
@@ -397,7 +400,8 @@ impl<'de> de::Deserializer<'de> for ValueNodeDeserializer<'de> {
         V: Visitor<'de>,
     {
         let (input, value) = self.json_value()?;
-        de::Deserializer::deserialize_seq(value, visitor).map_err(|err| Self::invalid(input, err))
+        de::Deserializer::deserialize_seq(value, visitor)
+            .map_err(|_| Self::invalid(input, "value does not match expected sequence"))
     }
 
     fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -409,7 +413,7 @@ impl<'de> de::Deserializer<'de> for ValueNodeDeserializer<'de> {
             ValueNode::Leaf { .. } => {
                 let (input, value) = self.json_value()?;
                 de::Deserializer::deserialize_map(value, visitor)
-                    .map_err(|err| Self::invalid(input, err))
+                    .map_err(|_| Self::invalid(input, "value does not match expected map"))
             }
         }
     }
@@ -498,13 +502,13 @@ impl<'de> MapAccess<'de> for ValueMapAccess<'de> {
 }
 
 impl de::Error for KeyValueProviderError {
-    fn custom<T>(message: T) -> Self
+    fn custom<T>(_message: T) -> Self
     where
         T: fmt::Display,
     {
         Self::InvalidValue {
             input: "<key/value>".to_owned(),
-            message: message.to_string(),
+            message: "value does not match target type".to_owned(),
         }
     }
 }
@@ -548,6 +552,26 @@ mod tests {
         assert_eq!(config.database.url, "postgres://db/app");
         assert_eq!(config.tags, ["cli", "worker"]);
         assert_eq!(provider.source().label(), "CLI overrides");
+    }
+
+    #[test]
+    fn nested_type_errors_do_not_expose_values() {
+        #[derive(Debug, Deserialize)]
+        #[allow(dead_code)]
+        struct Config {
+            ports: Vec<u16>,
+        }
+
+        let error = KeyValueProvider::new()
+            .with("ports", r#"["super-secret"]"#)
+            .load_partial::<Config>()
+            .unwrap_err();
+        let display = error.to_string();
+        let debug = format!("{error:?}");
+
+        assert!(!display.contains("super-secret"), "{display}");
+        assert!(!debug.contains("super-secret"), "{debug}");
+        assert_eq!(error.logical_path().as_deref(), Some("ports"));
     }
 
     #[test]

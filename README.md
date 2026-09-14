@@ -268,6 +268,13 @@ retain data from earlier layers, so `explain()` deliberately preserves the full
 supply history rather than pretending there is always one winner. Values filled
 by `#[config(default ...)]` are attributed to `field default`.
 
+`provenance().layers()` separately lists every successfully merged configuration
+layer, including empty layers that supplied no concrete field values.
+`explain_nearest(path)` first looks for the exact field, then its nearest supplied
+subconfig ancestor, and finally the merged layer history. This lets missing-field
+diagnostics still answer which sources were considered when the missing leaf was
+never supplied by any layer.
+
 Builder errors retain the provenance accumulated before the failure, including
 `build_partial()` failures. Use `build_tracked_partial()` when a successfully
 composed partial must keep provenance for later transformation or merging. Feed that
@@ -432,6 +439,10 @@ that omits a field never erases an earlier value and never forces its default.
 
 Please feel free to open an Issue or submit a PR at
 [https://github.com/soruh/einstellung](https://github.com/soruh/einstellung).
+
+Before publishing, run `scripts/verify-packages.sh`. It verifies the packaged
+`einstellung_derive` artifact first, then verifies the packaged `einstellung` crate
+against that exact derive artifact rather than an older registry release.
 
 (This includes confusing/incorrect documentation, bad error messages and missing
 features)

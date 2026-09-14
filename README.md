@@ -188,12 +188,19 @@ sources. Each `.provider(...)` is the next higher-precedence layer. Field-level
 constructs the final configuration. Use `.layer(...)` when a layer has already
 been loaded or transformed (for example, frozen).
 
+When several providers would otherwise have the same generic source label (for
+example, multiple inline JSON layers), use `.provider_named("base defaults",
+&provider)` or `.typed_provider_named(...)` to give that composition step a
+non-secret diagnostic/provenance identity.
+
 `EnvProvider` and `DotenvProvider` deliberately have no "load everything"
 default. `EnvProvider::only(...)` is convenient when environment names map
 directly to lowercase field names; `EnvProvider::prefixed(...)` additionally
-supports `__` for nested fields. Treat these selections as a trust boundary:
-explicitly expose only the secrets and machine-local values that should enter
-the typed configuration. Dotenv selection limits which final keys are loaded, but standard dotenv
+supports `__` for nested fields. Explicit-only process-environment mappings query
+just the configured variable names rather than enumerating unrelated environment
+values; prefix mode necessarily enumerates the environment to discover matching
+names. Treat these selections as a trust boundary: explicitly expose only the
+secrets and machine-local values that should enter the typed configuration. Dotenv selection limits which final keys are loaded, but standard dotenv
 substitution can still read process-environment variables while evaluating a selected value. Use
 `DotenvProvider::without_substitution()` when a local `.env` file must be isolated from process
 environment expansion; escaped and single-quoted dollar signs remain literal.
@@ -203,8 +210,8 @@ For CLI flags, secret stores, or other already-selected string key/value inputs,
 decoding as environment providers. Give it a non-secret source label when
 provenance matters, for example `KeyValueProvider::named("CLI overrides")`.
 For secret-bearing fields, use `Secret<T>`. It deserializes transparently, redacts
-its `Debug` representation, deliberately does not implement `Serialize`, and
-requires an explicit `expose_secret()` call to borrow the value. Keep secret
+its `Debug` and `Display` representations, deliberately does not implement
+`Serialize`, and requires an explicit `expose_secret()` call to borrow the value. Keep secret
 fields private as well if the complete config should not allow replacement after
 construction. `#[config(freezable)]` can prevent a value from being overwritten
 by later configuration layers, but it is a merge policy rather than a secrecy

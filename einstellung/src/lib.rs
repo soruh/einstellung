@@ -29,9 +29,7 @@ pub trait Config: Sized {
 
     /// Load this config as a [`PartialConfig`] for merging with other partial configs.
     fn load_partial(provider: &impl ConfigProvider) -> Result<Self::Partial, ConfigError> {
-        provider
-            .load_partial::<Self::Partial>()
-            .map_err(|error| error.with_source(provider.source()))
+        provider.load_partial_with_source::<Self::Partial>()
     }
 
     /// Load this config in its complete form.
@@ -524,6 +522,16 @@ pub trait Freezable {
 pub trait ConfigProvider {
     /// Load a [`PartialConfig`] (or any other deserializable type) from this provider.
     fn load_partial<T: DeserializeOwned>(&self) -> Result<T, ConfigError>;
+
+    /// Load a value and attach this provider's source identity to any error.
+    ///
+    /// The lower-level [`Self::load_partial`] method deliberately returns the provider's raw
+    /// configuration error. Use this helper when diagnostics should include the same source
+    /// context that [`Config::load_partial`] and [`ConfigBuilder`] attach automatically.
+    fn load_partial_with_source<T: DeserializeOwned>(&self) -> Result<T, ConfigError> {
+        self.load_partial::<T>()
+            .map_err(|error| error.with_source(self.source()))
+    }
 
     /// Describe this provider for diagnostics and provenance.
     ///

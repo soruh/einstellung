@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use crate::{Config, ConfigError, Freezable, JsonFileProvider, PartialConfig};
+use crate::{Config, ConfigError, ConfigProvider, Freezable, JsonFileProvider, PartialConfig};
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
     default,
@@ -1121,6 +1121,18 @@ fn tracked_builder_explains_nested_sources_and_defaults() {
             .label(),
         "field default"
     );
+}
+
+#[test]
+fn contextual_provider_load_attaches_source_to_parse_errors() {
+    let provider = JsonFileProvider::from_contents("{");
+    let error = match provider.load_partial_with_source::<AppConfigPartial>() {
+        Ok(_) => panic!("invalid JSON unexpectedly loaded"),
+        Err(error) => error,
+    };
+
+    assert_eq!(error.config_source().unwrap().label(), "inline json");
+    assert!(matches!(error.root_cause(), ConfigError::Json(_)));
 }
 
 #[test]

@@ -342,3 +342,55 @@ fn config_error_propagates_through_anyhow() {
     let err = fail().unwrap_err();
     assert!(err.downcast_ref::<ConfigError>().is_some());
 }
+
+#[test]
+fn config_builder_merges_providers_in_order() {
+    let base = JsonFileProvider::from_contents(
+        r#"{ "app_name": "base", "network": { "listen": { "address": "192.168.0.1" } } }"#,
+    );
+    let override_layer = JsonFileProvider::from_contents(
+        r#"{ "app_name": "override", "network": { "listen": { "port": 8443 } } }"#,
+    );
+
+    let config = AppConfig::builder()
+        .provider(&base)
+        .provider(&override_layer)
+        .build()
+        .unwrap();
+
+    assert_eq!(config.app_name, "override");
+    assert_eq!(
+        config.network.listen.address,
+        "192.168.0.1".parse::<IpAddr>().unwrap()
+    );
+    assert_eq!(config.network.listen.port, 8443);
+}
+
+#[test]
+fn config_builder_accepts_loaded_layers() {
+    let provider = JsonFileProvider::from_contents(
+        r#"{ "app_name": "layer", "network": { "listen": { "address": "192.168.0.1" } } }"#,
+    );
+    let layer = AppConfig::load_partial(&provider).unwrap();
+
+    let config = AppConfig::builder().layer(layer).build().unwrap();
+
+    assert_eq!(config.app_name, "layer");
+    assert_eq!(config.network.listen.port, 443);
+}
+
+#[test]
+fn config_builder_retains_first_provider_error() {
+    let invalid = JsonFileProvider::from_contents("{");
+    let valid = JsonFileProvider::from_contents(
+        r#"{ "app_name": "valid", "network": { "listen": { "address": "192.168.0.1" } } }"#,
+    );
+
+    let error = AppConfig::builder()
+        .provider(&invalid)
+        .provider(&valid)
+        .build()
+        .unwrap_err();
+
+    assert!(matches!(error, ConfigError::Json(_)));
+}

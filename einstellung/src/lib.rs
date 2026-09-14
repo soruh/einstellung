@@ -33,6 +33,63 @@ pub trait Config: Sized {
     fn load_complete(provider: &impl ConfigProvider) -> Result<Self, ConfigError> {
         Self::load_partial(provider)?.build()
     }
+
+    /// Start a builder for composing multiple configuration layers.
+    ///
+    /// Providers are merged in call order, with each later provider taking precedence.
+    /// Field defaults are applied only when [`ConfigBuilder::build`] constructs the final
+    /// configuration.
+    fn builder() -> ConfigBuilder<Self> {
+        ConfigBuilder::new()
+    }
+}
+
+/// Composes configuration layers before building a complete [`Config`].
+///
+/// The builder loads providers eagerly, but retains the first error until [`Self::build`] or
+/// [`Self::build_partial`] is called. Once a layer fails, later providers are not loaded.
+/// This keeps fluent composition concise while preserving fail-fast behavior.
+pub struct ConfigBuilder<C: Config> {
+    partial: Result<C::Partial, ConfigError>,
+}
+
+impl<C: Config> ConfigBuilder<C> {
+    /// Create an empty configuration builder.
+    pub fn new() -> Self {
+        Self {
+            partial: Ok(C::Partial::default()),
+        }
+    }
+
+    /// Merge a provider as the next, higher-precedence layer.
+    pub fn provider(mut self, provider: &impl ConfigProvider) -> Self {
+        self.partial = self
+            .partial
+            .and_then(|current| C::load_partial(provider).and_then(|next| current.merge(next)));
+        self
+    }
+
+    /// Merge an already-loaded partial configuration as the next layer.
+    pub fn layer(mut self, next: C::Partial) -> Self {
+        self.partial = self.partial.and_then(|current| current.merge(next));
+        self
+    }
+
+    /// Return the merged partial configuration without applying field defaults or validation.
+    pub fn build_partial(self) -> Result<C::Partial, ConfigError> {
+        self.partial
+    }
+
+    /// Build the final configuration, applying field defaults and validation.
+    pub fn build(self) -> Result<C, ConfigError> {
+        self.build_partial()?.build()
+    }
+}
+
+impl<C: Config> Default for ConfigBuilder<C> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// A Partial variant of a [`trait@Config`]. This means that every field is optional

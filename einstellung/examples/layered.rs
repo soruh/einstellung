@@ -87,11 +87,11 @@ fn load_config(dir: &Path) -> Result<AppConfig, ConfigError> {
         ..Default::default()
     };
 
-    hard_coded
-        .freeze()
-        .merge(user_config1)?
-        .merge(user_config2)?
-        .merge(listen_config)?
+    AppConfig::builder()
+        .layer(hard_coded.freeze())
+        .layer(user_config1)
+        .layer(user_config2)
+        .layer(listen_config)
         .build()
 }
 

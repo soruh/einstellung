@@ -141,7 +141,7 @@ configured. This makes it possible to reserve `.env` for secrets and
 machine-local paths without accidentally importing unrelated settings.
 
 ```rust
-use einstellung::{Config, DotenvProvider, EnvProvider, PartialConfig, TomlFileProvider};
+use einstellung::{Config, DotenvProvider, EnvProvider, TomlFileProvider};
 
 #[derive(Config)]
 struct AppConfig {
@@ -155,24 +155,28 @@ fn load_config() -> Result<AppConfig, einstellung::ConfigError> {
         .with_var("API_KEY", "api_key")
         .with_var("SOURCE_PATH", "source_path");
 
-    let shared = AppConfig::load_partial(&TomlFileProvider::from_path(
-        std::path::Path::new("config.toml"),
-    ))?;
-    let dotenv = AppConfig::load_partial(
-        &DotenvProvider::from_path(std::path::Path::new(".env"))
-            .with_env_provider(local.clone()),
-    )?;
-    let process_env = AppConfig::load_partial(&local)?;
-
-    shared.merge(dotenv)?.merge(process_env)?.build()
+    AppConfig::builder()
+        .provider(&TomlFileProvider::from_path(std::path::Path::new("config.toml")))
+        .provider(
+            &DotenvProvider::from_path(std::path::Path::new(".env"))
+                .with_env_provider(local.clone()),
+        )
+        .provider(&local)
+        .build()
 }
 ```
 
-Layers are merged left-to-right in the example, so the selected process
+Providers are merged left-to-right by `Config::builder()`, so the selected process
 environment variables override the selected `.env` values, while portable
 settings such as `model` continue to come from the shared TOML file. A missing
 field in a later layer does not clear an earlier value; the later layer must
 actually contain a value to replace it.
+
+`Config::builder()` is the recommended composition API when loading several
+sources. Each `.provider(...)` is the next higher-precedence layer. Field-level
+`#[config(default = ...)]` defaults are applied only once, when `.build()`
+constructs the final configuration. Use `.layer(...)` when a layer has already
+been loaded or transformed (for example, frozen).
 
 `EnvProvider` and `DotenvProvider` deliberately have no "load everything"
 default. Treat their mappings as a trust boundary: explicitly expose only the

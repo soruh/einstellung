@@ -145,7 +145,7 @@ impl<C: Config> ConfigBuilder<C> {
     /// Return the merged partial configuration without applying field defaults or validation.
     pub fn build_partial(self) -> Result<C::Partial, ConfigError> {
         match (self.partial, self.error) {
-            (_, Some(error)) => Err(error),
+            (_, Some(error)) => Err(error.with_provenance(self.provenance)),
             (Some(partial), None) => Ok(partial),
             (None, None) => unreachable!("builder partial missing without error"),
         }

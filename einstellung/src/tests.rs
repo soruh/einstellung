@@ -816,6 +816,34 @@ fn direct_load_attaches_source_to_validation_errors() {
 }
 
 #[test]
+fn build_partial_errors_retain_prior_provenance() {
+    let base = AppConfig::load_partial(&JsonFileProvider::from_contents(
+        r#"{ "app_name": "base", "network": { "listen": { "address": "192.168.0.1" } } }"#,
+    ))
+    .unwrap();
+
+    let error = match AppConfig::builder()
+        .layer_named("base config", base)
+        .provider(&JsonFileProvider::from_contents("{"))
+        .build_partial()
+    {
+        Ok(_) => panic!("invalid provider unexpectedly produced a partial config"),
+        Err(error) => error,
+    };
+
+    assert_eq!(error.config_source().unwrap().label(), "inline json");
+    assert_eq!(
+        error
+            .provenance()
+            .unwrap()
+            .latest_supplier("app_name")
+            .unwrap()
+            .label(),
+        "base config"
+    );
+}
+
+#[test]
 fn builder_errors_retain_provenance_for_failed_values() {
     let error = AppConfig::builder()
         .provider(&JsonFileProvider::from_contents(

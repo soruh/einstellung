@@ -55,6 +55,17 @@ You can customize enabled features to reduce compilation time or binary size:
   mutating the process environment.
 - `full`: Enables every provider and the derive macro.
 
+### Rust version support
+
+Rust requirements are feature-dependent rather than being raised globally by optional providers:
+
+- The `einstellung` core (`--no-default-features`) supports Rust 1.85+, the minimum for edition 2024.
+- The `derive` feature requires Rust 1.88+ because of its proc-macro dependencies.
+- The `yaml` feature requires Rust 1.89+ because `serde-saphyr` declares that MSRV.
+- The current default feature set includes both `derive` and `yaml`, so a default build requires Rust 1.89+.
+
+The crate metadata records the core MSRV. CI checks the higher feature-specific floors separately.
+
 ---
 
 ## Examples

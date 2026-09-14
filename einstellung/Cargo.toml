@@ -2,6 +2,7 @@
 name = "einstellung"
 version = "0.1.6"
 edition = "2024"
+rust-version = "1.85"
 description = "A Rust Configuration Parser"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/soruh/einstellung"

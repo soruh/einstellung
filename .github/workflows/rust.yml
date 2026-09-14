@@ -6,6 +6,37 @@ on:
   pull_request:
 
 jobs:
+  msrv:
+    name: MSRV (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: core
+            toolchain: "1.85.0"
+            command: cargo check -p einstellung --no-default-features
+          - name: derive
+            toolchain: "1.88.0"
+            command: cargo check -p einstellung --no-default-features --features derive
+          - name: yaml
+            toolchain: "1.89.0"
+            command: cargo check -p einstellung --no-default-features --features yaml
+          - name: defaults
+            toolchain: "1.89.0"
+            command: cargo check -p einstellung
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install Rust ${{ matrix.toolchain }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.toolchain }}
+      - name: Cache cargo registry + build
+        uses: Swatinem/rust-cache@v2
+      - name: Check supported Rust floor
+        run: ${{ matrix.command }}
+
   test:
     runs-on: ubuntu-latest
 

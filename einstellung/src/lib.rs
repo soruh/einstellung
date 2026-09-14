@@ -844,10 +844,10 @@ pub type MergeFunction<T, E> = fn(T, T) -> Result<T, E>;
 /// redacts its [`Debug`](std::fmt::Debug) representation. Access to the wrapped value is explicit
 /// through [`Secret::expose_secret`], and no mutable accessor is provided.
 ///
-/// This protects common logging and accidental-serialization paths. Parser errors produced before
-/// deserialization reaches the wrapper are controlled by the underlying format implementation and
-/// may still contain input context, so callers should avoid logging raw parser diagnostics from
-/// untrusted secret-bearing documents when that matters.
+/// This protects common logging and accidental-serialization paths. Built-in TOML, YAML, and
+/// dotenv providers suppress raw source lines in their normal parse diagnostics. Callers that
+/// explicitly inspect backend parser errors, or custom providers that embed input values in their
+/// own errors, remain responsible for handling that diagnostic data safely.
 #[derive(Clone, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[serde(transparent)]
 pub struct Secret<T>(T);

@@ -48,7 +48,7 @@ You can customize enabled features to reduce compilation time or binary size:
 - `derive` (default): Enables the `#[derive(Config)]` macro.
 - `json` (default): Enables `JsonFileProvider`.
 - `toml` (default): Enables `TomlFileProvider`.
-- `yaml` (default): Enables `YamlFileProvider`, backed by the pure-Rust `serde-saphyr` parser.
+- `yaml` (default): Enables `YamlFileProvider`, backed by the pure-Rust `serde-saphyr` parser (Rust 1.89+).
 - `key-value`: Enables `KeyValueProvider` for dotted-path string overrides.
 - `env`: Enables the allowlist-first `EnvProvider` and `key-value`.
 - `dotenv`: Enables `DotenvProvider` and `env`. Dotenv files are parsed without
@@ -233,9 +233,11 @@ retain data from earlier layers, so `explain()` deliberately preserves the full
 supply history rather than pretending there is always one winner. Values filled
 by `#[config(default ...)]` are attributed to `field default`.
 
-Builder errors retain the provenance accumulated before the failure. This is
-particularly useful for final validation errors, where there is no single parser
-failure to identify the source directly:
+Builder errors retain the provenance accumulated before the failure, including
+`build_partial()` failures. Use `build_tracked_partial()` when a successfully
+composed partial must keep provenance for later transformation or merging.
+This is particularly useful for final validation errors, where there is no single
+parser failure to identify the source directly:
 
 ```rust
 match AppConfig::builder()
@@ -245,10 +247,8 @@ match AppConfig::builder()
 {
     Ok(config) => use_config(config),
     Err(error) => {
-        if let (Some(path), Some(provenance)) = (error.logical_path(), error.provenance()) {
-            if let Some(sources) = provenance.explain(&path) {
-                eprintln!("{path} was supplied by: {sources:?}");
-            }
+        if let Some(path) = error.logical_path() {
+            eprintln!("{path} was associated with: {:?}", error.field_sources());
         }
         return Err(error.into());
     }
@@ -258,12 +258,17 @@ match AppConfig::builder()
 
 `ConfigError::root_cause()` unwraps source/provenance context when code needs to
 inspect the concrete error variant. `config_source()` reports the external source
-that triggered a load/merge error, and `logical_path()` returns a dotted field
-path when the error is field-specific.
+that triggered a load/merge error, `logical_path()` returns a dotted field path,
+and `field_sources()` combines successfully merged provenance with the provider
+whose attempted layer caused a field-specific failure.
 
 Provider parse errors and single-provider build errors include the provider
 source. File providers identify the path; inline providers identify only the
-format and never embed their contents in diagnostics.
+format and never embed their contents in diagnostics. Built-in TOML, YAML, and
+dotenv parse errors also avoid rendering raw configuration lines by default,
+which prevents nearby secrets from leaking through ordinary error logging.
+`TomlError::parser_error()` and `YamlError::parser_error()` provide explicit
+access to backend diagnostics when detailed parser output is intentionally needed.
 
 ### Mode-specific configuration views
 

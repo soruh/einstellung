@@ -193,7 +193,10 @@ default. `EnvProvider::only(...)` is convenient when environment names map
 directly to lowercase field names; `EnvProvider::prefixed(...)` additionally
 supports `__` for nested fields. Treat these selections as a trust boundary:
 explicitly expose only the secrets and machine-local values that should enter
-the typed configuration.
+the typed configuration. Dotenv selection limits which final keys are loaded, but standard dotenv
+substitution can still read process-environment variables while evaluating a selected value. Use
+`DotenvProvider::without_substitution()` when a local `.env` file must be isolated from process
+environment expansion; escaped and single-quoted dollar signs remain literal.
 
 For CLI flags, secret stores, or other already-selected string key/value inputs,
 `KeyValueProvider` accepts dotted logical paths directly and uses the same typed

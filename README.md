@@ -170,11 +170,22 @@ fn load_config() -> Result<AppConfig, einstellung::ConfigError> {
 
 Layers are merged left-to-right in the example, so the selected process
 environment variables override the selected `.env` values, while portable
-settings such as `model` continue to come from the shared TOML file.
+settings such as `model` continue to come from the shared TOML file. A missing
+field in a later layer does not clear an earlier value; the later layer must
+actually contain a value to replace it.
 
-When a JSON/TOML/YAML format is chosen at runtime, use `FormatProvider` with a
-`ConfigFormat` value instead of matching over separate provider types in the
-application.
+`EnvProvider` and `DotenvProvider` deliberately have no "load everything"
+default. Treat their mappings as a trust boundary: explicitly expose only the
+secrets and machine-local values that should enter the typed configuration.
+`einstellung` does not otherwise mark a field as secret or redact it from
+`Debug`; applications should keep secret fields private and avoid deriving or
+printing representations that expose them. `#[config(freezable)]` can prevent a
+value from being overwritten by later layers, but it is a merge policy rather
+than a secrecy mechanism.
+
+When a JSON/TOML/YAML format is chosen at runtime, use `FormatProvider`. For a
+filesystem path, `FormatProvider::from_path_detect` recognizes enabled `json`,
+`toml`, `yaml`, and `yml` extensions, avoiding an application-side format match.
 
 ---
 

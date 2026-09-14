@@ -41,8 +41,11 @@ pub trait PartialConfig: Default + DeserializeOwned {
     /// The associated Complete Config
     type Complete: Config;
 
-    /// Merge two partial configs.
-    /// See the derive macro for [`derive@Config`] for how to define merging stategies
+    /// Merge two partial configs, treating `next` as the higher-precedence layer.
+    ///
+    /// For the default replace strategy, a missing value in `next` leaves the value from
+    /// `self` unchanged; absence does not clear an earlier value. See the derive macro for
+    /// [`derive@Config`] for extend, custom, subconfig, and freeze behavior.
     fn merge(self, next: Self) -> Result<Self, ConfigError>;
 
     /// Build this partial config into its complete form. All required fields need to be present for this to succeed.
@@ -62,16 +65,22 @@ pub trait Freezable {
 }
 
 /// Generic provider for loading a partial configuration.
-/// This can be any type which can produce a `T: DeserializeOwned`
-/// See the `json`, `yaml` and `toml` features and the associated
-/// [`JsonFileProvider`], [`YamlFileProvider`] and [`TomlFileProvider`] types for the built-in implementations.
-/// The [`FileContentProvider`] provides an ergonomic interface to specifiy the location/data of an input file.
+///
+/// This can be any type which can produce a `T: DeserializeOwned`. The generic
+/// [`ConfigProvider::load_partial`] method intentionally makes this trait non-object-safe; use
+/// [`FormatProvider`] when JSON/TOML/YAML selection is only known at runtime, or define a concrete
+/// application-level provider enum when dispatching custom providers.
+///
+/// See the `json`, `yaml` and `toml` features and the associated [`JsonFileProvider`],
+/// [`YamlFileProvider`] and [`TomlFileProvider`] types for the built-in implementations. The
+/// [`FileContentProvider`] provides an ergonomic interface to specify the location or contents of
+/// an input file.
 pub trait ConfigProvider {
-    /// Load a [`PartialConfig`] (or really an deserializeable type) from this provider
+    /// Load a [`PartialConfig`] (or any other deserializable type) from this provider.
     fn load_partial<T: DeserializeOwned>(&self) -> Result<T, ConfigError>;
 }
 
-/// This types indicates the location an error occured.
+/// Indicates where a configuration error occurred.
 #[derive(Debug)]
 pub struct FieldPath {
     /// Name of the [`PartialConfig`] type on which failing method was called.
@@ -140,7 +149,7 @@ impl Display for FieldPath {
 /// Thread-safe boxed error used by configuration callbacks and providers.
 pub type BoxError = Box<dyn StdError + Send + Sync + 'static>;
 
-/// Possible errors which can be produces when loading a config
+/// Errors which can be produced while loading, merging, or building a configuration.
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum ConfigError {

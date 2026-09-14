@@ -373,7 +373,7 @@ pub trait PartialConfig: Default + DeserializeOwned {
     fn merge(self, next: Self) -> Result<Self, ConfigError>;
 
     /// Build this partial config into its complete form. All required fields need to be present for this to succeed.
-    /// See the derive macro for [`derive@Config`] for how to define validation stategies and field contents.
+    /// See the derive macro for [`derive@Config`] for how to define validation strategies and field contents.
     fn build(self) -> Result<Self::Complete, ConfigError>;
 
     /// Return logical dotted paths for fields explicitly present in this partial.
@@ -390,7 +390,7 @@ pub trait PartialConfig: Default + DeserializeOwned {
 }
 
 /// Indicates that parts of this type can be "frozen".
-/// This means that these parts can not be overwriten by merges in any way.
+/// This means that these parts cannot be overwritten by merges in any way.
 /// See the derive macro for [`derive@Config`] for how to mark fields as [`trait@Freezable`]
 pub trait Freezable {
     /// Freeze the freezable parts of this type

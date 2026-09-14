@@ -63,7 +63,7 @@ pub struct PartialType {
     pub wrap_freeze: bool,
 }
 
-/// Helper to extact inner type of an `Option``.
+/// Helper to extract inner type of an `Option`.
 /// For `Option<T>` return `Some(T)`
 /// For anything else return `None`
 fn extract_type_from_option(ty: &Type) -> Option<&Type> {

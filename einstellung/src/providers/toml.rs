@@ -1,7 +1,7 @@
 use super::*;
 use crate::{ConfigProvider, FileContentProvider, IntoFileContentProvider};
 
-/// [`ConfigProvider`] which interperts the file contents as TOML
+/// [`ConfigProvider`] which interprets the file contents as TOML
 pub struct TomlFileProvider<'i>(pub FileContentProvider<'i>);
 
 impl<'i> TomlFileProvider<'i> {

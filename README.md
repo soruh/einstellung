@@ -211,6 +211,13 @@ When a JSON/TOML/YAML format is chosen at runtime, use `FormatProvider`. For a
 filesystem path, `FormatProvider::from_path_detect` recognizes enabled `json`,
 `toml`, `yaml`, and `yml` extensions, avoiding an application-side format match.
 
+When the *provider set* itself is chosen at runtime, use `ConfigProviderFor<C>`.
+It is an object-safe adapter for one concrete config type, automatically implemented
+by every `ConfigProvider`, so heterogeneous providers can be stored as
+`Box<dyn ConfigProviderFor<AppConfig>>` and fed to
+`ConfigBuilder::typed_provider(...)`. This avoids an application-level provider enum
+without weakening the generic `ConfigProvider` API.
+
 For user-edited structured files, `#[config(deny_unknown_fields)]` opts a config
 type into strict key checking so misspellings fail instead of silently falling
 back to defaults. The policy is per config type; nested subconfigs opt in
@@ -272,6 +279,11 @@ inspect the concrete error variant. `config_source()` reports the external sourc
 that triggered a load/merge error, `logical_path()` returns a dotted field path,
 and `field_sources()` combines successfully merged provenance with the provider
 whose attempted layer caused a field-specific failure.
+
+Custom providers that know which destination field failed can attach the same
+metadata with `ConfigError::with_logical_path("model.remote.api_url")`. Path context
+is transparent in the displayed error but is available through `logical_path()` and
+participates in the same source/provenance accessors as derive-generated errors.
 
 Provider parse errors and single-provider build errors include the provider
 source. File providers identify the path; inline providers identify only the

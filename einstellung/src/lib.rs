@@ -522,6 +522,39 @@ where
     error.into()
 }
 
+#[cfg(feature = "yaml")]
+/// YAML parser error with source snippets suppressed in its default display.
+///
+/// The underlying [`serde_saphyr::Error`] remains available through [`std::error::Error::source`]
+/// so applications can opt into richer parser-specific diagnostics explicitly. Suppressing
+/// snippets by default avoids logging unrelated secret-bearing lines surrounding a syntax error.
+#[derive(Debug)]
+pub struct YamlError(serde_saphyr::Error);
+
+#[cfg(feature = "yaml")]
+impl Display for YamlError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let formatter = serde_saphyr::DefaultMessageFormatter;
+        let mut options = serde_saphyr::RenderOptions::new(&formatter);
+        options.snippets = serde_saphyr::SnippetMode::Off;
+        f.write_str(&self.0.render_with_options(options))
+    }
+}
+
+#[cfg(feature = "yaml")]
+impl StdError for YamlError {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        Some(&self.0)
+    }
+}
+
+#[cfg(feature = "yaml")]
+impl From<serde_saphyr::Error> for YamlError {
+    fn from(error: serde_saphyr::Error) -> Self {
+        Self(error)
+    }
+}
+
 /// Errors which can be produced while loading, merging, or building a configuration.
 #[derive(Error, Debug)]
 #[non_exhaustive]
@@ -535,7 +568,7 @@ pub enum ConfigError {
 
     #[cfg(feature = "yaml")]
     #[error("YAML Parse Error: {0}")]
-    Yaml(#[from] serde_saphyr::Error),
+    Yaml(#[from] YamlError),
 
     #[cfg(feature = "toml")]
     #[error("TOML Parse Error: {0}")]
@@ -584,6 +617,13 @@ pub enum ConfigError {
         #[source]
         reason: BoxError,
     },
+}
+
+#[cfg(feature = "yaml")]
+impl From<serde_saphyr::Error> for ConfigError {
+    fn from(error: serde_saphyr::Error) -> Self {
+        Self::Yaml(error.into())
+    }
 }
 
 impl ConfigError {

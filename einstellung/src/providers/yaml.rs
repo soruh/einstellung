@@ -129,6 +129,25 @@ mod tests {
     }
 
     #[test]
+    fn parse_errors_do_not_render_source_snippets() {
+        #[derive(Debug, Deserialize)]
+        #[allow(dead_code)]
+        struct Config {
+            api_key: String,
+            retries: u16,
+        }
+
+        let err = YamlFileProvider::from_contents("api_key: super-secret\nretries: [\n")
+            .load_partial::<Config>()
+            .unwrap_err();
+        let message = err.to_string();
+
+        assert!(!message.contains("super-secret"), "{message}");
+        assert!(!message.contains("api_key:"), "{message}");
+        assert!(message.contains("line 2"), "{message}");
+    }
+
+    #[test]
     fn parse_errors_retain_location_context() {
         #[derive(Debug, Deserialize)]
         #[allow(dead_code)]

@@ -80,49 +80,57 @@ pub fn require_for_view<V, T>(
 /// callers can inspect provenance with [`Self::build_tracked`]. Once a layer fails, later providers
 /// are not loaded.
 pub struct ConfigBuilder<C: Config> {
-    partial: Option<C::Partial>,
-    error: Option<ConfigError>,
+    state: ConfigBuilderState<C::Partial>,
     provenance: ConfigProvenance,
+}
+
+enum ConfigBuilderState<P> {
+    Ready(P),
+    Failed(ConfigError),
 }
 
 impl<C: Config> ConfigBuilder<C> {
     /// Create an empty configuration builder.
     pub fn new() -> Self {
         Self {
-            partial: Some(C::Partial::default()),
-            error: None,
+            state: ConfigBuilderState::Ready(C::Partial::default()),
             provenance: ConfigProvenance::default(),
         }
     }
 
     /// Merge a provider as the next, higher-precedence layer.
-    pub fn provider(mut self, provider: &impl ConfigProvider) -> Self {
-        if self.error.is_some() {
-            return self;
-        }
+    pub fn provider(self, provider: &impl ConfigProvider) -> Self {
+        let Self { state, provenance } = self;
+        let ConfigBuilderState::Ready(current) = state else {
+            return Self { state, provenance };
+        };
 
         let source = provider.source();
         let next = match C::load_partial(provider) {
             Ok(next) => next,
             Err(error) => {
-                self.error = Some(error);
-                return self;
+                return Self {
+                    state: ConfigBuilderState::Failed(error),
+                    provenance,
+                };
             }
         };
         let fields = next.provided_fields();
-        let current = self
-            .partial
-            .take()
-            .expect("builder partial missing without error");
 
         match current.merge(next) {
             Ok(merged) => {
-                self.partial = Some(merged);
-                self.provenance.record(source, fields);
+                let mut provenance = provenance;
+                provenance.record(source, fields);
+                Self {
+                    state: ConfigBuilderState::Ready(merged),
+                    provenance,
+                }
             }
-            Err(error) => self.error = Some(error.with_source(source)),
+            Err(error) => Self {
+                state: ConfigBuilderState::Failed(error.with_source(source)),
+                provenance,
+            },
         }
-        self
     }
 
     /// Merge an already-loaded partial configuration as the next layer.
@@ -133,25 +141,28 @@ impl<C: Config> ConfigBuilder<C> {
     }
 
     /// Merge an already-loaded partial configuration with an explicit provenance label.
-    pub fn layer_named(mut self, source: impl Into<String>, next: C::Partial) -> Self {
-        if self.error.is_some() {
-            return self;
-        }
+    pub fn layer_named(self, source: impl Into<String>, next: C::Partial) -> Self {
+        let Self { state, provenance } = self;
+        let ConfigBuilderState::Ready(current) = state else {
+            return Self { state, provenance };
+        };
 
         let source = ConfigSource::new(source);
         let fields = next.provided_fields();
-        let current = self
-            .partial
-            .take()
-            .expect("builder partial missing without error");
         match current.merge(next) {
             Ok(merged) => {
-                self.partial = Some(merged);
-                self.provenance.record(source, fields);
+                let mut provenance = provenance;
+                provenance.record(source, fields);
+                Self {
+                    state: ConfigBuilderState::Ready(merged),
+                    provenance,
+                }
             }
-            Err(error) => self.error = Some(error.with_source(source)),
+            Err(error) => Self {
+                state: ConfigBuilderState::Failed(error.with_source(source)),
+                provenance,
+            },
         }
-        self
     }
 
     /// Return the merged partial configuration without applying field defaults or validation.
@@ -164,13 +175,12 @@ impl<C: Config> ConfigBuilder<C> {
     /// Field defaults are not applied and therefore are not recorded. This is useful when a
     /// composed partial will be inspected, transformed, or merged again before final construction.
     pub fn build_tracked_partial(self) -> Result<TrackedConfig<C::Partial>, ConfigError> {
-        match (self.partial, self.error) {
-            (_, Some(error)) => Err(error.with_provenance(self.provenance)),
-            (Some(config), None) => Ok(TrackedConfig {
+        match self.state {
+            ConfigBuilderState::Failed(error) => Err(error.with_provenance(self.provenance)),
+            ConfigBuilderState::Ready(config) => Ok(TrackedConfig {
                 config,
                 provenance: self.provenance,
             }),
-            (None, None) => unreachable!("builder partial missing without error"),
         }
     }
 
@@ -202,24 +212,21 @@ impl<C: Config> ConfigBuilder<C> {
         self.finish()?.into_view()
     }
 
-    fn finish(mut self) -> Result<TrackedConfig<C>, ConfigError> {
-        if let Some(error) = self.error {
-            return Err(error.with_provenance(self.provenance));
-        }
+    fn finish(self) -> Result<TrackedConfig<C>, ConfigError> {
+        let Self {
+            state,
+            mut provenance,
+        } = self;
+        let partial = match state {
+            ConfigBuilderState::Ready(partial) => partial,
+            ConfigBuilderState::Failed(error) => return Err(error.with_provenance(provenance)),
+        };
 
-        let partial = self
-            .partial
-            .take()
-            .expect("builder partial missing without error");
-        self.provenance
-            .record(ConfigSource::defaults(), partial.defaulted_fields());
+        provenance.record(ConfigSource::defaults(), partial.defaulted_fields());
 
         match partial.build() {
-            Ok(config) => Ok(TrackedConfig {
-                config,
-                provenance: self.provenance,
-            }),
-            Err(error) => Err(error.with_provenance(self.provenance)),
+            Ok(config) => Ok(TrackedConfig { config, provenance }),
+            Err(error) => Err(error.with_provenance(provenance)),
         }
     }
 }

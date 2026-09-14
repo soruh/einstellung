@@ -784,27 +784,6 @@ fn line_column(input: &str, offset: usize) -> (usize, usize) {
     (line, column)
 }
 
-#[cfg(feature = "key-value")]
-#[derive(Debug)]
-struct ProviderPathError {
-    path: String,
-    source: BoxError,
-}
-
-#[cfg(feature = "key-value")]
-impl Display for ProviderPathError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self.source, f)
-    }
-}
-
-#[cfg(feature = "key-value")]
-impl StdError for ProviderPathError {
-    fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        Some(self.source.as_ref())
-    }
-}
-
 /// Errors which can be produced while loading, merging, or building a configuration.
 #[derive(Error, Debug)]
 #[non_exhaustive]
@@ -834,6 +813,13 @@ pub enum ConfigError {
     #[error("configuration source {source}: {error}")]
     Source {
         source: ConfigSource,
+        #[source]
+        error: Box<ConfigError>,
+    },
+
+    #[error("{error}")]
+    Path {
+        path: String,
         #[source]
         error: Box<ConfigError>,
     },
@@ -905,13 +891,7 @@ impl ConfigError {
         path: impl Into<String>,
         source: impl StdError + Send + Sync + 'static,
     ) -> Self {
-        Self::Provider {
-            provider,
-            source: Box::new(ProviderPathError {
-                path: path.into(),
-                source: Box::new(source),
-            }),
-        }
+        Self::provider(provider, source).with_logical_path(path)
     }
 
     /// Construct a mode-specific requirement error for a logical dotted field path.
@@ -930,6 +910,18 @@ impl ConfigError {
         }
     }
 
+    /// Attach a logical dotted configuration path to this error.
+    ///
+    /// This is primarily useful for custom providers that know the destination field associated
+    /// with a conversion or lookup failure. The path is metadata only; it does not alter the
+    /// displayed error text.
+    pub fn with_logical_path(self, path: impl Into<String>) -> Self {
+        Self::Path {
+            path: path.into(),
+            error: Box::new(self),
+        }
+    }
+
     fn with_provenance(self, provenance: ConfigProvenance) -> Self {
         Self::Composition {
             provenance,
@@ -942,7 +934,9 @@ impl ConfigError {
         match self {
             Self::MissingField(field) | Self::FreezeCollision(field) => Some(field),
             Self::Validation { field, .. } | Self::CustomMerge { field, .. } => Some(field),
-            Self::Source { error, .. } | Self::Composition { error, .. } => error.field_path(),
+            Self::Source { error, .. }
+            | Self::Path { error, .. }
+            | Self::Composition { error, .. } => error.field_path(),
             _ => None,
         }
     }
@@ -951,7 +945,7 @@ impl ConfigError {
     pub fn config_source(&self) -> Option<&ConfigSource> {
         match self {
             Self::Source { source, .. } => Some(source),
-            Self::Composition { error, .. } => error.config_source(),
+            Self::Path { error, .. } | Self::Composition { error, .. } => error.config_source(),
             _ => None,
         }
     }
@@ -960,7 +954,7 @@ impl ConfigError {
     pub fn provenance(&self) -> Option<&ConfigProvenance> {
         match self {
             Self::Composition { provenance, .. } => Some(provenance),
-            Self::Source { error, .. } => error.provenance(),
+            Self::Source { error, .. } | Self::Path { error, .. } => error.provenance(),
             _ => None,
         }
     }
@@ -971,13 +965,9 @@ impl ConfigError {
     /// rather than [`FieldPath`].
     pub fn logical_path(&self) -> Option<String> {
         match self {
-            Self::MissingForView { field, .. } => Some(field.clone()),
-            #[cfg(feature = "key-value")]
-            Self::Provider { source, .. } => source
-                .downcast_ref::<ProviderPathError>()
-                .map(|error| error.path.clone()),
-            #[cfg(not(feature = "key-value"))]
-            Self::Provider { .. } => None,
+            Self::MissingForView { field, .. } | Self::Path { path: field, .. } => {
+                Some(field.clone())
+            }
             Self::Source { error, .. } | Self::Composition { error, .. } => error.logical_path(),
             _ => self.field_path().map(FieldPath::logical_path),
         }
@@ -1022,7 +1012,9 @@ impl ConfigError {
     /// Return the underlying configuration error beneath any source context wrappers.
     pub fn root_cause(&self) -> &ConfigError {
         match self {
-            Self::Source { error, .. } | Self::Composition { error, .. } => error.root_cause(),
+            Self::Source { error, .. }
+            | Self::Path { error, .. }
+            | Self::Composition { error, .. } => error.root_cause(),
             error => error,
         }
     }

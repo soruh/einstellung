@@ -291,6 +291,23 @@ fn typed_provider_trait_objects_support_runtime_composition() {
 }
 
 #[test]
+fn custom_errors_can_attach_logical_paths() {
+    let error = ConfigError::provider(
+        "secret store",
+        std::io::Error::new(std::io::ErrorKind::InvalidData, "lookup failed"),
+    )
+    .with_logical_path("model.remote.api_key")
+    .with_source(crate::ConfigSource::new("vault"));
+
+    assert_eq!(
+        error.logical_path().as_deref(),
+        Some("model.remote.api_key")
+    );
+    assert_eq!(error.config_source().unwrap().label(), "vault");
+    assert!(matches!(error.root_cause(), ConfigError::Provider { .. }));
+}
+
+#[test]
 fn provider_error_preserves_source() {
     use std::error::Error;
 

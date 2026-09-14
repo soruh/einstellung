@@ -15,9 +15,8 @@ jobs:
 
       - name: Install Rust (stable)
         uses: dtolnay/rust-toolchain@stable
-
-      - name: Install rust-src
-        run: rustup component add rust-src
+        with:
+          components: rust-src, rustfmt, clippy
 
       - name: Cache cargo registry + build
         uses: Swatinem/rust-cache@v2
@@ -25,5 +24,23 @@ jobs:
       - name: Install nextest
         uses: taiki-e/install-action@nextest
 
-      - name: Run tests
-        run: cargo nextest run --test-threads 1
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run all-feature tests
+        run: cargo nextest run --workspace --all-features --test-threads 1
+
+      - name: Run doctests
+        run: cargo test --workspace --all-features --doc
+
+      - name: Check individual features
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check -p einstellung --no-default-features
+          for feature in derive json toml yaml env dotenv; do
+            cargo check -p einstellung --no-default-features --features "$feature"
+          done
+
+      - name: Run clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings

@@ -257,6 +257,19 @@ fn config_error_is_send_sync() {
 }
 
 #[test]
+fn typed_provider_contextual_load_attaches_source() {
+    let provider: Box<dyn crate::ConfigProviderFor<AppConfig>> =
+        Box::new(JsonFileProvider::from_owned_contents("{".to_owned()));
+    let error = match provider.load_config_partial_with_source() {
+        Ok(_) => panic!("invalid JSON unexpectedly loaded"),
+        Err(error) => error,
+    };
+
+    assert_eq!(error.config_source().unwrap().label(), "inline json");
+    assert!(matches!(error.root_cause(), ConfigError::Json(_)));
+}
+
+#[test]
 fn typed_provider_trait_objects_support_runtime_composition() {
     struct RuntimeJsonProvider(&'static str);
 

@@ -574,6 +574,12 @@ pub trait ConfigProviderFor<C: Config> {
     /// Load the partial associated with `C`.
     fn load_config_partial(&self) -> Result<C::Partial, ConfigError>;
 
+    /// Load the partial associated with `C` and attach this provider's source on failure.
+    fn load_config_partial_with_source(&self) -> Result<C::Partial, ConfigError> {
+        self.load_config_partial()
+            .map_err(|error| error.with_source(self.config_source()))
+    }
+
     /// Describe this provider for diagnostics and provenance.
     fn config_source(&self) -> ConfigSource;
 }

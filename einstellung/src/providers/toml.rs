@@ -73,8 +73,10 @@ mod tests {
             .load_partial::<Config>()
             .unwrap_err();
         let message = err.to_string();
+        let debug = format!("{err:?}");
 
         assert!(!message.contains("super-secret"), "{message}");
+        assert!(!debug.contains("super-secret"), "{debug}");
         assert!(message.contains("line 1"), "{message}");
         assert!(message.contains("column"), "{message}");
     }

@@ -93,10 +93,7 @@ mod tests {
             .unwrap_err();
         let message = err.to_string();
 
-        assert!(
-            message.contains("duplicate mapping key: thing"),
-            "{message}"
-        );
+        assert!(message.contains("configuration parse error"), "{message}");
         assert!(message.contains("line 3, column 1"), "{message}");
     }
 
@@ -141,8 +138,10 @@ mod tests {
             .load_partial::<Config>()
             .unwrap_err();
         let message = err.to_string();
+        let debug = format!("{err:?}");
 
         assert!(!message.contains("super-secret"), "{message}");
+        assert!(!debug.contains("super-secret"), "{debug}");
         assert!(!message.contains("api_key:"), "{message}");
         assert!(message.contains("line 2"), "{message}");
     }

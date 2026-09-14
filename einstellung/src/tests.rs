@@ -672,7 +672,10 @@ fn deny_unknown_fields_rejects_typos() {
     .expect("unknown field should be rejected");
 
     match error.root_cause() {
-        ConfigError::Json(error) => assert!(error.to_string().contains("unknown field `vlaue`")),
+        ConfigError::Json(error) => {
+            assert!(error.to_string().contains("data error"));
+            assert!(error.parser_error().to_string().contains("unknown field `vlaue`"));
+        }
         other => panic!("unexpected error: {other}"),
     }
 }

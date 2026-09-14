@@ -51,3 +51,29 @@ impl<'i> ConfigProvider for JsonFileProvider<'i> {
         crate::ConfigSource::new(self.0.source_label("json"))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use serde::Deserialize;
+
+    use super::*;
+
+    #[derive(Debug, Deserialize)]
+    #[allow(dead_code)]
+    struct Config {
+        retries: u16,
+    }
+
+    #[test]
+    fn data_errors_do_not_render_offending_values() {
+        let err = JsonFileProvider::from_contents(r#"{ "retries": "super-secret" }"#)
+            .load_partial::<Config>()
+            .unwrap_err();
+        let display = err.to_string();
+        let debug = format!("{err:?}");
+
+        assert!(!display.contains("super-secret"), "{display}");
+        assert!(!debug.contains("super-secret"), "{debug}");
+        assert!(display.contains("data error"), "{display}");
+    }
+}

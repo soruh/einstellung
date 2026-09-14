@@ -541,6 +541,53 @@ where
     error.into()
 }
 
+#[cfg(feature = "json")]
+/// JSON parser error with potentially sensitive values suppressed by default.
+pub struct JsonError(serde_json::Error);
+
+#[cfg(feature = "json")]
+impl JsonError {
+    /// Borrow the backend parser error for explicitly requested detailed diagnostics.
+    pub fn parser_error(&self) -> &serde_json::Error {
+        &self.0
+    }
+}
+
+#[cfg(feature = "json")]
+impl Display for JsonError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let kind = match self.0.classify() {
+            serde_json::error::Category::Io => "I/O error",
+            serde_json::error::Category::Syntax => "syntax error",
+            serde_json::error::Category::Data => "data error",
+            serde_json::error::Category::Eof => "unexpected end of input",
+        };
+        write!(
+            f,
+            "{kind} at line {}, column {}",
+            self.0.line(),
+            self.0.column()
+        )
+    }
+}
+
+#[cfg(feature = "json")]
+impl std::fmt::Debug for JsonError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("JsonError").field(&self.to_string()).finish()
+    }
+}
+
+#[cfg(feature = "json")]
+impl StdError for JsonError {}
+
+#[cfg(feature = "json")]
+impl From<serde_json::Error> for JsonError {
+    fn from(error: serde_json::Error) -> Self {
+        Self(error)
+    }
+}
+
 #[cfg(feature = "yaml")]
 /// YAML parser error with source snippets suppressed in its default display.
 ///
@@ -549,16 +596,28 @@ where
 /// through the normal error source chain because generic error reporters commonly print that chain.
 /// Suppressing snippets by default avoids logging unrelated secret-bearing lines surrounding a
 /// syntax error.
-#[derive(Debug)]
 pub struct YamlError(serde_saphyr::Error);
 
 #[cfg(feature = "yaml")]
 impl Display for YamlError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let formatter = serde_saphyr::DefaultMessageFormatter;
-        let mut options = serde_saphyr::RenderOptions::new(&formatter);
-        options.snippets = serde_saphyr::SnippetMode::Off;
-        f.write_str(&self.0.render_with_options(options))
+        if let Some(location) = self.0.location() {
+            write!(
+                f,
+                "configuration parse error at line {}, column {}",
+                location.line(),
+                location.column()
+            )
+        } else {
+            f.write_str("configuration parse error")
+        }
+    }
+}
+
+#[cfg(feature = "yaml")]
+impl std::fmt::Debug for YamlError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("YamlError").field(&self.to_string()).finish()
     }
 }
 
@@ -582,7 +641,6 @@ impl From<serde_saphyr::Error> for YamlError {
 
 #[cfg(feature = "toml")]
 /// TOML parser error with source text suppressed in its default display.
-#[derive(Debug)]
 pub struct TomlError {
     error: ::toml::de::Error,
     location: Option<(usize, usize)>,
@@ -607,14 +665,18 @@ impl Display for TomlError {
         if let Some((line, column)) = self.location {
             write!(
                 f,
-                "{} at line {line}, column {column}",
-                self.error.message()
+                "configuration parse error at line {line}, column {column}"
             )
         } else {
-            let mut safe = self.error.clone();
-            safe.set_input(None);
-            f.write_str(safe.to_string().trim_end())
+            f.write_str("configuration parse error")
         }
+    }
+}
+
+#[cfg(feature = "toml")]
+impl std::fmt::Debug for TomlError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("TomlError").field(&self.to_string()).finish()
     }
 }
 
@@ -658,7 +720,7 @@ pub enum ConfigError {
 
     #[cfg(feature = "json")]
     #[error("JSON Parse Error: {0}")]
-    Json(#[from] serde_json::Error),
+    Json(#[from] JsonError),
 
     #[cfg(feature = "yaml")]
     #[error("YAML Parse Error: {0}")]
@@ -711,6 +773,13 @@ pub enum ConfigError {
         #[source]
         reason: BoxError,
     },
+}
+
+#[cfg(feature = "json")]
+impl From<serde_json::Error> for ConfigError {
+    fn from(error: serde_json::Error) -> Self {
+        Self::Json(error.into())
+    }
 }
 
 #[cfg(feature = "yaml")]

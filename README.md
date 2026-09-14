@@ -278,7 +278,7 @@ source. File providers identify the path; inline providers identify only the
 format and never embed their contents in diagnostics. Built-in TOML, YAML, and
 dotenv parse errors also avoid rendering raw configuration lines by default,
 which prevents nearby secrets from leaking through ordinary error logging.
-`TomlError::parser_error()` and `YamlError::parser_error()` provide explicit
+`JsonError::parser_error()`, `TomlError::parser_error()`, and `YamlError::parser_error()` provide explicit
 access to backend diagnostics when detailed parser output is intentionally needed.
 
 ### Mode-specific configuration views

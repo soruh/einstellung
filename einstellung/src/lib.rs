@@ -396,6 +396,23 @@ impl ConfigProvenance {
         self.fields.get(path.as_ref()).map(Vec::as_slice)
     }
 
+    /// Return source history for `path`, falling back to the nearest supplied ancestor.
+    ///
+    /// This is useful for build errors on missing nested fields. A source can explicitly supply a
+    /// subconfig object such as `network.listen` while omitting the required child that eventually
+    /// fails, such as `network.listen.address`. In that case the parent source is the most useful
+    /// attribution available.
+    pub fn explain_nearest(&self, path: impl AsRef<str>) -> Option<&[ConfigSource]> {
+        let mut path = path.as_ref();
+        loop {
+            if let Some(sources) = self.explain(path) {
+                return Some(sources);
+            }
+            let (parent, _) = path.rsplit_once('.')?;
+            path = parent;
+        }
+    }
+
     /// Return the most recent source that supplied `path`.
     ///
     /// This is the winning source for the default replace strategy. Extend, custom-merge, and
@@ -1207,7 +1224,7 @@ impl ConfigError {
     /// never merged. Use [`Self::field_sources`] when that attempted source should be included.
     pub fn field_provenance(&self) -> Option<&[ConfigSource]> {
         let path = self.logical_path()?;
-        self.provenance()?.explain(path)
+        self.provenance()?.explain_nearest(path)
     }
 
     /// Return every source associated with the field that failed, in precedence order.

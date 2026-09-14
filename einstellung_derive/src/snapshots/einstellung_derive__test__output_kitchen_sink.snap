@@ -165,6 +165,7 @@ impl ::einstellung::PartialConfig for FullSystemConfigPartial {
             fields.push(::std::string::String::from("port"));
         }
         if let ::core::option::Option::Some(value) = (&self.database).as_ref() {
+            fields.push(::std::string::String::from("database"));
             for nested in ::einstellung::PartialConfig::provided_fields(value) {
                 fields.push(::std::format!("{}.{}", "database", nested));
             }
@@ -176,6 +177,7 @@ impl ::einstellung::PartialConfig for FullSystemConfigPartial {
             fields.push(::std::string::String::from("users"));
         }
         if let ::core::option::Option::Some(value) = (&self.optional_cache).as_ref() {
+            fields.push(::std::string::String::from("optional_cache"));
             for nested in ::einstellung::PartialConfig::provided_fields(value) {
                 fields.push(::std::format!("{}.{}", "optional_cache", nested));
             }

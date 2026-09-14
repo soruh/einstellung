@@ -82,11 +82,13 @@ impl ::einstellung::PartialConfig for AppConfigPartial {
             fields.push(::std::string::String::from("app_name"));
         }
         if let ::core::option::Option::Some(value) = (&self.database).as_ref() {
+            fields.push(::std::string::String::from("database"));
             for nested in ::einstellung::PartialConfig::provided_fields(value) {
                 fields.push(::std::format!("{}.{}", "database", nested));
             }
         }
         if let ::core::option::Option::Some(value) = (&self.redis).as_ref() {
+            fields.push(::std::string::String::from("redis"));
             for nested in ::einstellung::PartialConfig::provided_fields(value) {
                 fields.push(::std::format!("{}.{}", "redis", nested));
             }

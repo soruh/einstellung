@@ -68,6 +68,7 @@ impl ::einstellung::PartialConfig for TelemetryConfigPartial {
             fields.push(::std::string::String::from("enabled"));
         }
         if let ::core::option::Option::Some(value) = (&self.datadog).as_ref() {
+            fields.push(::std::string::String::from("datadog"));
             for nested in ::einstellung::PartialConfig::provided_fields(value) {
                 fields.push(::std::format!("{}.{}", "datadog", nested));
             }

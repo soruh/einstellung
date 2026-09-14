@@ -1168,6 +1168,40 @@ fn direct_load_attaches_source_to_validation_errors() {
 }
 
 #[test]
+fn missing_nested_field_uses_nearest_supplied_subconfig_source() {
+    let error = AppConfig::builder()
+        .provider(&JsonFileProvider::from_contents(
+            r#"{ "app_name": "demo", "network": { "listen": {} } }"#,
+        ))
+        .build()
+        .unwrap_err();
+
+    assert_eq!(
+        error.logical_path().as_deref(),
+        Some("network.listen.address")
+    );
+    assert_eq!(
+        error
+            .field_sources()
+            .into_iter()
+            .map(crate::ConfigSource::label)
+            .collect::<Vec<_>>(),
+        vec!["inline json"]
+    );
+    assert_eq!(
+        error
+            .provenance()
+            .unwrap()
+            .explain_nearest("network.listen.address")
+            .unwrap()
+            .last()
+            .unwrap()
+            .label(),
+        "inline json"
+    );
+}
+
+#[test]
 fn tracked_partial_retains_sources_without_applying_defaults() {
     let layer = AppConfig::load_partial(&JsonFileProvider::from_contents(
         r#"{ "app_name": "base", "network": { "listen": { "address": "192.168.0.1" } } }"#,
@@ -1441,6 +1475,8 @@ fn provenance_can_be_enumerated_without_configuration_values() {
         paths,
         vec![
             ("app_name", "inline json"),
+            ("network", "inline json"),
+            ("network.listen", "inline json"),
             ("network.listen.address", "inline json"),
             ("network.listen.port", "field default"),
         ]

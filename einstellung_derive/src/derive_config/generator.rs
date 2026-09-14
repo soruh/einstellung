@@ -279,6 +279,7 @@ fn generate_provided_field(f: &TransformedField, einstellung: &syn::Path) -> Tok
     if f.build.build {
         quote! {
             if let ::core::option::Option::Some(value) = (#field).as_ref() {
+                fields.push(::std::string::String::from(#ident_str));
                 for nested in #einstellung::PartialConfig::provided_fields(value) {
                     fields.push(::std::format!("{}.{}", #ident_str, nested));
                 }

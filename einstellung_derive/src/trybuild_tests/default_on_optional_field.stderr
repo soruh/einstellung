@@ -1,4 +1,4 @@
-error: #[config[default(..)] is meaningless on an `Option` type
+error: #[config(default = ...)] is meaningless on an `Option` type
  --> src/trybuild_tests/default_on_optional_field.rs
   |
   |     #[config(default)]

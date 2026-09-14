@@ -185,7 +185,7 @@ fn transform_field(
         if let Some(default) = field.default {
             return Err(syn::Error::new(
                 default.span(),
-                "#[config[default(..)] is meaningless on an `Option` type",
+                "#[config(default = ...)] is meaningless on an `Option` type",
             ));
         }
 

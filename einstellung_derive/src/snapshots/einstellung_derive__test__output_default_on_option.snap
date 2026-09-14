@@ -11,5 +11,5 @@ struct Config4 {
 
 /// --- output ---
 ::core::compile_error! {
-    "#[config[default(..)] is meaningless on an `Option` type"
+    "#[config(default = ...)] is meaningless on an `Option` type"
 }

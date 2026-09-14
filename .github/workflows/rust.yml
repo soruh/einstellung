@@ -64,6 +64,11 @@ jobs:
       - name: Run doctests
         run: cargo test --workspace --all-features --doc
 
+      - name: Check public documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --workspace --all-features --no-deps
+
       - name: Check individual features
         shell: bash
         run: |

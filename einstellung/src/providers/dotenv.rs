@@ -186,4 +186,26 @@ mod tests {
         let _ = provider.load_partial::<LocalConfig>().unwrap();
         assert!(std::env::var_os(KEY).is_none());
     }
+    #[test]
+    fn mapped_conversion_errors_report_destination_path() {
+        #[derive(Debug, Deserialize)]
+        #[allow(dead_code)]
+        struct Config {
+            database: Database,
+        }
+
+        #[derive(Debug, Deserialize)]
+        #[allow(dead_code)]
+        struct Database {
+            port: u16,
+        }
+
+        let error = DotenvProvider::from_contents("DATABASE_PORT=super-secret-value\n")
+            .with_var("DATABASE_PORT", "database.port")
+            .load_partial::<Config>()
+            .unwrap_err();
+
+        assert_eq!(error.logical_path().as_deref(), Some("database.port"));
+        assert!(!error.to_string().contains("super-secret-value"));
+    }
 }

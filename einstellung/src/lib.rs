@@ -711,6 +711,24 @@ fn line_column(input: &str, offset: usize) -> (usize, usize) {
     (line, column)
 }
 
+#[derive(Debug)]
+struct ProviderPathError {
+    path: String,
+    source: BoxError,
+}
+
+impl Display for ProviderPathError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.source, f)
+    }
+}
+
+impl StdError for ProviderPathError {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        Some(self.source.as_ref())
+    }
+}
+
 /// Errors which can be produced while loading, merging, or building a configuration.
 #[derive(Error, Debug)]
 #[non_exhaustive]
@@ -805,6 +823,20 @@ impl ConfigError {
         }
     }
 
+    pub(crate) fn provider_at(
+        provider: &'static str,
+        path: impl Into<String>,
+        source: impl StdError + Send + Sync + 'static,
+    ) -> Self {
+        Self::Provider {
+            provider,
+            source: Box::new(ProviderPathError {
+                path: path.into(),
+                source: Box::new(source),
+            }),
+        }
+    }
+
     /// Construct a mode-specific requirement error for a logical dotted field path.
     pub fn missing_for_view<V>(field: impl Into<String>) -> Self {
         Self::MissingForView {
@@ -863,6 +895,9 @@ impl ConfigError {
     pub fn logical_path(&self) -> Option<String> {
         match self {
             Self::MissingForView { field, .. } => Some(field.clone()),
+            Self::Provider { source, .. } => source
+                .downcast_ref::<ProviderPathError>()
+                .map(|error| error.path.clone()),
             Self::Source { error, .. } | Self::Composition { error, .. } => error.logical_path(),
             _ => self.field_path().map(FieldPath::logical_path),
         }

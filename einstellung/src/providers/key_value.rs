@@ -20,7 +20,7 @@ pub enum KeyValueProviderError {
 /// This is useful for CLI overrides, secret-store adapters, and other external key/value
 /// sources. Scalar fields parse from their string representation, while sequences and maps use
 /// JSON syntax. Later duplicate paths replace earlier ones.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct KeyValueProvider {
     source: ConfigSource,
     values: Vec<KeyValueBinding>,
@@ -30,6 +30,20 @@ pub struct KeyValueProvider {
 struct KeyValueBinding {
     path: String,
     value: String,
+}
+
+impl fmt::Debug for KeyValueProvider {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let paths = self
+            .values
+            .iter()
+            .map(|binding| binding.path.as_str())
+            .collect::<Vec<_>>();
+        f.debug_struct("KeyValueProvider")
+            .field("source", &self.source)
+            .field("paths", &paths)
+            .finish()
+    }
 }
 
 impl Default for KeyValueProvider {
@@ -88,7 +102,13 @@ impl ConfigProvider for KeyValueProvider {
                 binding.value.clone(),
             )
         }))
-        .map_err(|error| ConfigError::provider("key/value", error))
+        .map_err(|error| {
+            let path = match &error {
+                KeyValueProviderError::ConflictingPath { path } => path.clone(),
+                KeyValueProviderError::InvalidValue { input, .. } => input.clone(),
+            };
+            ConfigError::provider_at("key/value", path, error)
+        })
     }
 
     fn source(&self) -> ConfigSource {
@@ -566,5 +586,37 @@ mod tests {
         let config = provider.load_partial::<TestConfig>().unwrap();
 
         assert_eq!(config.api_key, "new");
+    }
+    #[test]
+    fn debug_does_not_expose_values() {
+        let provider = KeyValueProvider::new().with("api_key", "super-secret");
+        let debug = format!("{provider:?}");
+
+        assert!(debug.contains("api_key"));
+        assert!(!debug.contains("super-secret"));
+    }
+
+    #[test]
+    fn conversion_errors_report_logical_path_without_value() {
+        #[derive(Debug, Deserialize)]
+        #[allow(dead_code)]
+        struct PortConfig {
+            database: DatabaseConfig,
+        }
+
+        #[derive(Debug, Deserialize)]
+        #[allow(dead_code)]
+        struct DatabaseConfig {
+            port: u16,
+        }
+
+        let error = KeyValueProvider::new()
+            .with("database.port", "not-a-port")
+            .load_partial::<PortConfig>()
+            .unwrap_err();
+
+        assert_eq!(error.logical_path().as_deref(), Some("database.port"));
+        assert!(!error.to_string().contains("not-a-port"));
+        assert!(!format!("{error:?}").contains("not-a-port"));
     }
 }

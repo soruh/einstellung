@@ -128,6 +128,7 @@ impl EnvProvider {
     {
         let vars: Vec<_> = vars.into_iter().collect();
         let mut mapped = Vec::new();
+        let mut input_paths = std::collections::BTreeMap::new();
 
         if let Some(prefix) = &self.prefix {
             for (key, value) in &vars {
@@ -141,12 +142,9 @@ impl EnvProvider {
                     continue;
                 }
 
-                mapped.push(mapped_env_value(
-                    provider_name,
-                    env_key_path(suffix),
-                    key,
-                    value,
-                )?);
+                let path = env_key_path(suffix);
+                input_paths.insert(key.to_owned(), path.join("."));
+                mapped.push(mapped_env_value(provider_name, path, key, value)?);
             }
         }
 
@@ -158,17 +156,26 @@ impl EnvProvider {
                 continue;
             };
 
+            let path = binding.path.split('.').map(str::to_owned).collect();
+            input_paths.insert(binding.variable.clone(), binding.path.clone());
             mapped.push(mapped_env_value(
                 provider_name,
-                binding.path.split('.').map(str::to_owned).collect(),
+                path,
                 &binding.variable,
                 value,
             )?);
         }
 
-        load_mapped_values(mapped)
-            .map_err(EnvProviderError::from)
-            .map_err(|error| ConfigError::provider(provider_name, error))
+        load_mapped_values(mapped).map_err(|error| {
+            let path = match &error {
+                KeyValueProviderError::ConflictingPath { path } => path.clone(),
+                KeyValueProviderError::InvalidValue { input, .. } => input_paths
+                    .get(input)
+                    .cloned()
+                    .unwrap_or_else(|| input.clone()),
+            };
+            ConfigError::provider_at(provider_name, path, EnvProviderError::from(error))
+        })
     }
 }
 
@@ -197,8 +204,9 @@ fn mapped_env_value(
     let value = value
         .to_str()
         .ok_or_else(|| {
-            ConfigError::provider(
+            ConfigError::provider_at(
                 provider_name,
+                path.join("."),
                 EnvProviderError::NonUnicode {
                     variable: variable.to_owned(),
                 },
@@ -347,5 +355,33 @@ mod tests {
             .unwrap();
 
         assert_eq!(config.port, 8443);
+    }
+    #[test]
+    fn conversion_errors_report_destination_path() {
+        #[derive(Debug, Deserialize)]
+        #[allow(dead_code)]
+        struct Config {
+            database: Database,
+        }
+
+        #[derive(Debug, Deserialize)]
+        #[allow(dead_code)]
+        struct Database {
+            port: u16,
+        }
+
+        let provider = EnvProvider::new().with_var("DATABASE_PORT", "database.port");
+        let error = provider
+            .load_from_vars::<Config>(
+                "environment",
+                [(
+                    OsString::from("DATABASE_PORT"),
+                    OsString::from("super-secret-value"),
+                )],
+            )
+            .unwrap_err();
+
+        assert_eq!(error.logical_path().as_deref(), Some("database.port"));
+        assert!(!error.to_string().contains("super-secret-value"));
     }
 }

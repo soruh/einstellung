@@ -191,6 +191,13 @@ When a JSON/TOML/YAML format is chosen at runtime, use `FormatProvider`. For a
 filesystem path, `FormatProvider::from_path_detect` recognizes enabled `json`,
 `toml`, `yaml`, and `yml` extensions, avoiding an application-side format match.
 
+For user-edited structured files, `#[config(deny_unknown_fields)]` opts a config
+type into strict key checking so misspellings fail instead of silently falling
+back to defaults. The policy is per config type; nested subconfigs opt in
+independently. Environment providers remain allowlist-driven before
+deserialization, so unrelated process variables are never treated as config
+keys.
+
 ---
 
 ## Layering Features

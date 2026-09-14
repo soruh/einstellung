@@ -7,6 +7,7 @@ pub struct TransformedStruct {
     pub complete_ident: syn::Ident,
     pub partial_ident: syn::Ident,
     pub any_freezable: bool,
+    pub deny_unknown_fields: bool,
     pub vis: syn::Visibility,
     pub fields: Vec<TransformedField>,
     pub attrs: Vec<syn::Attribute>,
@@ -93,6 +94,7 @@ pub fn transform_struct(mut receiver: ConfigStructReceiver) -> syn::Result<Trans
         .expect("Only named structs supported");
 
     let any_freezable = receiver.freezable || struct_data.iter().any(|field| field.freezable);
+    let deny_unknown_fields = receiver.deny_unknown_fields;
 
     let mut fields = Vec::with_capacity(struct_data.len());
     let mut errors: Option<syn::Error> = None;
@@ -117,6 +119,7 @@ pub fn transform_struct(mut receiver: ConfigStructReceiver) -> syn::Result<Trans
             complete_ident,
             partial_ident,
             any_freezable,
+            deny_unknown_fields,
             attrs,
             vis,
             fields,

@@ -22,6 +22,9 @@ pub struct ConfigStructReceiver {
     #[darling(default)]
     pub freezable: bool,
 
+    #[darling(default)]
+    pub deny_unknown_fields: bool,
+
     #[darling(rename = "crate")]
     #[darling(default = default_crate_path)]
     pub einstellung: syn::Path,

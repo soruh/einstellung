@@ -46,6 +46,11 @@ mod derive_config;
 ///   Overrides the path to the `einstellung` crate. Useful if you are re-exporting the
 ///   crate or using it from within a workspace where the name might differ.
 ///
+/// * `#[config(deny_unknown_fields)]`
+///   Rejects input keys that do not correspond to fields in the generated partial config.
+///   This is useful for catching typos in structured configuration files. Nested subconfigs
+///   opt in independently, so apply the attribute to each config type that should be strict.
+///
 /// # Field Attributes
 ///
 /// Attributes applied to individual fields via `#[config(...)]`.

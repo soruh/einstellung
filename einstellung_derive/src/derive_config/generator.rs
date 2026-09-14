@@ -63,6 +63,9 @@ fn generate_partial_struct(model: &TransformedStruct) -> TokenStream {
     let vis = &model.vis;
     let einstellung = &model.einstellung;
     let attrs = &model.attrs;
+    let deny_unknown_fields = model
+        .deny_unknown_fields
+        .then(|| quote!(#[serde(deny_unknown_fields)]));
 
     let fields = model.fields.iter().map(|f| {
         let ident = &f.ident;
@@ -83,6 +86,7 @@ fn generate_partial_struct(model: &TransformedStruct) -> TokenStream {
         #[derive(::core::default::Default, #einstellung::serde::Deserialize)]
         #(#attrs)*
         #[serde(crate = #serde_lit)]
+        #deny_unknown_fields
         #vis struct #partial_ident {
             #(#fields,)*
         }

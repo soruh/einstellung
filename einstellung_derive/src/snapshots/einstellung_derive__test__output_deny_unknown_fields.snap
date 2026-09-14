@@ -1,0 +1,57 @@
+---
+source: einstellung_derive/src/test.rs
+expression: formatted
+---
+/// --- input ---
+#[derive(Config)]
+#[config(deny_unknown_fields)]
+struct ServerConfig {
+    host: String,
+    port: u16,
+}
+
+/// --- output ---
+#[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
+#[serde(crate = "::einstellung::serde")]
+#[serde(deny_unknown_fields)]
+struct ServerConfigPartial {
+    host: ::core::option::Option<String>,
+    port: ::core::option::Option<u16>,
+}
+#[automatically_derived]
+impl ::einstellung::PartialConfig for ServerConfigPartial {
+    type Complete = ServerConfig;
+    fn merge(
+        self,
+        next: Self,
+    ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(Self {
+            host: next.host.or(self.host),
+            port: next.port.or(self.port),
+        })
+    }
+    fn build(
+        self,
+    ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
+        ::core::result::Result::Ok(ServerConfig {
+            host: self
+                .host
+                .ok_or(
+                    ::einstellung::ConfigError::MissingField(
+                        ::einstellung::FieldPath::new("ServerConfig", "host"),
+                    ),
+                )?,
+            port: self
+                .port
+                .ok_or(
+                    ::einstellung::ConfigError::MissingField(
+                        ::einstellung::FieldPath::new("ServerConfig", "port"),
+                    ),
+                )?,
+        })
+    }
+}
+#[automatically_derived]
+impl ::einstellung::Config for ServerConfig {
+    type Partial = ServerConfigPartial;
+}

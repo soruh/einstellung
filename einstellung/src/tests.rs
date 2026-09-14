@@ -34,6 +34,12 @@ struct CustomMergeConfig {
 }
 
 #[derive(Config, Debug)]
+#[config(crate = crate, deny_unknown_fields)]
+struct StrictConfig {
+    value: String,
+}
+
+#[derive(Config, Debug)]
 #[config(crate = crate)]
 struct AppConfig {
     app_name: String,
@@ -432,6 +438,20 @@ fn custom_merge_accepts_convertible_error_types() {
             assert_eq!(field.to_string(), "CustomMergeConfig::value");
             assert_eq!(reason.to_string(), "value must not be empty");
         }
+        other => panic!("unexpected error: {other}"),
+    }
+}
+
+#[test]
+fn deny_unknown_fields_rejects_typos() {
+    let error = StrictConfig::load_partial(&JsonFileProvider::from_contents(
+        r#"{ "value": "ok", "vlaue": "typo" }"#,
+    ))
+    .err()
+    .expect("unknown field should be rejected");
+
+    match error {
+        ConfigError::Json(error) => assert!(error.to_string().contains("unknown field `vlaue`")),
         other => panic!("unexpected error: {other}"),
     }
 }

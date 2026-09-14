@@ -113,6 +113,15 @@ assert_macro_test!(PASS, basic_primitives: {
     }
 });
 
+assert_macro_test!(PASS, deny_unknown_fields: {
+    #[derive(Config)]
+    #[config(deny_unknown_fields)]
+    struct ServerConfig {
+        host: String,
+        port: u16,
+    }
+});
+
 assert_macro_test!(FAIL, invalid: {
     #[derive(Config)]
     struct ServerConfig(u16);

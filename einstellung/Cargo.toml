@@ -26,6 +26,7 @@ name = "layered"
 required-features = ["derive", "json", "toml", "yaml"]
 
 [dev-dependencies]
+anyhow = "1.0"
 insta = "1.46.3"
 
 

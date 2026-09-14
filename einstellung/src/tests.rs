@@ -328,3 +328,17 @@ fn config_freeze_collision() {
     let res = frozen1.merge(frozen2).and_then(|x| x.build());
     insta::assert_snapshot!(print_res(res, false));
 }
+
+#[test]
+fn config_error_propagates_through_anyhow() {
+    fn fail() -> anyhow::Result<()> {
+        Err(ConfigError::MissingField(crate::FieldPath::new(
+            "TestConfig",
+            "api_key",
+        )))?;
+        Ok(())
+    }
+
+    let err = fail().unwrap_err();
+    assert!(err.downcast_ref::<ConfigError>().is_some());
+}

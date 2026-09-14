@@ -5,6 +5,7 @@ workspace_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$workspace_root"
 
 scratch="$(mktemp -d)"
+export CARGO_TARGET_DIR="$scratch/target"
 lock_backup="$scratch/Cargo.lock"
 cp Cargo.lock "$lock_backup"
 cleanup() {
@@ -18,9 +19,9 @@ trap cleanup EXIT
 # checked-in lockfile afterward.
 cargo metadata --locked --no-deps --format-version 1 >/dev/null
 
-cargo package -p einstellung_derive --target-dir "$scratch/derive-target"
+cargo package -p einstellung_derive
 
-derive_crate="$(ls -t target/package/einstellung_derive-*.crate | head -n 1)"
+derive_crate="$(ls -t "$CARGO_TARGET_DIR"/package/einstellung_derive-*.crate | head -n 1)"
 mkdir -p "$scratch/derive-package"
 tar -xzf "$derive_crate" -C "$scratch/derive-package"
 derive_dir="$(find "$scratch/derive-package" -mindepth 1 -maxdepth 1 -type d -name 'einstellung_derive-*' -print -quit)"
@@ -34,5 +35,4 @@ fi
 # freshly packaged derive crate so the main package is verified against the exact derive artifact
 # that would be published alongside it, rather than a previously published version.
 cargo package -p einstellung \
-    --target-dir "$scratch/einstellung-target" \
     --config "patch.crates-io.einstellung_derive.path=\"$derive_dir\""

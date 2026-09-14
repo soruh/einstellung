@@ -116,11 +116,11 @@ impl<'i> FormatProvider<'i> {
     }
 
     /// Convert borrowed source data to owned data.
-    pub fn into_owned(self) -> FormatProvider<'static> {
-        FormatProvider {
+    pub fn into_owned(self) -> Result<FormatProvider<'static>, ConfigError> {
+        Ok(FormatProvider {
             format: self.format,
-            source: self.source.into_owned(),
-        }
+            source: self.source.into_owned()?,
+        })
     }
 }
 

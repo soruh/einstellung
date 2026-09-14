@@ -24,8 +24,8 @@ impl<'i> JsonFileProvider<'i> {
         Self(FileContentProvider::PathBorrowed(path))
     }
 
-    pub fn into_owned(self) -> JsonFileProvider<'static> {
-        JsonFileProvider(self.0.into_owned())
+    pub fn into_owned(self) -> Result<JsonFileProvider<'static>, ConfigError> {
+        Ok(JsonFileProvider(self.0.into_owned()?))
     }
 }
 

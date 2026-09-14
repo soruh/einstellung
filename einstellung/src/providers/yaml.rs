@@ -23,8 +23,8 @@ impl<'i> YamlFileProvider<'i> {
         Self(FileContentProvider::PathBorrowed(path))
     }
 
-    pub fn into_owned(self) -> YamlFileProvider<'static> {
-        YamlFileProvider(self.0.into_owned())
+    pub fn into_owned(self) -> Result<YamlFileProvider<'static>, ConfigError> {
+        Ok(YamlFileProvider(self.0.into_owned()?))
     }
 }
 

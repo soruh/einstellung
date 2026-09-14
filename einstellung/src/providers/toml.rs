@@ -23,8 +23,8 @@ impl<'i> TomlFileProvider<'i> {
         Self(FileContentProvider::PathBorrowed(path))
     }
 
-    pub fn into_owned(self) -> TomlFileProvider<'static> {
-        TomlFileProvider(self.0.into_owned())
+    pub fn into_owned(self) -> Result<TomlFileProvider<'static>, ConfigError> {
+        Ok(TomlFileProvider(self.0.into_owned()?))
     }
 }
 

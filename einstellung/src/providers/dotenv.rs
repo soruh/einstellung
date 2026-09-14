@@ -93,11 +93,11 @@ impl<'i> DotenvProvider<'i> {
     }
 
     /// Convert borrowed source data to owned data.
-    pub fn into_owned(self) -> DotenvProvider<'static> {
-        DotenvProvider {
-            source: self.source.into_owned(),
+    pub fn into_owned(self) -> Result<DotenvProvider<'static>, ConfigError> {
+        Ok(DotenvProvider {
+            source: self.source.into_owned()?,
             selection: self.selection,
-        }
+        })
     }
 }
 

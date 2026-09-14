@@ -42,10 +42,13 @@ pub trait ReaderFactory: Send + Sync {
     fn get_reader(&self) -> Result<Box<dyn Read + '_>, ConfigError>;
 
     /// Clone this source in a dyn-compatible way
-    fn clone_dyn(&self) -> Box<dyn ReaderFactory + 'static> {
-        panic!(
-            "this reader factory is not cloneable. Implement your own `ReaderFactory` for a custom cloneable FileProvider"
-        )
+    fn clone_dyn(&self) -> Result<Box<dyn ReaderFactory + 'static>, ConfigError> {
+        Err(ConfigError::provider(
+            "reader factory",
+            std::io::Error::other(
+                "this reader factory is not cloneable; implement `ReaderFactory::clone_dyn` to support owned conversion",
+            ),
+        ))
     }
 }
 
@@ -113,17 +116,17 @@ impl<'i> FileContentProvider<'i> {
     }
 
     /// Convert to `'static` owned data.
-    pub fn into_owned(self) -> FileContentProvider<'static> {
+    pub fn into_owned(self) -> Result<FileContentProvider<'static>, ConfigError> {
         use FileContentProvider::*;
-        match self {
+        Ok(match self {
             InlineBorrowed(s) => InlineOwned(s.to_owned()),
             PathBorrowed(p) => PathOwned(p.to_path_buf()),
             InlineOwned(s) => InlineOwned(s),
             PathOwned(p) => PathOwned(p),
             CustomFn(f) => CustomFn(f),
             CustomBoxed(f) => CustomBoxed(f),
-            CustomRef(f) => CustomBoxed(f.clone_dyn()),
-        }
+            CustomRef(f) => CustomBoxed(f.clone_dyn()?),
+        })
     }
 
     /// Get a reference to the provider
@@ -147,7 +150,7 @@ pub trait IntoFileContentProvider<'i> {
     fn into_provider(self) -> FileContentProvider<'i>;
 
     /// Open this provider and immediately make it static
-    fn into_owned_provider(self) -> FileContentProvider<'static>
+    fn into_owned_provider(self) -> Result<FileContentProvider<'static>, ConfigError>
     where
         Self: Sized,
     {
@@ -205,5 +208,56 @@ where
 {
     fn into_provider(self) -> FileContentProvider<'i> {
         FileContentProvider::CustomRef(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct BorrowedFactory;
+
+    impl ReaderFactory for BorrowedFactory {
+        fn get_reader(&self) -> Result<Box<dyn Read + '_>, ConfigError> {
+            Ok(Box::new(Cursor::new("name = \"test\"")))
+        }
+    }
+
+    #[test]
+    fn borrowed_custom_reader_requires_explicit_clone_support() {
+        let factory = BorrowedFactory;
+        let provider = FileContentProvider::CustomRef(&factory);
+
+        let error = provider.into_owned().err().expect("conversion should fail");
+        assert!(error.to_string().contains("not cloneable"), "{error}");
+    }
+
+    #[derive(Clone)]
+    struct CloneableFactory;
+
+    impl ReaderFactory for CloneableFactory {
+        fn get_reader(&self) -> Result<Box<dyn Read + '_>, ConfigError> {
+            Ok(Box::new(Cursor::new("name = \"test\"")))
+        }
+
+        fn clone_dyn(&self) -> Result<Box<dyn ReaderFactory + 'static>, ConfigError> {
+            Ok(Box::new(self.clone()))
+        }
+    }
+
+    #[test]
+    fn borrowed_cloneable_reader_can_be_owned() {
+        let factory = CloneableFactory;
+        let provider = FileContentProvider::CustomRef(&factory);
+        let owned = provider.into_owned().expect("conversion should succeed");
+
+        let contents = owned
+            .with_reader(|reader| {
+                let mut contents = String::new();
+                reader.read_to_string(&mut contents)?;
+                Ok(contents)
+            })
+            .expect("reader should work");
+        assert_eq!(contents, "name = \"test\"");
     }
 }

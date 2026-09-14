@@ -10,7 +10,7 @@ pub use einstellung_derive::Config;
 #[doc(hidden)]
 pub use serde;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "derive", feature = "json"))]
 pub mod tests;
 
 mod providers;

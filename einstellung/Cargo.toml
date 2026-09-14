@@ -17,6 +17,14 @@ toml = { version = "0.9.8", optional = true }
 
 einstellung_derive = { version = "0.1.6", path = "../einstellung_derive", optional = true }
 
+[[example]]
+name = "simple"
+required-features = ["derive", "json", "toml", "yaml"]
+
+[[example]]
+name = "layered"
+required-features = ["derive", "json", "toml", "yaml"]
+
 [dev-dependencies]
 insta = "1.46.3"
 

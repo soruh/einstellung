@@ -425,10 +425,25 @@ pub fn build_with_context<P: PartialConfig>(
         .map_err(|err| context(err, complete, segment))
 }
 
+#[doc(hidden)]
+pub fn merge_with_context<P: PartialConfig>(
+    current: P,
+    next: P,
+    complete: &'static str,
+    segment: &'static str,
+) -> Result<P, ConfigError> {
+    current
+        .merge(next)
+        .map_err(|err| context(err, complete, segment))
+}
+
 fn context(error: ConfigError, complete: &'static str, segment: &'static str) -> ConfigError {
     match error {
         ConfigError::MissingField(field) => {
             ConfigError::MissingField(field.context(complete, segment))
+        }
+        ConfigError::FreezeCollision(field) => {
+            ConfigError::FreezeCollision(field.context(complete, segment))
         }
         ConfigError::Validation { field, reason } => ConfigError::Validation {
             field: field.context(complete, segment),
@@ -437,6 +452,10 @@ fn context(error: ConfigError, complete: &'static str, segment: &'static str) ->
         ConfigError::CustomMerge { field, reason } => ConfigError::CustomMerge {
             field: field.context(complete, segment),
             reason,
+        },
+        ConfigError::Source { source, error } => ConfigError::Source {
+            source,
+            error: Box::new(context(*error, complete, segment)),
         },
         x => x,
     }

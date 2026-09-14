@@ -69,6 +69,13 @@ struct OptionalCustomMergeConfig {
 }
 
 #[derive(Config, Debug)]
+#[config(crate = crate)]
+struct NestedCustomMergeConfig {
+    #[config(subconfig)]
+    nested: CustomMergeConfig,
+}
+
+#[derive(Config, Debug)]
 #[config(crate = crate, deny_unknown_fields)]
 struct StrictConfig {
     value: String,
@@ -648,6 +655,27 @@ fn builtin_and_closure_validators_work() {
     ))
     .unwrap_err();
     assert_eq!(error.field_path().unwrap().logical_path(), "port");
+}
+
+#[test]
+fn nested_merge_errors_include_outer_field_context() {
+    let base = JsonFileProvider::from_contents(r#"{ "nested": { "value": "base" } }"#);
+    let override_layer = JsonFileProvider::from_contents(r#"{ "nested": { "value": "" } }"#);
+
+    let error = NestedCustomMergeConfig::builder()
+        .provider(&base)
+        .provider(&override_layer)
+        .build()
+        .unwrap_err();
+
+    assert_eq!(error.field_path().unwrap().logical_path(), "nested.value");
+    assert_eq!(
+        error.field_path().unwrap().to_string(),
+        "NestedCustomMergeConfig::nested::value"
+    );
+    assert!(error.to_string().starts_with(
+        "configuration source inline json: Custom Merge failed for field 'NestedCustomMergeConfig::nested::value'"
+    ));
 }
 
 #[test]

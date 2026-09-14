@@ -124,12 +124,20 @@ fn generate_field_merge(
                 })?
             })
         }
-        MergeStrategy::MergeSubconfig => quote! {
-            match (#left, #right) {
-                (Some(a), Some(b)) => Some(#einstellung::PartialConfig::merge(a, b)?),
-                (a, b) => a.or(b)
+        MergeStrategy::MergeSubconfig => {
+            let ident_str = f.ident.to_string();
+            quote! {
+                match (#left, #right) {
+                    (Some(a), Some(b)) => Some(#einstellung::merge_with_context(
+                        a,
+                        b,
+                        #complete_str,
+                        #ident_str,
+                    )?),
+                    (a, b) => a.or(b)
+                }
             }
-        },
+        }
     }
 }
 

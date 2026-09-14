@@ -181,6 +181,48 @@ mod tests {
         port: u16,
     }
 
+    #[test]
+    fn structured_errors_retain_nested_paths_and_safe_diagnostics() {
+        #[derive(Debug, Deserialize)]
+        #[allow(dead_code)]
+        struct Nested {
+            #[serde(rename = "service-nodes")]
+            nodes: Vec<TestConfig>,
+        }
+
+        let cases = [
+            #[cfg(feature = "json")]
+            (
+                ConfigFormat::Json,
+                r#"{"service-nodes":[{"name":"api","port":"super-secret"}]}"#,
+            ),
+            #[cfg(feature = "toml")]
+            (
+                ConfigFormat::Toml,
+                "[[service-nodes]]\nname = \"api\"\nport = \"super-secret\"\n",
+            ),
+            #[cfg(feature = "yaml")]
+            (
+                ConfigFormat::Yaml,
+                "service-nodes:\n  - name: api\n    port: super-secret\n",
+            ),
+        ];
+        for (format, contents) in cases {
+            let error = FormatProvider::from_contents(format, contents)
+                .load_partial_with_source::<Nested>()
+                .unwrap_err();
+            assert_eq!(
+                error.logical_path().as_deref(),
+                Some("service-nodes.0.port")
+            );
+            assert!(error.source_location().is_some());
+            assert_eq!(error.field_sources().len(), 1);
+            assert!(!error.to_string().contains("super-secret"));
+            assert!(!format!("{error:?}").contains("super-secret"));
+            assert!(error.root_cause().logical_path().is_none());
+        }
+    }
+
     #[cfg(feature = "json")]
     #[test]
     fn loads_json_selected_at_runtime() {

@@ -46,8 +46,16 @@ pub(super) fn load_toml<T: serde::de::DeserializeOwned>(
     source.with_reader(|reader| {
         let mut buffer = String::new();
         reader.read_to_string(&mut buffer)?;
-        ::toml::from_str(&buffer)
-            .map_err(|error| crate::TomlError::with_input(error, &buffer).into())
+        let deserializer = ::toml::de::Deserializer::parse(&buffer)
+            .map_err(|error| crate::TomlError::with_input(error, &buffer))?;
+        let mut track = serde_path_to_error::Track::new();
+        T::deserialize(serde_path_to_error::Deserializer::new(
+            deserializer,
+            &mut track,
+        ))
+        .map_err(|error| {
+            with_deserialization_path(crate::TomlError::with_input(error, &buffer).into(), track)
+        })
     })
 }
 

@@ -36,6 +36,26 @@ pub use yaml::YamlFileProvider;
 
 use crate::ConfigError;
 
+#[cfg(any(feature = "json", feature = "toml", feature = "yaml"))]
+fn with_deserialization_path(error: ConfigError, track: serde_path_to_error::Track) -> ConfigError {
+    // Use dotted segments so collection failures can find their parent field's provenance.
+    // Unknown segments only identify the enclosing value, not a destination of their own.
+    let mut segments = Vec::new();
+    for segment in track.path().iter() {
+        match segment {
+            serde_path_to_error::Segment::Map { key } => segments.push(key.clone()),
+            serde_path_to_error::Segment::Seq { index } => segments.push(index.to_string()),
+            serde_path_to_error::Segment::Enum { variant } => segments.push(variant.clone()),
+            serde_path_to_error::Segment::Unknown => break,
+        }
+    }
+    if segments.is_empty() {
+        error
+    } else {
+        error.with_logical_path(segments.join("."))
+    }
+}
+
 /// Helper trait to read from type-erased file sources
 pub trait ReaderFactory: Send + Sync {
     /// Produce a reader from this source

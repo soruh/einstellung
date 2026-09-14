@@ -44,7 +44,17 @@ impl JsonFileProvider<'static> {
 pub(super) fn load_json<T: serde::de::DeserializeOwned>(
     source: &FileContentProvider<'_>,
 ) -> Result<T, ConfigError> {
-    source.with_reader(|reader| Ok(serde_json::from_reader(reader)?))
+    source.with_reader(|reader| {
+        let mut deserializer = serde_json::Deserializer::from_reader(reader);
+        let mut track = serde_path_to_error::Track::new();
+        let value = T::deserialize(serde_path_to_error::Deserializer::new(
+            &mut deserializer,
+            &mut track,
+        ))
+        .map_err(|error| with_deserialization_path(error.into(), track))?;
+        deserializer.end()?;
+        Ok(value)
+    })
 }
 
 impl<'i> ConfigProvider for JsonFileProvider<'i> {
@@ -77,6 +87,15 @@ mod tests {
 
         assert_eq!(error.location(), None);
         assert_eq!(error.to_string(), "I/O error");
+    }
+
+    #[test]
+    fn rejects_trailing_input_without_attaching_a_field_path() {
+        let error = JsonFileProvider::from_contents(r#"{"retries": 1} {}"#)
+            .load_partial::<Config>()
+            .unwrap_err();
+        assert_eq!(error.logical_path(), None);
+        assert!(matches!(error.root_cause(), ConfigError::Json(_)));
     }
 
     #[test]

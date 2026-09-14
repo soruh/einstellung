@@ -1251,6 +1251,55 @@ fn contextual_provider_load_attaches_source_to_parse_errors() {
 }
 
 #[test]
+fn structured_conversion_errors_include_previous_and_attempted_field_sources() {
+    use crate::{ConfigFormat, FormatProvider};
+
+    let cases = [
+        (
+            ConfigFormat::Json,
+            r#"{"network":{"listen":{"port":"super-secret"}}}"#,
+        ),
+        #[cfg(feature = "toml")]
+        (
+            ConfigFormat::Toml,
+            "[network.listen]\nport = \"super-secret\"\n",
+        ),
+        #[cfg(feature = "yaml")]
+        (
+            ConfigFormat::Yaml,
+            "network:\n  listen:\n    port: super-secret\n",
+        ),
+    ];
+    for (format, contents) in cases {
+        let error = AppConfig::builder()
+            .provider_named("base", &JsonFileProvider::from_contents(
+                r#"{"app_name":"demo","network":{"listen":{"address":"192.0.2.1","port":8080}}}"#,
+            ))
+            .provider_named("override", &FormatProvider::from_contents(format, contents))
+            .build()
+            .unwrap_err();
+
+        assert_eq!(error.logical_path().as_deref(), Some("network.listen.port"));
+        assert_eq!(
+            error
+                .field_sources()
+                .iter()
+                .map(|source| source.label())
+                .collect::<Vec<_>>(),
+            ["base", "override"],
+        );
+        assert_eq!(
+            error.field_provenance().unwrap().last().unwrap().label(),
+            "base"
+        );
+        assert_eq!(error.latest_field_source().unwrap().label(), "override");
+        assert!(error.source_location().is_some());
+        assert!(!error.to_string().contains("super-secret"));
+        assert!(!format!("{error:?}").contains("super-secret"));
+    }
+}
+
+#[test]
 fn direct_load_attaches_source_to_validation_errors() {
     let error = AppConfig::load_complete(&JsonFileProvider::from_contents(
         r#"{ "app_name": "bad", "network": { "listen": { "address": "127.0.0.1" } } }"#,

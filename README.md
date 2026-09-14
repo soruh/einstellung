@@ -309,6 +309,12 @@ that triggered a load/merge error, `logical_path()` returns a dotted field path,
 and `field_sources()` combines successfully merged provenance with the provider
 whose attempted layer caused a field-specific failure.
 
+JSON, TOML, and YAML providers retain deserialization paths through
+`serde_path_to_error`, including nested fields, map keys, and collection indices
+(for example, `servers.0.port`). These paths participate in provenance lookup and
+honor Serde's input field names. Errors without a known destination, such as
+document-level syntax errors, may have no logical path.
+
 Custom providers that know which destination field failed can attach the same
 metadata with `ConfigError::with_logical_path("model.remote.api_url")`. Path context
 is transparent in the displayed error but is available through `logical_path()` and

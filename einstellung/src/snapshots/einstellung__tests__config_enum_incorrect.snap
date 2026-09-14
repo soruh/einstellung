@@ -8,9 +8,12 @@ Source {
     source: ConfigSource {
         label: "inline json",
     },
-    error: Json(
-        JsonError(
-            "data error at line 1, column 17",
+    error: Path {
+        path: "mode",
+        error: Json(
+            JsonError(
+                "data error at line 1, column 17",
+            ),
         ),
-    ),
+    },
 }

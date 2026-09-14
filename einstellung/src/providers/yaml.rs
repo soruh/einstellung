@@ -43,7 +43,16 @@ impl YamlFileProvider<'static> {
 pub(super) fn load_yaml<T: serde::de::DeserializeOwned>(
     source: &FileContentProvider<'_>,
 ) -> Result<T, ConfigError> {
-    source.with_reader(|reader| Ok(serde_saphyr::from_reader(reader)?))
+    source.with_reader(|reader| {
+        let mut track = serde_path_to_error::Track::new();
+        serde_saphyr::with_deserializer_from_reader(reader, |deserializer| {
+            T::deserialize(serde_path_to_error::Deserializer::new(
+                deserializer,
+                &mut track,
+            ))
+        })
+        .map_err(|error| with_deserialization_path(error.into(), track))
+    })
 }
 
 impl<'i> ConfigProvider for YamlFileProvider<'i> {
@@ -128,6 +137,15 @@ mod tests {
                 },
             }
         );
+    }
+
+    #[test]
+    fn rejects_multiple_documents_without_attaching_a_field_path() {
+        let error = YamlFileProvider::from_contents("---\nname: first\n---\nname: second\n")
+            .load_partial::<std::collections::BTreeMap<String, String>>()
+            .unwrap_err();
+        assert_eq!(error.logical_path(), None);
+        assert!(matches!(error.root_cause(), ConfigError::Yaml(_)));
     }
 
     #[test]

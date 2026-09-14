@@ -22,7 +22,7 @@ pub use dotenv::DotenvProvider;
 #[cfg(feature = "env")]
 pub use env::{EnvProvider, EnvProviderError};
 #[cfg(any(feature = "json", feature = "toml", feature = "yaml"))]
-pub use format::{ConfigFormat, FormatProvider};
+pub use format::{ConfigFormat, FormatProvider, FormatProviderError};
 #[cfg(feature = "json")]
 pub use json::JsonFileProvider;
 #[cfg(feature = "toml")]

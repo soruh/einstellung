@@ -151,14 +151,23 @@ fn insert_mapped_value(
         };
 
         if is_leaf {
-            children.insert(
-                segment.clone(),
-                ValueNode::Leaf {
-                    input: input.clone(),
-                    value: value.clone(),
-                },
-            );
-            return Ok(());
+            match children.get(segment) {
+                Some(ValueNode::Branch(_)) => {
+                    return Err(KeyValueProviderError::ConflictingPath {
+                        path: path.join("."),
+                    });
+                }
+                Some(ValueNode::Leaf { .. }) | None => {
+                    children.insert(
+                        segment.clone(),
+                        ValueNode::Leaf {
+                            input: input.clone(),
+                            value: value.clone(),
+                        },
+                    );
+                    return Ok(());
+                }
+            }
         }
 
         node = children
@@ -527,5 +536,32 @@ mod tests {
         let error = provider.load_partial::<TestConfig>().unwrap_err();
 
         assert!(error.to_string().contains("database.url"));
+    }
+
+    #[test]
+    fn rejects_conflicting_paths_in_reverse_order() {
+        let provider = KeyValueProvider::new()
+            .with("database.url", "postgres://db/app")
+            .with("database", "scalar");
+
+        let error = provider.load_partial::<TestConfig>().unwrap_err();
+
+        assert!(error.to_string().contains("database"));
+    }
+
+    #[test]
+    fn later_duplicate_paths_replace_earlier_values() {
+        let provider = KeyValueProvider::new()
+            .with("api_key", "old")
+            .with("api_key", "new")
+            .with("source_path", "/srv/app")
+            .with("port", "443")
+            .with("enabled", "true")
+            .with("database.url", "postgres://db/app")
+            .with("tags", "[]");
+
+        let config = provider.load_partial::<TestConfig>().unwrap();
+
+        assert_eq!(config.api_key, "new");
     }
 }

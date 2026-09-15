@@ -268,7 +268,9 @@ pub fn transform_struct(mut receiver: ConfigStructReceiver) -> syn::Result<Trans
     let attrs = receiver.take_partial_attrs();
 
     let complete_ident = receiver.ident.clone();
-    let partial_ident = syn::Ident::new(&format!("{complete_ident}Partial"), complete_ident.span());
+    let complete_name = complete_ident.to_string();
+    let complete_name = complete_name.strip_prefix("r#").unwrap_or(&complete_name);
+    let partial_ident = syn::Ident::new(&format!("{complete_name}Partial"), complete_ident.span());
     let vis = receiver.vis;
     let einstellung = receiver.einstellung;
 

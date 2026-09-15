@@ -757,3 +757,17 @@ assert_macro_test!(PASS, validator_deref_coercion:
         }
     }
 );
+
+assert_macro_test!(PASS, raw_struct_identifier: {
+    #[allow(non_camel_case_types)]
+    #[derive(Config)]
+    struct r#type {
+        value: u16,
+    }
+});
+
+assert_macro_test!(PASS, empty_freezable_struct: {
+    #[derive(Config)]
+    #[config(freezable)]
+    struct Empty {}
+});

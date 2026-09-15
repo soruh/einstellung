@@ -78,9 +78,15 @@ fn generate_partial_struct(model: &TransformedStruct) -> TokenStream {
         let f_attrs = &f.attrs;
         let f_vis = &f.vis;
         let ty = render_partial_type(&f.partial_type, einstellung);
+        let deserialize_flattened = f.flattened_subconfig.then(|| {
+            let path: syn::Path = syn::parse_quote!(#einstellung::deserialize_flattened);
+            let path = path_to_litstr(&path);
+            quote!(#[serde(deserialize_with = #path)])
+        });
 
         quote! {
             #(#f_attrs)*
+            #deserialize_flattened
             #f_vis #ident: #ty
         }
     });
@@ -180,6 +186,8 @@ fn generate_build_for_field(
                 (!#einstellung::PartialConfig::provided_fields(&value).is_empty()).then_some(value)
             })
         }
+    } else if f.flattened_subconfig {
+        quote!(::core::option::Option::Some(#unfreeze.unwrap_or_default()))
     } else {
         unfreeze
     };
@@ -200,7 +208,7 @@ fn generate_build_for_field(
             quote! { #built.ok_or(#einstellung::ConfigError::MissingField(#einstellung::FieldPath::new(#complete_type_name, #ident_str)))? }
         }
         UnwrapStrategy::UnwrapWithDefault(default) => match default {
-            DefaultStrategy::Value(val) => quote! { #built.unwrap_or(#val) },
+            DefaultStrategy::Value(val) => quote! { #built.unwrap_or_else(|| #val) },
             DefaultStrategy::Call(func) => quote! { #built.unwrap_or_else(#func) },
             DefaultStrategy::DefaultTrait => {
                 quote! { #built.unwrap_or_else(::core::default::Default::default) }
@@ -334,9 +342,23 @@ fn generate_defaulted_field(f: &TransformedField, einstellung: &syn::Path) -> To
 
     if f.build.build {
         if f.flattened_subconfig {
+            let optional = matches!(f.build.unwrap, UnwrapStrategy::DontUnwrap);
+            if optional {
+                return quote! {
+                    if let ::core::option::Option::Some(value) = (#field).as_ref() {
+                        if !#einstellung::PartialConfig::provided_fields(value).is_empty() {
+                            fields.extend(#einstellung::PartialConfig::defaulted_fields(value));
+                        }
+                    }
+                };
+            }
+            let core = &f.partial_type.core_type;
             quote! {
                 if let ::core::option::Option::Some(value) = (#field).as_ref() {
                     fields.extend(#einstellung::PartialConfig::defaulted_fields(value));
+                } else {
+                    let value = <<#core as #einstellung::Config>::Partial as ::core::default::Default>::default();
+                    fields.extend(#einstellung::PartialConfig::defaulted_fields(&value));
                 }
             }
         } else {
@@ -454,18 +476,26 @@ fn generate_freezable_impl(model: &TransformedStruct) -> TokenStream {
         quote_spanned!(ident.span() => #ident: #resolve)
     });
 
-    let is_field_frozen = fields.iter().filter_map(|f| {
-        let ident = &f.ident;
-        (f.freeze != FreezeStrategy::NotFreezable).then(
-            || quote_spanned!(ident.span() => #einstellung::Freezable::is_frozen(&self.#ident)),
-        )
-    });
+    let is_field_frozen = fields
+        .iter()
+        .filter_map(|f| {
+            let ident = &f.ident;
+            (f.freeze != FreezeStrategy::NotFreezable).then(
+                || quote_spanned!(ident.span() => #einstellung::Freezable::is_frozen(&self.#ident)),
+            )
+        })
+        .collect::<Vec<_>>();
+    let is_frozen = if is_field_frozen.is_empty() {
+        quote!(false)
+    } else {
+        quote!(#(#is_field_frozen)||*)
+    };
 
     quote_spanned! {partial_ident.span() =>
         #[automatically_derived]
         impl #einstellung::Freezable for #partial_ident {
             fn freeze(self) -> Self { Self { #(#freeze_fields,)* } }
-            fn is_frozen(&self) -> bool { #(#is_field_frozen)||* }
+            fn is_frozen(&self) -> bool { #is_frozen }
         }
     }
 }

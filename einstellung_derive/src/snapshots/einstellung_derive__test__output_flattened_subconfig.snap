@@ -17,6 +17,7 @@ struct AppConfig {
 struct AppConfigPartial {
     name: ::core::option::Option<String>,
     #[serde(flatten)]
+    #[serde(deserialize_with = "::einstellung::deserialize_flattened")]
     credentials: ::core::option::Option<
         <CredentialsConfig as ::einstellung::Config>::Partial,
     >,
@@ -47,8 +48,9 @@ impl ::einstellung::PartialConfig for AppConfigPartial {
                         ::einstellung::FieldPath::new("AppConfig", "name"),
                     ),
                 )?,
-            credentials: self
-                .credentials
+            credentials: ::core::option::Option::Some(
+                    self.credentials.unwrap_or_default(),
+                )
                 .map(|x| ::einstellung::PartialConfig::build(x))
                 .transpose()?
                 .ok_or(
@@ -72,6 +74,9 @@ impl ::einstellung::PartialConfig for AppConfigPartial {
         let mut fields = ::std::vec::Vec::new();
         if let ::core::option::Option::Some(value) = (&self.credentials).as_ref() {
             fields.extend(::einstellung::PartialConfig::defaulted_fields(value));
+        } else {
+            let value = <<CredentialsConfig as ::einstellung::Config>::Partial as ::core::default::Default>::default();
+            fields.extend(::einstellung::PartialConfig::defaulted_fields(&value));
         }
         fields
     }

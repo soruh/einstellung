@@ -63,15 +63,7 @@ struct ListenConfig {
 }
 
 fn config_dir() -> PathBuf {
-    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let relative = Path::new(file!()).iter().skip(1).collect::<PathBuf>();
-
-    manifest_dir
-        .join(relative)
-        .parent()
-        .unwrap()
-        .canonicalize()
-        .unwrap()
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("examples")
 }
 
 fn load_config(dir: &Path) -> Result<AppConfig, ConfigError> {
@@ -96,11 +88,10 @@ fn load_config(dir: &Path) -> Result<AppConfig, ConfigError> {
         .build()
 }
 
-fn main() {
+fn main() -> Result<(), ConfigError> {
     let dir = config_dir();
 
-    match load_config(&dir) {
-        Ok(config) => println!("loaded config: {config:#?}"),
-        Err(err) => eprintln!("failed to load config: {err}"),
-    }
+    let config = load_config(&dir)?;
+    println!("loaded config: {config:#?}");
+    Ok(())
 }

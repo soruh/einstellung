@@ -55,6 +55,7 @@ pub struct EnvProvider {
 struct EnvBinding {
     variable: String,
     path: String,
+    json: bool,
 }
 
 impl EnvProvider {
@@ -107,6 +108,25 @@ impl EnvProvider {
         self.vars.push(EnvBinding {
             variable: variable.into(),
             path: config_path.into(),
+            json: false,
+        });
+        self
+    }
+
+    /// Map a selected variable whose value is encoded as JSON.
+    ///
+    /// This preserves numeric, boolean, and collection types in flattened subconfigs and
+    /// untagged enums. String values must use JSON quotes. Explicit mappings override
+    /// prefix mappings for the same destination path.
+    pub fn with_json_var(
+        mut self,
+        variable: impl Into<String>,
+        config_path: impl Into<String>,
+    ) -> Self {
+        self.vars.push(EnvBinding {
+            variable: variable.into(),
+            path: config_path.into(),
+            json: true,
         });
         self
     }
@@ -159,12 +179,10 @@ impl EnvProvider {
             };
 
             let path = binding.path.split('.').map(str::to_owned).collect();
-            mapped.push(mapped_env_value(
-                provider_name,
-                path,
-                &binding.variable,
-                value,
-            )?);
+            mapped.push(
+                mapped_env_value(provider_name, path, &binding.variable, value)?
+                    .with_json_mode(binding.json),
+            );
         }
 
         load_mapped_values(mapped).map_err(|error| {
@@ -463,5 +481,33 @@ mod tests {
         assert_eq!(error.logical_path().as_deref(), Some("a_port"));
         assert!(error.to_string().contains("PORT"));
         assert!(!error.to_string().contains("not-a-number"));
+    }
+
+    #[test]
+    fn json_and_raw_mappings_share_one_lookup_and_preserve_flattened_types() {
+        #[derive(Deserialize)]
+        struct Inner {
+            port: u16,
+            literal: String,
+        }
+        #[derive(Deserialize)]
+        struct Outer {
+            #[serde(flatten)]
+            inner: Inner,
+        }
+        let provider = EnvProvider::new()
+            .with_json_var("PORT", "port")
+            .with_var("PORT", "literal");
+        let mut lookups = 0;
+        let config: Outer = provider
+            .load_from_lookup("environment", |key| {
+                assert_eq!(key, "PORT");
+                lookups += 1;
+                Some(OsString::from("8080"))
+            })
+            .unwrap();
+        assert_eq!(lookups, 1);
+        assert_eq!(config.inner.port, 8080);
+        assert_eq!(config.inner.literal, "8080");
     }
 }

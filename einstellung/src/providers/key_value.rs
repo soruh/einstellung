@@ -83,6 +83,7 @@ pub struct KeyValueProvider {
 struct KeyValueBinding {
     path: String,
     value: String,
+    json: bool,
 }
 
 impl fmt::Debug for KeyValueProvider {
@@ -126,6 +127,21 @@ impl KeyValueProvider {
         self.values.push(KeyValueBinding {
             path: path.into(),
             value: value.into(),
+            json: false,
+        });
+        self
+    }
+
+    /// Add a value encoded as JSON, preserving its type through Serde buffering.
+    ///
+    /// Use this for numeric, boolean, or collection values in flattened subconfigs and
+    /// untagged enums. JSON strings must be quoted. Ordinary [`Self::with`] keeps literal
+    /// string semantics and parses scalars only when the destination requests their type.
+    pub fn with_json(mut self, path: impl Into<String>, value: impl Into<String>) -> Self {
+        self.values.push(KeyValueBinding {
+            path: path.into(),
+            value: value.into(),
+            json: true,
         });
         self
     }
@@ -141,6 +157,7 @@ impl KeyValueProvider {
             .extend(values.into_iter().map(|(path, value)| KeyValueBinding {
                 path: path.into(),
                 value: value.into(),
+                json: false,
             }));
         self
     }
@@ -154,6 +171,7 @@ impl ConfigProvider for KeyValueProvider {
                 binding.path.clone(),
                 binding.value.clone(),
             )
+            .with_json_mode(binding.json)
         }))
         .map_err(|error| {
             let (path, source) = error.into_parts();
@@ -171,11 +189,22 @@ pub(super) struct MappedValue {
     path: Vec<String>,
     input: String,
     value: String,
+    json: bool,
 }
 
 impl MappedValue {
     pub(super) fn new(path: Vec<String>, input: String, value: String) -> Self {
-        Self { path, input, value }
+        Self {
+            path,
+            input,
+            value,
+            json: false,
+        }
+    }
+
+    pub(super) fn with_json_mode(mut self, json: bool) -> Self {
+        self.json = json;
+        self
     }
 }
 
@@ -189,6 +218,7 @@ enum ValueNode {
         path: String,
         input: String,
         value: String,
+        json: bool,
     },
 }
 
@@ -218,7 +248,12 @@ where
 }
 
 fn insert_mapped_value(root: &mut ValueNode, mapped: MappedValue) -> Result<(), MappedValueError> {
-    let MappedValue { path, input, value } = mapped;
+    let MappedValue {
+        path,
+        input,
+        value,
+        json,
+    } = mapped;
     let logical_path = path.join(".");
     let conflict = || {
         MappedValueError::new(
@@ -250,6 +285,7 @@ fn insert_mapped_value(root: &mut ValueNode, mapped: MappedValue) -> Result<(), 
                             path: logical_path.clone(),
                             input: input.clone(),
                             value: value.clone(),
+                            json,
                         },
                     );
                     return Ok(());
@@ -280,7 +316,9 @@ impl<'a> ValueNodeDeserializer<'a> {
 
     fn leaf(&self) -> Result<(&'a str, &'a str, &'a str), MappedValueError> {
         match self.node {
-            ValueNode::Leaf { path, input, value } => Ok((path, input, value)),
+            ValueNode::Leaf {
+                path, input, value, ..
+            } => Ok((path, input, value)),
             ValueNode::Branch { path, .. } => Err(MappedValueError::new(
                 path.clone(),
                 KeyValueProviderError::InvalidValue {
@@ -625,6 +663,25 @@ impl<'de> MapAccess<'de> for ValueMapAccess<'de> {
                 },
             )
         })?;
+        if let ValueNode::Leaf {
+            path,
+            input,
+            value,
+            json: true,
+        } = value
+        {
+            let invalid = |_| {
+                ValueNodeDeserializer::invalid(
+                    path,
+                    input,
+                    "JSON value does not match target type or syntax",
+                )
+            };
+            let mut deserializer = serde_json::Deserializer::from_str(value);
+            let result = seed.deserialize(&mut deserializer).map_err(invalid)?;
+            deserializer.end().map_err(invalid)?;
+            return Ok(result);
+        }
         seed.deserialize(ValueNodeDeserializer::new(value))
             .map_err(|error| error.with_path_if_unknown(value.path()))
     }
@@ -784,5 +841,55 @@ mod tests {
 
         assert_eq!(error.logical_path().as_deref(), Some("database.typo"));
         assert!(!error.to_string().contains("secret"));
+    }
+
+    #[test]
+    fn json_bindings_preserve_buffered_types_and_literal_strings() {
+        #[derive(Deserialize, Debug, PartialEq)]
+        #[serde(untagged)]
+        enum Value {
+            Number(u16),
+            Text(String),
+        }
+        #[derive(Deserialize, Debug)]
+        struct Config {
+            value: Value,
+        }
+        let raw: Config = KeyValueProvider::new()
+            .with("value", "8080")
+            .load_partial()
+            .unwrap();
+        assert_eq!(raw.value, Value::Text("8080".into()));
+        let typed: Config = KeyValueProvider::new()
+            .with("value", "old")
+            .with_json("value", "8080")
+            .load_partial()
+            .unwrap();
+        assert_eq!(typed.value, Value::Number(8080));
+        let quoted: Config = KeyValueProvider::new()
+            .with_json("value", r#""8080""#)
+            .load_partial()
+            .unwrap();
+        assert_eq!(quoted.value, Value::Text("8080".into()));
+    }
+
+    #[test]
+    fn json_bindings_reject_wrong_types_and_trailing_input() {
+        #[derive(Deserialize, Debug)]
+        struct Config {
+            value: u16,
+        }
+        let valid: Config = KeyValueProvider::new()
+            .with_json("value", "8080")
+            .load_partial()
+            .unwrap();
+        assert_eq!(valid.value, 8080);
+        for input in ["invalid", "8080 trailing", r#""text""#] {
+            let error = KeyValueProvider::new()
+                .with_json("value", input)
+                .load_partial::<Config>()
+                .unwrap_err();
+            assert_eq!(error.logical_path().as_deref(), Some("value"));
+        }
     }
 }

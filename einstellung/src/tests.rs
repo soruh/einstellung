@@ -1727,3 +1727,196 @@ fn serde_renames_define_logical_diagnostic_and_provenance_paths() {
     let error = RenamedPathConfig::builder().build().unwrap_err();
     assert_eq!(error.logical_path().as_deref(), Some("service-port"));
 }
+
+#[derive(Config, Debug)]
+#[config(crate = crate)]
+struct TypedFlattenedFields {
+    #[config(default = 80)]
+    port: u16,
+    #[config(default = false)]
+    enabled: bool,
+    #[config(default)]
+    tags: Vec<String>,
+    #[config(default)]
+    label: String,
+}
+
+#[derive(Config, Debug)]
+#[config(crate = crate)]
+struct RequiredTypedFlatten {
+    #[config(subconfig)]
+    #[config(serde(flatten))]
+    nested: TypedFlattenedFields,
+}
+
+#[derive(Config, Debug)]
+#[config(crate = crate)]
+struct OptionalTypedFlatten {
+    #[config(subconfig)]
+    #[config(serde(flatten))]
+    nested: Option<TypedFlattenedFields>,
+}
+
+#[test]
+fn flattened_decoding_preserves_errors_across_formats() {
+    let cases = [
+        (
+            crate::ConfigFormat::Json,
+            r#"{"port":8080}"#,
+            r#"{"port":"invalid"}"#,
+        ),
+        #[cfg(feature = "toml")]
+        (crate::ConfigFormat::Toml, "port = 8080", "port = 'invalid'"),
+        #[cfg(feature = "yaml")]
+        (crate::ConfigFormat::Yaml, "port: 8080", "port: invalid"),
+    ];
+    for (format, valid, invalid) in cases {
+        let provider = crate::FormatProvider::from_contents(format, valid);
+        assert_eq!(
+            RequiredTypedFlatten::load_complete(&provider)
+                .unwrap()
+                .nested
+                .port,
+            8080
+        );
+        assert_eq!(
+            OptionalTypedFlatten::load_complete(&provider)
+                .unwrap()
+                .nested
+                .unwrap()
+                .port,
+            8080
+        );
+        let bad = crate::FormatProvider::from_contents(format, invalid);
+        for error in [
+            RequiredTypedFlatten::load_complete(&bad).unwrap_err(),
+            OptionalTypedFlatten::builder()
+                .provider(&provider)
+                .provider(&bad)
+                .build()
+                .unwrap_err(),
+        ] {
+            assert!(
+                !matches!(error.root_cause(), ConfigError::MissingField(_)),
+                "{error:?}"
+            );
+            assert!(error.source_location().is_some());
+            assert!(error.config_source().is_some());
+        }
+    }
+}
+
+#[test]
+fn flattened_defaults_and_provenance_agree_for_empty_and_present_layers() {
+    let empty = JsonFileProvider::from_contents("{}");
+    for tracked in [
+        RequiredTypedFlatten::builder().build_tracked().unwrap(),
+        RequiredTypedFlatten::builder()
+            .provider(&empty)
+            .build_tracked()
+            .unwrap(),
+    ] {
+        assert_eq!(tracked.config().nested.port, 80);
+        assert_eq!(tracked.explain("port").unwrap()[0].label(), "field default");
+        assert!(tracked.explain("nested").is_none());
+    }
+    for tracked in [
+        OptionalTypedFlatten::builder().build_tracked().unwrap(),
+        OptionalTypedFlatten::builder()
+            .provider(&empty)
+            .build_tracked()
+            .unwrap(),
+    ] {
+        assert!(tracked.config().nested.is_none());
+        assert_eq!(tracked.provenance().iter().count(), 0);
+    }
+    let tracked = OptionalTypedFlatten::builder()
+        .provider(&JsonFileProvider::from_contents(r#"{"label":"set"}"#))
+        .build_tracked()
+        .unwrap();
+    assert_eq!(tracked.config().nested.as_ref().unwrap().port, 80);
+    assert_eq!(tracked.explain("port").unwrap()[0].label(), "field default");
+    assert_eq!(tracked.explain("label").unwrap()[0].label(), "inline json");
+}
+
+#[test]
+fn expression_defaults_are_evaluated_only_for_missing_fields() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    static CALLS: AtomicUsize = AtomicUsize::new(0);
+    #[derive(Config)]
+    #[config(crate = crate)]
+    struct Lazy {
+        #[config(default = { CALLS.fetch_add(1, Ordering::SeqCst); 80 })]
+        port: u16,
+    }
+    let config = Lazy::builder()
+        .provider(&JsonFileProvider::from_contents(r#"{"port":8080}"#))
+        .provider(&JsonFileProvider::from_contents("{}"))
+        .build()
+        .unwrap();
+    assert_eq!(config.port, 8080);
+    assert_eq!(CALLS.load(Ordering::SeqCst), 0);
+    assert_eq!(Lazy::builder().build().unwrap().port, 80);
+    assert_eq!(CALLS.load(Ordering::SeqCst), 1);
+}
+
+#[cfg(feature = "key-value")]
+#[test]
+fn explicit_json_overlays_preserve_types_through_flattening() {
+    let raw = crate::KeyValueProvider::new().with("port", "8080");
+    let error = OptionalTypedFlatten::load_complete(&raw).unwrap_err();
+    assert_eq!(error.logical_path(), None);
+    assert!(RequiredTypedFlatten::load_complete(&raw).is_err());
+    assert_eq!(
+        TypedFlattenedFields::load_complete(&raw).unwrap().port,
+        8080
+    );
+
+    let typed = crate::KeyValueProvider::named("CLI")
+        .with_json("port", "8080")
+        .with_json("enabled", "true")
+        .with_json("tags", r#"["one","two"]"#)
+        .with("label", "123");
+    let tracked = OptionalTypedFlatten::builder()
+        .provider(&typed)
+        .build_tracked()
+        .unwrap();
+    let fields = tracked.config().nested.as_ref().unwrap();
+    assert_eq!(fields.port, 8080);
+    assert!(fields.enabled);
+    assert_eq!(fields.tags, ["one", "two"]);
+    assert_eq!(fields.label, "123");
+    assert_eq!(tracked.explain("port").unwrap()[0].label(), "CLI");
+    assert_eq!(
+        RequiredTypedFlatten::load_complete(&typed)
+            .unwrap()
+            .nested
+            .port,
+        8080
+    );
+}
+
+#[cfg(feature = "dotenv")]
+#[test]
+fn explicit_json_dotenv_values_load_flattened_fields() {
+    let text = "PORT=8080\nENABLED=true\nTAGS='[\"one\",\"two\"]'\nLABEL=123";
+    let typed = crate::DotenvProvider::from_contents(text)
+        .with_json_var("PORT", "port")
+        .with_json_var("ENABLED", "enabled")
+        .with_json_var("TAGS", "tags")
+        .with_var("LABEL", "label");
+    let fields = OptionalTypedFlatten::load_complete(&typed)
+        .unwrap()
+        .nested
+        .unwrap();
+    assert_eq!(fields.port, 8080);
+    assert!(fields.enabled);
+    assert_eq!(fields.tags, ["one", "two"]);
+    assert_eq!(fields.label, "123");
+    assert!(
+        OptionalTypedFlatten::load_complete(
+            &crate::DotenvProvider::from_contents("PORT=8080").with_var("PORT", "port")
+        )
+        .is_err()
+    );
+}

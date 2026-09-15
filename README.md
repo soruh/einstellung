@@ -3,7 +3,7 @@
 [![Crates.io](https://img.shields.io/crates/v/einstellung.svg)](https://crates.io/crates/einstellung)
 [![Docs.rs](https://docs.rs/einstellung/badge.svg)](https://docs.rs/einstellung)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/soruh/einstellung/.github/workflows/rust.yml?branch=main)](https://github.com/soruh/einstellung/actions)
-[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
 
 `einstellung` is a configuration parser for Rust based on `serde`. It allows you
 to define your application's configuration in a flexible but ergonomic way using
@@ -34,11 +34,13 @@ single final config.
 
 ## Installation
 
+Upgrading from 0.1.x? See the [0.2.0 migration notes](https://github.com/soruh/einstellung/blob/main/CHANGELOG.md).
+
 Add `einstellung` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-einstellung = "0.1.6"
+einstellung = "0.2.0"
 ```
 
 ### Feature Flags
@@ -74,7 +76,7 @@ The crate metadata records the core MSRV. CI checks the higher feature-specific 
 
 Loading a complete configuration from a single YAML file.
 
-```rust
+```rust,no_run
 use std::net::IpAddr;
 use einstellung::{Config, YamlFileProvider};
 
@@ -114,8 +116,8 @@ fn main() {
 Combining hardcoded defaults with external files while protecting specific
 fields.
 
-```rust
-use einstellung::{Config, ConfigError, Freezable, JsonFileProvider, PartialConfig, TomlFileProvider};
+```rust,no_run
+use einstellung::{Config, ConfigError, ConfigProvider, Freezable, JsonFileProvider, PartialConfig, TomlFileProvider};
 
 #[derive(Config, Debug)]
 struct AppConfig {
@@ -152,7 +154,7 @@ Environment providers are opt-in and load nothing unless a mapping or prefix is
 configured. This makes it possible to reserve `.env` for secrets and
 machine-local paths without accidentally importing unrelated settings.
 
-```rust
+```rust,no_run
 use einstellung::{Config, DotenvProvider, EnvProvider, TomlFileProvider};
 
 #[derive(Config)]
@@ -209,6 +211,46 @@ For CLI flags, secret stores, or other already-selected string key/value inputs,
 `KeyValueProvider` accepts dotted logical paths directly and uses the same typed
 decoding as environment providers. Give it a non-secret source label when
 provenance matters, for example `KeyValueProvider::named("CLI overrides")`.
+
+For numeric, boolean, or collection fields behind Serde flattening or untagged
+enums, explicitly encode selected values as JSON with `KeyValueProvider::with_json`
+or `EnvProvider::with_json_var` / `DotenvProvider::with_json_var`:
+
+```rust,no_run
+use einstellung::{Config, KeyValueProvider};
+
+#[derive(Config)]
+struct Listen {
+    port: u16,
+    label: String,
+}
+
+#[derive(Config)]
+struct App {
+    #[config(subconfig)]
+    #[config(serde(flatten))]
+    listen: Option<Listen>,
+}
+
+let config = App::load_complete(
+    &KeyValueProvider::new()
+        .with_json("port", "8080")
+        .with("label", "123"),
+)?;
+assert_eq!(config.listen.unwrap().port, 8080);
+# Ok::<(), einstellung::ConfigError>(())
+```
+
+Ordinary string mappings parse scalars when Serde requests a concrete target
+type. Flattening and untagged enums buffer values before that type is known,
+so ordinary mapped values remain strings there. An untagged numeric-or-string
+enum will therefore select its string variant for an ordinary `"8080"` mapping;
+`with_json("value", "8080")` supplies a number. JSON-valued mappings require valid
+JSON, including quotes around JSON strings. Dotenv quoting is processed first:
+for example, `LABEL='"123"'` preserves the quotes needed by a JSON string mapping.
+Non-unit enums can likewise use an explicit JSON representation. Invalid supplied
+flattened values produce an error, including when the subconfig is optional.
+
 For secret-bearing fields, use `Secret<T>`. It deserializes transparently, redacts
 its `Debug` and `Display` representations, deliberately does not implement
 `Serialize`, and requires an explicit `expose_secret()` call to borrow the value. Keep secret
@@ -246,7 +288,11 @@ keys.
 
 Use `build_tracked()` when you need to explain where a final setting came from:
 
-```rust
+```rust,no_run
+# use einstellung::{Config, EnvProvider, TomlFileProvider};
+# #[derive(Config)]
+# struct AppConfig { api_key: String }
+# fn main() -> Result<(), einstellung::ConfigError> {
 let tracked = AppConfig::builder()
     .provider(&TomlFileProvider::from_path(std::path::Path::new("config.toml")))
     .provider(&EnvProvider::only(["API_KEY"]))
@@ -259,6 +305,8 @@ for source in tracked.explain("api_key").unwrap_or_default() {
 for (path, sources) in tracked.provenance().iter() {
     eprintln!("{path}: {} source(s)", sources.len());
 }
+# Ok(())
+# }
 ```
 
 Provenance stores only logical field paths and source labels, never configuration
@@ -286,7 +334,11 @@ with the caller's earlier layers in precedence order.
 This is particularly useful for final validation errors, where there is no single
 parser failure to identify the source directly:
 
-```rust
+```rust,no_run
+# use einstellung::{Config, EnvProvider, TomlFileProvider};
+# #[derive(Config)]
+# struct AppConfig { port: u16 }
+# fn main() -> Result<(), einstellung::ConfigError> {
 match AppConfig::builder()
     .provider(&TomlFileProvider::from_path(std::path::Path::new("config.toml")))
     .provider(&EnvProvider::only(["PORT"]))
@@ -297,9 +349,11 @@ match AppConfig::builder()
         if let Some(path) = error.logical_path() {
             eprintln!("{path} was associated with: {:?}", error.field_sources());
         }
-        return Err(error.into());
+        return Err(error);
     }
 }
+# Ok(())
+# }
 # fn use_config<T>(_config: T) {}
 ```
 
@@ -314,6 +368,9 @@ JSON, TOML, and YAML providers retain deserialization paths through
 (for example, `servers.0.port`). These paths participate in provenance lookup and
 honor Serde's input field names. Errors without a known destination, such as
 document-level syntax errors, may have no logical path.
+Serde-buffered representations such as flattened subconfigs and untagged enums
+can also lose the exact field path during deserialization. Their errors still
+propagate with provider context; an unknown path is not reported as an empty string.
 
 Custom providers that know which destination field failed can attach the same
 metadata with `ConfigError::with_logical_path("model.remote.api_url")`. Path context
@@ -338,7 +395,7 @@ For example, a validation command can build `AppConfig` with `remote: None`, whi
 an execution command uses `build_view::<RemoteMode>()` and rejects a missing
 remote section:
 
-```rust
+```rust,no_run
 use einstellung::{Config, ConfigError, ConfigView, require_for_view};
 
 #[derive(Config)]
@@ -401,6 +458,9 @@ their nested keys are present. An outer `#[config(default)]` is intentionally
 rejected on flattened subconfigs because Serde represents an absent flattened
 object as an empty partial, making outer-field absence ambiguous; put defaults
 on the nested fields instead.
+Required flattened subconfigs also apply nested defaults when built without any
+provider. Optional flattened subconfigs that remain absent contribute no field
+defaults or field provenance.
 
 Field defaults are a final construction fallback, not an implicit merge layer.
 Providers are merged first; only then does `.build()` fill still-missing fields
@@ -446,9 +506,19 @@ that omits a field never erases an earlier value and never forces its default.
 Please feel free to open an Issue or submit a PR at
 [https://github.com/soruh/einstellung](https://github.com/soruh/einstellung).
 
-Before publishing, run `scripts/verify-packages.sh`. It verifies the packaged
+Before publishing, run `scripts/verify-packages.sh` from a clean checkout. For a
+local pre-commit check, pass `--allow-dirty`. It verifies the packaged
 `einstellung_derive` artifact first, then verifies the packaged `einstellung` crate
 against that exact derive artifact rather than an older registry release.
+It also compiles README doctests and runs both examples from the extracted archive.
+
+The root `README.md` is the documentation source; the crate READMEs link to it.
+All Rust snippets are compiled by
+`cargo test --workspace --all-features --doc`. Package verification also checks
+that the README and license copies match their workspace originals.
+
+Publish `einstellung_derive` first, wait until it is available from crates.io, then
+publish `einstellung`. Tag the verified release commit as `v0.2.0`.
 
 (This includes confusing/incorrect documentation, bad error messages and missing
 features)

@@ -27,7 +27,9 @@ impl ::einstellung::PartialConfig for ConfigPartial {
     fn build(
         self,
     ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
-        ::core::result::Result::Ok(Config { x: self.x.unwrap_or(10) })
+        ::core::result::Result::Ok(Config {
+            x: self.x.unwrap_or_else(|| 10),
+        })
     }
     fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
         let mut fields = ::std::vec::Vec::new();

@@ -6,6 +6,20 @@ on:
   pull_request:
 
 jobs:
+  platforms:
+    name: Runtime (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Test providers and configuration composition
+        run: cargo test -p einstellung --all-features --lib -- --test-threads=1
+
   msrv:
     name: MSRV (${{ matrix.name }})
     runs-on: ubuntu-latest

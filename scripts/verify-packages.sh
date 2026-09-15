@@ -4,6 +4,14 @@ set -euo pipefail
 workspace_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$workspace_root"
 
+# These copies make the documentation and licenses available inside each published crate.
+cmp README.md einstellung/README.md
+cmp README.md einstellung_derive/README.md
+for package in einstellung einstellung_derive; do
+    cmp LICENSE-MIT "$package/LICENSE-MIT"
+    cmp LICENSE-APACHE "$package/LICENSE-APACHE"
+done
+
 scratch="$(mktemp -d)"
 export CARGO_TARGET_DIR="$scratch/target"
 lock_backup="$scratch/Cargo.lock"
@@ -17,9 +25,9 @@ trap cleanup EXIT
 # Fail before packaging if the checked-in lockfile is already stale. The main package check below
 # uses a temporary crates.io patch, which Cargo records in Cargo.lock; cleanup restores the exact
 # checked-in lockfile afterward.
-cargo metadata --locked --no-deps --format-version 1 >/dev/null
+cargo metadata --locked --format-version 1 >/dev/null
 
-cargo package -p einstellung_derive
+cargo package -p einstellung_derive "$@"
 
 derive_crate="$(ls -t "$CARGO_TARGET_DIR"/package/einstellung_derive-*.crate | head -n 1)"
 mkdir -p "$scratch/derive-package"
@@ -31,8 +39,32 @@ if [[ -z "$derive_dir" ]]; then
     exit 1
 fi
 
+cmp LICENSE-MIT "$derive_dir/LICENSE-MIT"
+cmp LICENSE-APACHE "$derive_dir/LICENSE-APACHE"
+
 # `cargo package` rewrites path dependencies as registry dependencies. Patch crates.io to the
 # freshly packaged derive crate so the main package is verified against the exact derive artifact
 # that would be published alongside it, rather than a previously published version.
-cargo package -p einstellung \
+cargo package -p einstellung "$@" \
     --config "patch.crates-io.einstellung_derive.path=\"$derive_dir\""
+
+main_crate="$(ls -t "$CARGO_TARGET_DIR"/package/einstellung-*.crate | head -n 1)"
+mkdir -p "$scratch/main-package"
+tar -xzf "$main_crate" -C "$scratch/main-package"
+main_dir="$(find "$scratch/main-package" -mindepth 1 -maxdepth 1 -type d -name 'einstellung-*' -print -quit)"
+if [[ -z "$main_dir" ]]; then
+    echo "failed to locate packaged einstellung source" >&2
+    exit 1
+fi
+
+cmp README.md "$main_dir/README.md"
+cmp LICENSE-MIT "$main_dir/LICENSE-MIT"
+cmp LICENSE-APACHE "$main_dir/LICENSE-APACHE"
+
+# Exercise the published layout, including README doctests and example fixture paths.
+cargo test --manifest-path "$main_dir/Cargo.toml" --all-features --doc \
+    --config "patch.crates-io.einstellung_derive.path=\"$derive_dir\""
+for example in simple layered; do
+    cargo run --manifest-path "$main_dir/Cargo.toml" --example "$example" \
+        --config "patch.crates-io.einstellung_derive.path=\"$derive_dir\""
+done

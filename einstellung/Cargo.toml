@@ -1,6 +1,6 @@
 [package]
 name = "einstellung"
-version = "0.1.6"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.85"
 description = "A Rust Configuration Parser"
@@ -20,7 +20,7 @@ dotenvy = { version = "0.15.7", optional = true }
 serde_saphyr = { package = "serde-saphyr", version = "1.2.0", default-features = false, features = ["deserialize"], optional = true }
 toml = { version = "0.9.8", optional = true }
 
-einstellung_derive = { version = "0.1.6", path = "../einstellung_derive", optional = true }
+einstellung_derive = { version = "0.2.0", path = "../einstellung_derive", optional = true }
 
 [[example]]
 name = "simple"

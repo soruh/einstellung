@@ -27,4 +27,7 @@ error[E0277]: `u16` is not an iterator
   = note: required for `u16` to implement `IntoIterator`
 note: required by a bound in `extend`
  --> $RUST/core/src/iter/traits/collect.rs
+  |
+  |     fn extend<T: IntoIterator<Item = A>>(&mut self, iter: T);
+  |                  ^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `Extend::extend`
   = note: this error originates in the derive macro `Config` (in Nightly builds, run with -Z macro-backtrace for more info)

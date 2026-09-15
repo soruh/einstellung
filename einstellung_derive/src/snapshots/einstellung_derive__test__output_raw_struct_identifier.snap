@@ -3,52 +3,55 @@ source: einstellung_derive/src/test.rs
 expression: formatted
 ---
 /// --- input ---
+#[allow(non_camel_case_types)]
 #[derive(Config)]
-struct ServerConfig {
-    #[config(default = "8080")]
-    port: u16,
+struct r#type {
+    value: u16,
 }
 
 /// --- output ---
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
-struct ServerConfigPartial {
-    port: ::core::option::Option<u16>,
+struct typePartial {
+    value: ::core::option::Option<u16>,
 }
 #[automatically_derived]
-impl ::einstellung::PartialConfig for ServerConfigPartial {
-    type Complete = ServerConfig;
+impl ::einstellung::PartialConfig for typePartial {
+    type Complete = r#type;
     fn merge(
         self,
         next: Self,
     ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
         ::core::result::Result::Ok(Self {
-            port: next.port.or(self.port),
+            value: next.value.or(self.value),
         })
     }
     fn build(
         self,
     ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
-        ::core::result::Result::Ok(ServerConfig {
-            port: self.port.unwrap_or_else(|| "8080"),
+        ::core::result::Result::Ok(r#type {
+            value: self
+                .value
+                .ok_or(
+                    ::einstellung::ConfigError::MissingField(
+                        ::einstellung::FieldPath::new("r#type", "value"),
+                    ),
+                )?,
         })
     }
     fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
         let mut fields = ::std::vec::Vec::new();
-        if (&self.port).is_some() {
-            fields.push(::std::string::String::from("port"));
+        if (&self.value).is_some() {
+            fields.push(::std::string::String::from("value"));
         }
         fields
     }
     fn defaulted_fields(&self) -> ::std::vec::Vec<::std::string::String> {
-        let mut fields = ::std::vec::Vec::new();
-        if (&self.port).is_none() {
-            fields.push(::std::string::String::from("port"));
-        }
+        let fields = ::std::vec::Vec::new();
         fields
     }
 }
 #[automatically_derived]
-impl ::einstellung::Config for ServerConfig {
-    type Partial = ServerConfigPartial;
+impl ::einstellung::Config for r#type {
+    type Partial = typePartial;
 }

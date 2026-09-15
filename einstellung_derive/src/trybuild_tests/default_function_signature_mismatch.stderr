@@ -12,3 +12,9 @@ error[E0593]: function is expected to take 0 arguments, but it takes 1 argument
   |
 note: required by a bound in `std::option::Option::<T>::unwrap_or_else`
  --> $RUST/core/src/option.rs
+  |
+  |     pub const fn unwrap_or_else<F>(self, f: F) -> T
+  |                  -------------- required by a bound in this associated function
+  |     where
+  |         F: [const] FnOnce() -> T + [const] Destruct,
+  |            ^^^^^^^^^^^^^^^^^^^^^ required by this bound in `Option::<T>::unwrap_or_else`

@@ -61,22 +61,14 @@ struct ListenConfig {
 }
 
 fn config_dir() -> PathBuf {
-    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let relative = Path::new(file!()).iter().skip(1).collect::<PathBuf>();
-
-    manifest_dir
-        .join(relative)
-        .parent()
-        .unwrap()
-        .canonicalize()
-        .unwrap()
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("examples")
 }
 
-fn main() {
+fn main() -> Result<(), ConfigError> {
     let dir = config_dir();
 
-    match AppConfig::load_complete(&YamlFileProvider::from_path_buf(dir.join("config.yaml"))) {
-        Ok(config) => println!("loaded config: {config:#?}"),
-        Err(err) => eprintln!("failed to load config: {err}"),
-    }
+    let config =
+        AppConfig::load_complete(&YamlFileProvider::from_path_buf(dir.join("config.yaml")))?;
+    println!("loaded config: {config:#?}");
+    Ok(())
 }

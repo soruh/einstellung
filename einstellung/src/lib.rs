@@ -1,3 +1,8 @@
+#![cfg_attr(
+    all(feature = "derive", feature = "json", feature = "toml", feature = "yaml", feature = "env", feature = "dotenv"),
+    doc = include_str!("../README.md")
+)]
+
 use std::{error::Error as StdError, fmt::Display};
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
@@ -529,6 +534,16 @@ pub trait PartialConfig: Default + DeserializeOwned {
     fn defaulted_fields(&self) -> Vec<String> {
         Vec::new()
     }
+}
+
+/// Deserialize a flattened partial without Serde's error-suppressing `Option` visitor.
+#[doc(hidden)]
+pub fn deserialize_flattened<'de, T, D>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    T: Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    T::deserialize(deserializer).map(Some)
 }
 
 /// Indicates that parts of this type can be "frozen".
@@ -1109,7 +1124,13 @@ impl ConfigError {
         path: impl Into<String>,
         source: impl StdError + Send + Sync + 'static,
     ) -> Self {
-        Self::provider(provider, source).with_logical_path(path)
+        let error = Self::provider(provider, source);
+        let path = path.into();
+        if path.is_empty() {
+            error
+        } else {
+            error.with_logical_path(path)
+        }
     }
 
     /// Construct a mode-specific requirement error for a logical dotted field path.
@@ -1259,10 +1280,10 @@ impl ConfigError {
             .field_provenance()
             .map(|sources| sources.iter().collect::<Vec<_>>())
             .unwrap_or_default();
-        if let Some(source) = self.config_source()
-            && sources.last() != Some(&source)
-        {
-            sources.push(source);
+        if let Some(source) = self.config_source() {
+            if sources.last() != Some(&source) {
+                sources.push(source);
+            }
         }
         sources
     }

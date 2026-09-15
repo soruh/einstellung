@@ -63,7 +63,7 @@ impl ::einstellung::PartialConfig for ListenConfigPartial {
                 }
                 address
             },
-            port: self.port.unwrap_or(443),
+            port: self.port.unwrap_or_else(|| 443),
         })
     }
     fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {

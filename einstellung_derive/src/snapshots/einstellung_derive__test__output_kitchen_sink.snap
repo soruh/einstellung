@@ -247,7 +247,7 @@ impl ::einstellung::PartialConfig for DatabaseConfigPartial {
                         ::einstellung::FieldPath::new("DatabaseConfig", "url"),
                     ),
                 )?,
-            port: self.port.unwrap_or(5432),
+            port: self.port.unwrap_or_else(|| 5432),
         })
     }
     fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
@@ -303,7 +303,7 @@ impl ::einstellung::PartialConfig for CacheConfigPartial {
         self,
     ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
         ::core::result::Result::Ok(CacheConfig {
-            size_mb: self.size_mb.unwrap_or(1024),
+            size_mb: self.size_mb.unwrap_or_else(|| 1024),
         })
     }
     fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {

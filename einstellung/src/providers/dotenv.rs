@@ -85,6 +85,19 @@ impl<'i> DotenvProvider<'i> {
         self
     }
 
+    /// Map a selected dotenv variable whose parsed value is encoded as JSON.
+    ///
+    /// Use this for typed values in flattened subconfigs or untagged enums. Dotenv quoting
+    /// is processed first; a JSON string therefore needs its quotes preserved in the value.
+    pub fn with_json_var(
+        mut self,
+        variable: impl Into<String>,
+        config_path: impl Into<String>,
+    ) -> Self {
+        self.selection = self.selection.with_json_var(variable, config_path);
+        self
+    }
+
     /// Add dotenv variables whose names map directly to configuration paths.
     ///
     /// Variable names are lowercased and `__` denotes nested fields, matching

@@ -10,9 +10,11 @@ struct Config {
 }
 
 /// --- output ---
+///Partial configuration for the `Config` type.
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct ConfigPartial {
+    ///Partial value for the `x` configuration field.
     #[serde(rename = "field")]
     x: ::core::option::Option<Vec<u32>>,
 }

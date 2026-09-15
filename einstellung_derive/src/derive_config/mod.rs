@@ -1,9 +1,12 @@
+//! Parse, validate, and generate the configuration derive implementation.
+
 use quote::ToTokens;
 
 pub mod generator;
 pub mod parser;
 pub mod transformer;
 
+/// Run parsing, semantic validation, and generation, returning compile errors on failure.
 pub fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let input: syn::DeriveInput = match syn::parse2(input) {
         Ok(val) => val,

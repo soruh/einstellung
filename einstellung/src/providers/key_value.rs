@@ -1,3 +1,5 @@
+//! Typed dotted-path overrides and the shared environment deserializer.
+
 use std::{collections::BTreeMap, fmt};
 
 use serde::de::{self, DeserializeOwned, DeserializeSeed, MapAccess, Visitor};
@@ -9,19 +11,33 @@ use crate::{ConfigError, ConfigProvider, ConfigSource};
 #[derive(Debug, Error)]
 pub enum KeyValueProviderError {
     #[error("configuration path {path:?} conflicts with another mapped value")]
-    ConflictingPath { path: String },
+    /// A mapped leaf conflicts with another mapping’s nested branch.
+    ConflictingPath {
+        /// Destination path or filesystem path involved in the failure.
+        path: String,
+    },
 
     #[error("invalid value for configuration input {input:?}: {message}")]
-    InvalidValue { input: String, message: String },
+    /// A selected value cannot be decoded into the requested target type.
+    InvalidValue {
+        /// Input binding name used in the diagnostic.
+        input: String,
+        /// Conversion summary with the supplied value omitted.
+        message: String,
+    },
 }
 
 #[derive(Debug)]
+/// Conversion failure carrying the most specific known destination path.
 pub(super) struct MappedValueError {
+    /// Logical destination path used for diagnostics and provenance lookup.
     path: String,
+    /// Provider-facing conversion error with sensitive values omitted.
     source: KeyValueProviderError,
 }
 
 impl MappedValueError {
+    /// Associate a provider-facing failure with its logical destination.
     fn new(path: impl Into<String>, source: KeyValueProviderError) -> Self {
         Self {
             path: path.into(),
@@ -29,6 +45,7 @@ impl MappedValueError {
         }
     }
 
+    /// Fill a missing destination path without replacing more precise nested context.
     fn with_path_if_unknown(mut self, path: impl Into<String>) -> Self {
         if self.path == "<key/value>" {
             self.path = path.into();
@@ -36,6 +53,7 @@ impl MappedValueError {
         self
     }
 
+    /// Separate the logical destination from the provider-facing error.
     pub(super) fn into_parts(self) -> (String, KeyValueProviderError) {
         (self.path, self.source)
     }
@@ -75,14 +93,20 @@ impl de::Error for MappedValueError {
 /// JSON syntax. Later duplicate paths replace earlier ones.
 #[derive(Clone)]
 pub struct KeyValueProvider {
+    /// Source identity used for diagnostics and provenance.
     source: ConfigSource,
+    /// Ordered input bindings; later bindings replace earlier identical paths.
     values: Vec<KeyValueBinding>,
 }
 
 #[derive(Clone, Debug)]
+/// One dotted-path override and its selected interpretation.
 struct KeyValueBinding {
+    /// Logical destination path used for diagnostics and provenance lookup.
     path: String,
+    /// Supplied value retained until deserialization.
     value: String,
+    /// Whether the selected value must be interpreted as JSON before Serde buffering.
     json: bool,
 }
 
@@ -185,14 +209,20 @@ impl ConfigProvider for KeyValueProvider {
 }
 
 #[derive(Clone, Debug)]
+/// Selected input value with segmented destination and source identity.
 pub(super) struct MappedValue {
+    /// Logical destination path used for diagnostics and provenance lookup.
     path: Vec<String>,
+    /// Input binding name used in errors; contains no supplied value.
     input: String,
+    /// Supplied value retained until deserialization.
     value: String,
+    /// Whether the selected value must be interpreted as JSON before Serde buffering.
     json: bool,
 }
 
 impl MappedValue {
+    /// Construct the internal value with its loading and diagnostic context.
     pub(super) fn new(path: Vec<String>, input: String, value: String) -> Self {
         Self {
             path,
@@ -202,6 +232,7 @@ impl MappedValue {
         }
     }
 
+    /// Select explicit JSON decoding for this mapped input.
     pub(super) fn with_json_mode(mut self, json: bool) -> Self {
         self.json = json;
         self
@@ -209,20 +240,30 @@ impl MappedValue {
 }
 
 #[derive(Debug)]
+/// Tree of mapped destinations used to drive typed deserialization.
 enum ValueNode {
+    /// Nested mapping whose child names address the next path segment.
     Branch {
+        /// Logical destination path used for diagnostics and provenance lookup.
         path: String,
+        /// Child nodes indexed in deterministic lexical order.
         children: BTreeMap<String, ValueNode>,
     },
+    /// One selected value at a complete destination path.
     Leaf {
+        /// Logical destination path used for diagnostics and provenance lookup.
         path: String,
+        /// Input binding name used in errors; contains no supplied value.
         input: String,
+        /// Supplied value retained until deserialization.
         value: String,
+        /// Whether the selected value must be interpreted as JSON before Serde buffering.
         json: bool,
     },
 }
 
 impl ValueNode {
+    /// Borrow this node’s logical destination path.
     fn path(&self) -> &str {
         match self {
             Self::Branch { path, .. } | Self::Leaf { path, .. } => path,
@@ -230,6 +271,11 @@ impl ValueNode {
     }
 }
 
+/// Construct the destination tree and deserialize the selected inputs.
+///
+/// # Errors
+///
+/// Returns an error for empty/conflicting paths or incompatible input values.
 pub(super) fn load_mapped_values<T>(
     values: impl IntoIterator<Item = MappedValue>,
 ) -> Result<T, MappedValueError>
@@ -247,6 +293,11 @@ where
     T::deserialize(ValueNodeDeserializer::new(&root))
 }
 
+/// Insert an override, replacing duplicate leaves and rejecting branch conflicts.
+///
+/// # Errors
+///
+/// Returns an error for an empty path segment or a leaf/branch path conflict.
 fn insert_mapped_value(root: &mut ValueNode, mapped: MappedValue) -> Result<(), MappedValueError> {
     let MappedValue {
         path,
@@ -305,15 +356,23 @@ fn insert_mapped_value(root: &mut ValueNode, mapped: MappedValue) -> Result<(), 
     Ok(())
 }
 
+/// Serde adapter that decodes raw strings when a concrete type is requested.
 struct ValueNodeDeserializer<'a> {
+    /// Current destination node being deserialized.
     node: &'a ValueNode,
 }
 
 impl<'a> ValueNodeDeserializer<'a> {
+    /// Borrow the node to deserialize without copying its stored value.
     fn new(node: &'a ValueNode) -> Self {
         Self { node }
     }
 
+    /// Borrow a scalar leaf or reject a nested mapping in scalar position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the current destination is a branch rather than a scalar leaf.
     fn leaf(&self) -> Result<(&'a str, &'a str, &'a str), MappedValueError> {
         match self.node {
             ValueNode::Leaf {
@@ -329,6 +388,7 @@ impl<'a> ValueNodeDeserializer<'a> {
         }
     }
 
+    /// Construct a conversion error without including the supplied value.
     fn invalid(path: &str, input: &str, message: &'static str) -> MappedValueError {
         MappedValueError::new(
             path.to_owned(),
@@ -339,6 +399,11 @@ impl<'a> ValueNodeDeserializer<'a> {
         )
     }
 
+    /// Parse a scalar leaf as JSON for a collection or mapping destination.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the current node is not a leaf or its text is not valid JSON.
     fn json_value(&self) -> Result<(&'a str, &'a str, serde_json::Value), MappedValueError> {
         let (path, input, value) = self.leaf()?;
         let value = serde_json::from_str(value)
@@ -347,6 +412,7 @@ impl<'a> ValueNodeDeserializer<'a> {
     }
 }
 
+/// Generate numeric visitors that parse raw strings and retain destination context.
 macro_rules! deserialize_number {
     ($method:ident, $visit:ident, $ty:ty) => {
         fn $method<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -607,13 +673,18 @@ impl<'de> de::Deserializer<'de> for ValueNodeDeserializer<'de> {
     }
 }
 
+/// Serde map cursor over one branch of the destination tree.
 struct ValueMapAccess<'a> {
+    /// Logical destination path used for diagnostics and provenance lookup.
     path: &'a str,
+    /// Remaining entries of the current mapping.
     iter: std::collections::btree_map::Iter<'a, String, ValueNode>,
+    /// Entry whose key was emitted and whose value must be visited next.
     value: Option<&'a ValueNode>,
 }
 
 impl<'a> ValueMapAccess<'a> {
+    /// Start iterating a mapping while retaining its parent path.
     fn new(path: &'a str, children: &'a BTreeMap<String, ValueNode>) -> Self {
         Self {
             path,
@@ -622,6 +693,7 @@ impl<'a> ValueMapAccess<'a> {
         }
     }
 
+    /// Join a child name to the current branch’s logical path.
     fn child_path(&self, key: &str) -> String {
         if self.path.is_empty() {
             key.to_owned()
@@ -688,6 +760,13 @@ impl<'de> MapAccess<'de> for ValueMapAccess<'de> {
 }
 
 #[cfg(test)]
+#[allow(
+    missing_docs,
+    clippy::missing_docs_in_private_items,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    reason = "Test fixtures model user input rather than library APIs."
+)]
 mod tests {
     use serde::Deserialize;
 

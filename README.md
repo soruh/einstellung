@@ -517,6 +517,20 @@ All Rust snippets are compiled by
 `cargo test --workspace --all-features --doc`. Package verification also checks
 that the README and license copies match their workspace originals.
 
+Both crates inherit the workspace's `forbid(unsafe_code)` policy. Documentation
+lints deny missing public and private documentation, missing error/panic contracts,
+and malformed documentation. `clippy.toml` enables `check-private-items`, so error
+and panic contracts are checked on implementation helpers too. Test fixture modules
+have scoped exemptions for intentionally incomplete user types; implementation code
+and examples retain the checks. The crate-local Clippy configurations link to the
+workspace copy and are included in published archives.
+
+Run `cargo clippy --workspace --all-targets --all-features -- -D warnings` and
+`cargo doc --workspace --all-features --no-deps --document-private-items` when editing
+documentation. CI also builds private-item documentation with each individual feature
+and with no default features. Derived public partial types receive documentation,
+and original field documentation is preserved on their corresponding partial fields.
+
 Publish `einstellung_derive` first, wait until it is available from crates.io, then
 publish `einstellung`. Tag the verified release commit as `v0.2.0`.
 

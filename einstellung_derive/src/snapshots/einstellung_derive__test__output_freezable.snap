@@ -14,12 +14,16 @@ struct ConfigFreezable1 {
 }
 
 /// --- output ---
+///Partial configuration for the `ConfigFreezable1` type.
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[derive(Clone)]
 #[serde(crate = "::einstellung::serde")]
 struct ConfigFreezable1Partial {
+    ///Partial value for the `name` configuration field.
     name: ::core::option::Option<String>,
+    ///Partial value for the `pass` configuration field.
     pass: ::core::option::Option<u8>,
+    ///Partial value for the `private_key` configuration field.
     private_key: ::einstellung::Freeze<::core::option::Option<String>>,
 }
 #[automatically_derived]

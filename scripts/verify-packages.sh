@@ -10,6 +10,7 @@ cmp README.md einstellung_derive/README.md
 for package in einstellung einstellung_derive; do
     cmp LICENSE-MIT "$package/LICENSE-MIT"
     cmp LICENSE-APACHE "$package/LICENSE-APACHE"
+    cmp clippy.toml "$package/clippy.toml"
 done
 
 scratch="$(mktemp -d)"
@@ -41,6 +42,7 @@ fi
 
 cmp LICENSE-MIT "$derive_dir/LICENSE-MIT"
 cmp LICENSE-APACHE "$derive_dir/LICENSE-APACHE"
+cmp clippy.toml "$derive_dir/clippy.toml"
 
 # `cargo package` rewrites path dependencies as registry dependencies. Patch crates.io to the
 # freshly packaged derive crate so the main package is verified against the exact derive artifact
@@ -60,6 +62,7 @@ fi
 cmp README.md "$main_dir/README.md"
 cmp LICENSE-MIT "$main_dir/LICENSE-MIT"
 cmp LICENSE-APACHE "$main_dir/LICENSE-APACHE"
+cmp clippy.toml "$main_dir/clippy.toml"
 
 # Exercise the published layout, including README doctests and example fixture paths.
 cargo test --manifest-path "$main_dir/Cargo.toml" --all-features --doc \

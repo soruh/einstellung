@@ -78,10 +78,10 @@ jobs:
       - name: Run doctests
         run: cargo test --workspace --all-features --doc
 
-      - name: Check public documentation
+      - name: Check public and internal documentation
         env:
           RUSTDOCFLAGS: -D warnings
-        run: cargo doc --workspace --all-features --no-deps
+        run: cargo doc --workspace --all-features --no-deps --document-private-items
 
       - name: Verify publishable packages
         run: scripts/verify-packages.sh
@@ -92,10 +92,12 @@ jobs:
           set -euo pipefail
           cargo check -p einstellung --no-default-features
           cargo clippy -p einstellung --lib --no-default-features -- -D warnings
+          RUSTDOCFLAGS='-D warnings' cargo doc -p einstellung --no-default-features --no-deps --document-private-items
           for feature in derive json toml yaml key-value env dotenv; do
             cargo check -p einstellung --no-default-features --features "$feature"
             cargo test -p einstellung --lib --no-default-features --features "$feature"
             cargo clippy -p einstellung --lib --no-default-features --features "$feature" -- -D warnings
+            RUSTDOCFLAGS='-D warnings' cargo doc -p einstellung --no-default-features --features "$feature" --no-deps --document-private-items
           done
 
       - name: Run clippy

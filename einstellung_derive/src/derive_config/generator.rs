@@ -1,3 +1,5 @@
+//! Emit partial declarations and trait implementations from the validated model.
+
 use crate::derive_config::{parser::DefaultStrategy, transformer::UnwrapStrategy};
 
 use super::transformer::{
@@ -16,7 +18,7 @@ impl ToTokens for TransformedStruct {
     }
 }
 
-/// Converts a syn::Path into a literal string for use in attributes like #[serde(crate = "...")]
+/// Convert a `syn::Path` to a literal for attributes such as `#[serde(crate = "...")]`.
 fn path_to_litstr(path: &syn::Path) -> syn::LitStr {
     let mut s = String::new();
     let mut iter = path.segments.iter();
@@ -36,7 +38,7 @@ fn path_to_litstr(path: &syn::Path) -> syn::LitStr {
     syn::LitStr::new(&s, path.span())
 }
 
-/// Renders the Rust type for a partial field based on the PartialType metadata
+/// Renders the Rust type for a partial field based on the `PartialType` metadata.
 fn render_partial_value_type(pt: &PartialType, einstellung: &syn::Path) -> TokenStream {
     let core = &pt.core_type;
 
@@ -53,6 +55,7 @@ fn render_partial_value_type(pt: &PartialType, einstellung: &syn::Path) -> Token
     tokens
 }
 
+/// Render the partial field type, including its freeze wrapper when required.
 fn render_partial_type(pt: &PartialType, einstellung: &syn::Path) -> TokenStream {
     let tokens = render_partial_value_type(pt, einstellung);
 
@@ -63,12 +66,18 @@ fn render_partial_type(pt: &PartialType, einstellung: &syn::Path) -> TokenStream
     }
 }
 
-/// Generate the associated Partial as described by the `TransformedStruct`
+/// Generate the associated Partial as described by the `TransformedStruct`.
 fn generate_partial_struct(model: &TransformedStruct) -> TokenStream {
     let partial_ident = &model.partial_ident;
     let vis = &model.vis;
     let einstellung = &model.einstellung;
     let attrs = &model.attrs;
+    let partial_doc = format!(
+        "Partial configuration for the `{}` type.",
+        model.complete_ident
+    );
+    let partial_doc = (!attrs.iter().any(|attr| attr.path().is_ident("doc")))
+        .then(|| quote!(#[doc = #partial_doc]));
     let deny_unknown_fields = model
         .deny_unknown_fields
         .then(|| quote!(#[serde(deny_unknown_fields)]));
@@ -78,6 +87,9 @@ fn generate_partial_struct(model: &TransformedStruct) -> TokenStream {
         let f_attrs = &f.attrs;
         let f_vis = &f.vis;
         let ty = render_partial_type(&f.partial_type, einstellung);
+        let field_doc = format!("Partial value for the `{ident}` configuration field.");
+        let field_doc = (!f_attrs.iter().any(|attr| attr.path().is_ident("doc")))
+            .then(|| quote!(#[doc = #field_doc]));
         let deserialize_flattened = f.flattened_subconfig.then(|| {
             let path: syn::Path = syn::parse_quote!(#einstellung::deserialize_flattened);
             let path = path_to_litstr(&path);
@@ -85,6 +97,7 @@ fn generate_partial_struct(model: &TransformedStruct) -> TokenStream {
         });
 
         quote! {
+            #field_doc
             #(#f_attrs)*
             #deserialize_flattened
             #f_vis #ident: #ty
@@ -95,6 +108,7 @@ fn generate_partial_struct(model: &TransformedStruct) -> TokenStream {
     let serde_lit = path_to_litstr(&serde_path);
 
     quote! {
+        #partial_doc
         #[derive(::core::default::Default, #einstellung::serde::Deserialize)]
         #(#attrs)*
         #[serde(crate = #serde_lit)]
@@ -105,7 +119,7 @@ fn generate_partial_struct(model: &TransformedStruct) -> TokenStream {
     }
 }
 
-/// Generate the code to merge the field `left` with the field `right`
+/// Generate the code to merge the field `left` with the field `right`.
 fn generate_field_merge(
     f: &TransformedField,
     einstellung: &syn::Path,
@@ -162,7 +176,7 @@ fn generate_field_merge(
     }
 }
 
-/// Generate the code to build a single field in a `PartialConfig::build` impl
+/// Generate the code to build a single field in a `PartialConfig::build` impl.
 fn generate_build_for_field(
     einstellung: &syn::Path,
     complete_type_name: &str,
@@ -235,7 +249,7 @@ fn generate_build_for_field(
     quote_spanned!(ident.span() => #ident: #validated)
 }
 
-/// Generate the code to merge a single field in a `PartialConfig::merge` impl
+/// Generate the code to merge a single field in a `PartialConfig::merge` impl.
 fn generate_merge_for_field(
     einstellung: &syn::Path,
     complete_type_name: &str,
@@ -292,6 +306,7 @@ fn generate_merge_for_field(
     quote_spanned!(ident.span() => #ident: #merged)
 }
 
+/// Borrow the optional field value through any freeze wrapper.
 fn partial_option_ref(f: &TransformedField, einstellung: &syn::Path) -> TokenStream {
     let ident = &f.ident;
     if f.freeze == FreezeStrategy::Wrapped {
@@ -305,6 +320,7 @@ fn partial_option_ref(f: &TransformedField, einstellung: &syn::Path) -> TokenStr
     }
 }
 
+/// Generate provenance paths for values explicitly supplied by this partial.
 fn generate_provided_field(f: &TransformedField, einstellung: &syn::Path) -> TokenStream {
     let ident_str = &f.logical_name;
     let field = partial_option_ref(f, einstellung);
@@ -335,6 +351,7 @@ fn generate_provided_field(f: &TransformedField, einstellung: &syn::Path) -> Tok
     }
 }
 
+/// Generate paths for defaults that final construction will actually apply.
 fn generate_defaulted_field(f: &TransformedField, einstellung: &syn::Path) -> TokenStream {
     let ident_str = &f.logical_name;
     let field = partial_option_ref(f, einstellung);
@@ -388,7 +405,7 @@ fn generate_defaulted_field(f: &TransformedField, einstellung: &syn::Path) -> To
     }
 }
 
-/// Generate the impl of `PartialConfig` for the associated partial struct
+/// Generate the impl of `PartialConfig` for the associated partial struct.
 fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
     let TransformedStruct {
         partial_ident,
@@ -452,7 +469,7 @@ fn generate_partial_impl(model: &TransformedStruct) -> TokenStream {
     }
 }
 
-/// Generate the impl of `Freezable` for the associated partial struct if required
+/// Generate the impl of `Freezable` for the associated partial struct if required.
 fn generate_freezable_impl(model: &TransformedStruct) -> TokenStream {
     let TransformedStruct {
         partial_ident,
@@ -500,7 +517,7 @@ fn generate_freezable_impl(model: &TransformedStruct) -> TokenStream {
     }
 }
 
-/// Generate the actual impl of `Config` for the input type
+/// Generate the actual impl of `Config` for the input type.
 fn generate_config_impl(model: &TransformedStruct) -> TokenStream {
     let TransformedStruct {
         partial_ident,

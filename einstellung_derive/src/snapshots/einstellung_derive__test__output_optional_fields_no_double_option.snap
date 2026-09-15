@@ -11,11 +11,15 @@ struct ClientConfig {
 }
 
 /// --- output ---
+///Partial configuration for the `ClientConfig` type.
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct ClientConfigPartial {
+    ///Partial value for the `name` configuration field.
     name: ::core::option::Option<String>,
+    ///Partial value for the `timeout_ms` configuration field.
     timeout_ms: ::core::option::Option<u32>,
+    ///Partial value for the `proxy` configuration field.
     proxy: ::core::option::Option<String>,
 }
 #[automatically_derived]

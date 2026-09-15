@@ -22,3 +22,6 @@ prettyplease = "0.2.37"
 trybuild = "1.0.116"
 einstellung = { path = "../einstellung" }
 paste = "1.0.15"
+
+[lints]
+workspace = true

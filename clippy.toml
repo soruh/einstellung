@@ -1,0 +1,2 @@
+# Require error and panic contracts on implementation helpers as well as public APIs.
+check-private-items = true

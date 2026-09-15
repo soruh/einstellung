@@ -31,16 +31,23 @@ struct FullSystemConfig {
 }
 
 /// --- output ---
+///Partial configuration for the `FullSystemConfig` type.
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct FullSystemConfigPartial {
+    ///Partial value for the `name` configuration field.
     #[serde(rename = "sys_name")]
     name: ::core::option::Option<String>,
+    ///Partial value for the `port` configuration field.
     port: ::core::option::Option<u16>,
+    ///Partial value for the `database` configuration field.
     database: ::core::option::Option<<DatabaseConfig as ::einstellung::Config>::Partial>,
+    ///Partial value for the `log_files` configuration field.
     #[serde(alias = "files")]
     log_files: ::core::option::Option<Vec<String>>,
+    ///Partial value for the `users` configuration field.
     users: ::core::option::Option<std::collections::HashSet<String>>,
+    ///Partial value for the `optional_cache` configuration field.
     optional_cache: ::core::option::Option<
         <CacheConfig as ::einstellung::Config>::Partial,
     >,
@@ -218,10 +225,13 @@ struct DatabaseConfig {
 }
 
 /// --- output ---
+///Partial configuration for the `DatabaseConfig` type.
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct DatabaseConfigPartial {
+    ///Partial value for the `url` configuration field.
     url: ::core::option::Option<String>,
+    ///Partial value for the `port` configuration field.
     port: ::core::option::Option<u16>,
 }
 #[automatically_derived]
@@ -283,9 +293,11 @@ struct CacheConfig {
 }
 
 /// --- output ---
+///Partial configuration for the `CacheConfig` type.
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct CacheConfigPartial {
+    ///Partial value for the `size_mb` configuration field.
     size_mb: ::core::option::Option<u32>,
 }
 #[automatically_derived]

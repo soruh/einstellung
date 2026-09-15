@@ -10,9 +10,11 @@ struct Config1 {
 }
 
 /// --- output ---
+///Partial configuration for the `Config1` type.
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct Config1Partial {
+    ///Partial value for the `x` configuration field.
     x: ::core::option::Option<::std::collections::HashSet<String>>,
 }
 #[automatically_derived]
@@ -72,9 +74,11 @@ struct Config2 {
 }
 
 /// --- output ---
+///Partial configuration for the `Config2` type.
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct Config2Partial {
+    ///Partial value for the `x` configuration field.
     x: ::core::option::Option<::std::collections::HashSet<String>>,
 }
 #[automatically_derived]
@@ -131,9 +135,11 @@ struct Config3 {
 }
 
 /// --- output ---
+///Partial configuration for the `Config3` type.
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct Config3Partial {
+    ///Partial value for the `x` configuration field.
     x: ::core::option::Option<::std::collections::HashSet<String>>,
 }
 #[automatically_derived]

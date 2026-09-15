@@ -11,11 +11,15 @@ struct ServerConfig {
 }
 
 /// --- output ---
+///Partial configuration for the `ServerConfig` type.
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct ServerConfigPartial {
+    ///Partial value for the `host` configuration field.
     host: ::core::option::Option<String>,
+    ///Partial value for the `port` configuration field.
     port: ::core::option::Option<u16>,
+    ///Partial value for the `is_active` configuration field.
     is_active: ::core::option::Option<bool>,
 }
 #[automatically_derived]

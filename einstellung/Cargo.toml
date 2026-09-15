@@ -48,3 +48,6 @@ yaml = ["dep:serde_saphyr", "dep:serde_path_to_error"]
 full = ["dotenv", "env", "json", "toml", "yaml", "derive"]
 
 default = ["json", "toml", "yaml", "derive"]
+
+[lints]
+workspace = true

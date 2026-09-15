@@ -1,3 +1,5 @@
+//! File-content sources and feature-gated configuration providers.
+
 use std::{
     fs::File,
     io::{BufReader, Cursor, Read},
@@ -37,6 +39,7 @@ pub use yaml::YamlFileProvider;
 use crate::ConfigError;
 
 #[cfg(any(feature = "json", feature = "toml", feature = "yaml"))]
+/// Convert Serde tracking segments to a dotted path when a destination is known.
 fn with_deserialization_path(error: ConfigError, track: serde_path_to_error::Track) -> ConfigError {
     // Use dotted segments so collection failures can find their parent field's provenance.
     // Unknown segments only identify the enclosing value, not a destination of their own.
@@ -56,12 +59,21 @@ fn with_deserialization_path(error: ConfigError, track: serde_path_to_error::Tra
     }
 }
 
-/// Helper trait to read from type-erased file sources
+/// Helper trait to read from type-erased file sources.
 pub trait ReaderFactory: Send + Sync {
-    /// Produce a reader from this source
+    /// Produce a reader from this source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if opening or constructing the reader fails.
     fn get_reader(&self) -> Result<Box<dyn Read + '_>, ConfigError>;
 
-    /// Clone this source in a dyn-compatible way
+    /// Clone this source in a dyn-compatible way.
+    ///
+    /// # Errors
+    ///
+    /// The default implementation returns an unsupported-clone error. Overrides may
+    /// return an error when cloning their reader factory fails.
     fn clone_dyn(&self) -> Result<Box<dyn ReaderFactory + 'static>, ConfigError> {
         Err(ConfigError::provider(
             "reader factory",
@@ -86,20 +98,32 @@ where
 /// See [`FileContentProvider::into_owned`] and [`FileContentProvider::as_borrowed`] for conversion methods.
 #[non_exhaustive]
 pub enum FileContentProvider<'i> {
+    /// Borrowed inline configuration text.
     InlineBorrowed(&'i str),
+    /// Owned inline configuration text.
     InlineOwned(String),
 
+    /// Borrowed filesystem path opened each time a reader is requested.
     PathBorrowed(&'i Path),
+    /// Owned filesystem path opened each time a reader is requested.
     PathOwned(PathBuf),
 
+    /// Function producing a fresh reader on each load.
     CustomFn(fn() -> Result<Box<dyn Read + 'static>, ConfigError>),
 
+    /// Owned type-erased reader factory.
     CustomBoxed(Box<dyn ReaderFactory + 'static>),
+    /// Borrowed type-erased reader factory; owned conversion requires clone support.
     CustomRef(&'i dyn ReaderFactory),
 }
 
 impl<'i> FileContentProvider<'i> {
-    /// call the provider to produce a reader
+    /// Open the source and pass its reader to the callback.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file or custom reader cannot be opened, or if the
+    /// reader callback fails.
     pub fn with_reader<R>(
         &self,
         f: impl FnOnce(&mut dyn Read) -> Result<R, ConfigError>,
@@ -136,6 +160,11 @@ impl<'i> FileContentProvider<'i> {
     }
 
     /// Convert to `'static` owned data.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a borrowed custom reader factory cannot be cloned.
+    /// Built-in inline and filesystem sources convert without performing I/O.
     pub fn into_owned(self) -> Result<FileContentProvider<'static>, ConfigError> {
         use FileContentProvider::*;
         Ok(match self {
@@ -149,7 +178,7 @@ impl<'i> FileContentProvider<'i> {
         })
     }
 
-    /// Get a reference to the provider
+    /// Get a reference to the provider.
     pub fn as_borrowed<'s>(&'s self) -> FileContentProvider<'s> {
         use FileContentProvider::*;
         match self {
@@ -164,12 +193,17 @@ impl<'i> FileContentProvider<'i> {
     }
 }
 
-/// Any type from which file contents can be read (see [`FileContentProvider`])
+/// Any type from which file contents can be read (see [`FileContentProvider`]).
 pub trait IntoFileContentProvider<'i> {
-    /// Open this provider
+    /// Convert the source into a provider without opening or reading it.
     fn into_provider(self) -> FileContentProvider<'i>;
 
-    /// Open this provider and immediately make it static
+    /// Convert the source into an owned provider without opening or reading it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the resulting provider borrows a custom reader factory
+    /// that does not support cloning.
     fn into_owned_provider(self) -> Result<FileContentProvider<'static>, ConfigError>
     where
         Self: Sized,
@@ -244,6 +278,13 @@ impl<'i> IntoFileContentProvider<'i> for &'i dyn ReaderFactory {
 }
 
 #[cfg(test)]
+#[allow(
+    missing_docs,
+    clippy::missing_docs_in_private_items,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    reason = "Test fixtures model user input rather than library APIs."
+)]
 mod tests {
     use super::*;
 

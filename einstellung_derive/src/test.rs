@@ -771,3 +771,27 @@ assert_macro_test!(PASS, empty_freezable_struct: {
     #[config(freezable)]
     struct Empty {}
 });
+
+assert_macro_test!(PASS, documented_public_config: {
+    /// Public type whose generated API must also satisfy strict documentation policy.
+    #[deny(missing_docs)]
+    #[derive(Config)]
+    pub struct DocumentedConfig {
+        /// Listening port retained on the partial field as well.
+        pub port: u16,
+    }
+}
+helper {
+    /// Public module applies its documentation policy to every generated sibling.
+    #[deny(missing_docs)]
+    pub mod strict_api {
+        use super::Config;
+
+        /// Public configuration accepted by a strict downstream crate.
+        #[derive(Config)]
+        pub struct StrictConfig {
+            /// Configured port.
+            pub port: u16,
+        }
+    }
+});

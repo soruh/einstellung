@@ -24,10 +24,13 @@ struct ListenConfig {
 }
 
 /// --- output ---
+///Partial configuration for the `ListenConfig` type.
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct ListenConfigPartial {
+    ///Partial value for the `address` configuration field.
     address: ::core::option::Option<std::net::IpAddr>,
+    ///Partial value for the `port` configuration field.
     port: ::core::option::Option<u16>,
 }
 #[automatically_derived]

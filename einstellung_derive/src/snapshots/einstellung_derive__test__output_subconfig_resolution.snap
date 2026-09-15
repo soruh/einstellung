@@ -13,11 +13,15 @@ struct AppConfig {
 }
 
 /// --- output ---
+///Partial configuration for the `AppConfig` type.
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct AppConfigPartial {
+    ///Partial value for the `app_name` configuration field.
     app_name: ::core::option::Option<String>,
+    ///Partial value for the `database` configuration field.
     database: ::core::option::Option<<DatabaseConfig as ::einstellung::Config>::Partial>,
+    ///Partial value for the `redis` configuration field.
     redis: ::core::option::Option<<RedisConfig as ::einstellung::Config>::Partial>,
 }
 #[automatically_derived]
@@ -125,10 +129,13 @@ struct DatabaseConfig {
 }
 
 /// --- output ---
+///Partial configuration for the `DatabaseConfig` type.
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct DatabaseConfigPartial {
+    ///Partial value for the `url` configuration field.
     url: ::core::option::Option<String>,
+    ///Partial value for the `pool_size` configuration field.
     pool_size: ::core::option::Option<u32>,
 }
 #[automatically_derived]
@@ -192,9 +199,11 @@ struct RedisConfig {
 }
 
 /// --- output ---
+///Partial configuration for the `RedisConfig` type.
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct RedisConfigPartial {
+    ///Partial value for the `cluster_mode` configuration field.
     cluster_mode: ::core::option::Option<bool>,
 }
 #[automatically_derived]

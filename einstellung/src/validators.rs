@@ -4,6 +4,10 @@
 //! validation is usually clearer as a local function or closure.
 
 /// Require a string to contain at least one byte.
+///
+/// # Errors
+///
+/// Returns `"value must not be empty"` when the string has no bytes.
 pub fn non_empty(value: &str) -> Result<(), &'static str> {
     if value.is_empty() {
         Err("value must not be empty")
@@ -13,6 +17,10 @@ pub fn non_empty(value: &str) -> Result<(), &'static str> {
 }
 
 /// Require a string to contain at least one non-whitespace character.
+///
+/// # Errors
+///
+/// Returns `"value must not be blank"` when the string contains only whitespace or is empty.
 pub fn non_blank(value: &str) -> Result<(), &'static str> {
     if value.trim().is_empty() {
         Err("value must not be blank")
@@ -22,6 +30,10 @@ pub fn non_blank(value: &str) -> Result<(), &'static str> {
 }
 
 /// Require a slice to contain at least one item.
+///
+/// # Errors
+///
+/// Returns `"value must not be empty"` when the slice contains no elements.
 pub fn non_empty_slice<T>(value: &[T]) -> Result<(), &'static str> {
     if value.is_empty() {
         Err("value must not be empty")
@@ -31,6 +43,13 @@ pub fn non_empty_slice<T>(value: &[T]) -> Result<(), &'static str> {
 }
 
 #[cfg(test)]
+#[allow(
+    missing_docs,
+    clippy::missing_docs_in_private_items,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    reason = "Test fixtures model user input rather than library APIs."
+)]
 mod tests {
     use super::*;
 

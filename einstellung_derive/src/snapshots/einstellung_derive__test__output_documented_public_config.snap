@@ -3,61 +3,48 @@ source: einstellung_derive/src/test.rs
 expression: formatted
 ---
 /// --- input ---
+/// Public type whose generated API must also satisfy strict documentation policy.
+#[deny(missing_docs)]
 #[derive(Config)]
-#[config(deny_unknown_fields)]
-struct ServerConfig {
-    host: String,
-    port: u16,
+pub struct DocumentedConfig {
+    /// Listening port retained on the partial field as well.
+    pub port: u16,
 }
 
 /// --- output ---
-///Partial configuration for the `ServerConfig` type.
+///Partial configuration for the `DocumentedConfig` type.
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
-#[serde(deny_unknown_fields)]
-struct ServerConfigPartial {
-    ///Partial value for the `host` configuration field.
-    host: ::core::option::Option<String>,
-    ///Partial value for the `port` configuration field.
-    port: ::core::option::Option<u16>,
+pub struct DocumentedConfigPartial {
+    /// Listening port retained on the partial field as well.
+    pub port: ::core::option::Option<u16>,
 }
 #[automatically_derived]
-impl ::einstellung::PartialConfig for ServerConfigPartial {
-    type Complete = ServerConfig;
+impl ::einstellung::PartialConfig for DocumentedConfigPartial {
+    type Complete = DocumentedConfig;
     fn merge(
         self,
         next: Self,
     ) -> ::core::result::Result<Self, ::einstellung::ConfigError> {
         ::core::result::Result::Ok(Self {
-            host: next.host.or(self.host),
             port: next.port.or(self.port),
         })
     }
     fn build(
         self,
     ) -> ::core::result::Result<Self::Complete, ::einstellung::ConfigError> {
-        ::core::result::Result::Ok(ServerConfig {
-            host: self
-                .host
-                .ok_or(
-                    ::einstellung::ConfigError::MissingField(
-                        ::einstellung::FieldPath::new("ServerConfig", "host"),
-                    ),
-                )?,
+        ::core::result::Result::Ok(DocumentedConfig {
             port: self
                 .port
                 .ok_or(
                     ::einstellung::ConfigError::MissingField(
-                        ::einstellung::FieldPath::new("ServerConfig", "port"),
+                        ::einstellung::FieldPath::new("DocumentedConfig", "port"),
                     ),
                 )?,
         })
     }
     fn provided_fields(&self) -> ::std::vec::Vec<::std::string::String> {
         let mut fields = ::std::vec::Vec::new();
-        if (&self.host).is_some() {
-            fields.push(::std::string::String::from("host"));
-        }
         if (&self.port).is_some() {
             fields.push(::std::string::String::from("port"));
         }
@@ -69,6 +56,21 @@ impl ::einstellung::PartialConfig for ServerConfigPartial {
     }
 }
 #[automatically_derived]
-impl ::einstellung::Config for ServerConfig {
-    type Partial = ServerConfigPartial;
+impl ::einstellung::Config for DocumentedConfig {
+    type Partial = DocumentedConfigPartial;
+}
+
+// ---------------------------------
+
+/// --- helper ---
+/// Public module applies its documentation policy to every generated sibling.
+#[deny(missing_docs)]
+pub mod strict_api {
+    use super::Config;
+    /// Public configuration accepted by a strict downstream crate.
+    #[derive(Config)]
+    pub struct StrictConfig {
+        /// Configured port.
+        pub port: u16,
+    }
 }

@@ -17,9 +17,11 @@ struct AppConfig {
 }
 
 /// --- output ---
+///Partial configuration for the `AppConfig` type.
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct AppConfigPartial {
+    ///Partial value for the `name` configuration field.
     name: ::core::option::Option<String>,
 }
 #[automatically_derived]

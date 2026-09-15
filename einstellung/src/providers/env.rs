@@ -1,3 +1,5 @@
+//! Explicit and prefix-based environment selection without process mutation.
+
 use std::ffi::{OsStr, OsString};
 
 use serde::de::DeserializeOwned;
@@ -7,19 +9,34 @@ use crate::{ConfigError, ConfigProvider};
 
 use super::key_value::{KeyValueProviderError, MappedValue, load_mapped_values};
 
+/// Separator used to map environment names onto nested configuration fields.
 const NESTED_SEPARATOR: &str = "__";
 
 /// Errors produced while selecting or decoding environment variables.
 #[derive(Debug, Error)]
 pub enum EnvProviderError {
     #[error("environment variable {variable:?} contains non-Unicode data")]
-    NonUnicode { variable: String },
+    /// A selected environment variable contains non-Unicode data.
+    NonUnicode {
+        /// Selected environment variable name.
+        variable: String,
+    },
 
     #[error("environment mapping for {path:?} conflicts with another mapped value")]
-    ConflictingPath { path: String },
+    /// A mapped leaf conflicts with another mapping’s nested branch.
+    ConflictingPath {
+        /// Destination path or filesystem path involved in the failure.
+        path: String,
+    },
 
     #[error("invalid value for environment variable {variable:?}: {message}")]
-    InvalidValue { variable: String, message: String },
+    /// A selected value cannot be decoded into the requested target type.
+    InvalidValue {
+        /// Selected environment variable name.
+        variable: String,
+        /// Conversion summary with the supplied value omitted.
+        message: String,
+    },
 }
 
 impl From<KeyValueProviderError> for EnvProviderError {
@@ -47,14 +64,20 @@ impl From<KeyValueProviderError> for EnvProviderError {
 /// as a nested field separator. For example `APP_DATABASE__URL` maps to `database.url`.
 #[derive(Clone, Debug, Default)]
 pub struct EnvProvider {
+    /// Explicit variable-to-field mappings in application order.
     vars: Vec<EnvBinding>,
+    /// Optional prefix used to discover additional variables.
     prefix: Option<String>,
 }
 
 #[derive(Clone, Debug)]
+/// One explicit environment-variable selection and destination mapping.
 struct EnvBinding {
+    /// Selected environment variable name.
     variable: String,
+    /// Logical destination path used for diagnostics and provenance lookup.
     path: String,
+    /// Whether the selected value must be interpreted as JSON before Serde buffering.
     json: bool,
 }
 
@@ -141,6 +164,12 @@ impl EnvProvider {
         self
     }
 
+    /// Apply prefix and explicit mappings to supplied variables, then deserialize.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for non-Unicode selected values, conflicting destination
+    /// paths, or values that do not deserialize into the requested type.
     pub(crate) fn load_from_vars<T>(
         &self,
         provider_name: &'static str,
@@ -193,6 +222,11 @@ impl EnvProvider {
 }
 
 impl EnvProvider {
+    /// Query each explicitly selected name once without enumerating the environment.
+    ///
+    /// # Errors
+    ///
+    /// Returns a selection or typed deserialization error from the selected values.
     fn load_from_lookup<T>(
         &self,
         provider_name: &'static str,
@@ -231,12 +265,18 @@ impl ConfigProvider for EnvProvider {
     }
 }
 
+/// Lowercase and split an environment name into logical field segments.
 fn env_key_path(key: &str) -> Vec<String> {
     key.split(NESTED_SEPARATOR)
         .map(str::to_ascii_lowercase)
         .collect()
 }
 
+/// Convert a selected Unicode variable into a mapped value with destination context.
+///
+/// # Errors
+///
+/// Returns an error if the selected variable value is not valid Unicode.
 fn mapped_env_value(
     provider_name: &'static str,
     path: Vec<String>,
@@ -260,6 +300,13 @@ fn mapped_env_value(
 }
 
 #[cfg(test)]
+#[allow(
+    missing_docs,
+    clippy::missing_docs_in_private_items,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    reason = "Test fixtures model user input rather than library APIs."
+)]
 mod tests {
     use std::ffi::OsString;
 

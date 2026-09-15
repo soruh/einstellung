@@ -69,6 +69,12 @@ overlays, and redacted parser diagnostics. It is a breaking release relative to 
 
 ### Release validation
 
+- Both crates forbid unsafe code and deny missing public/private documentation,
+  missing error/panic contracts (including private helpers), and documentation
+  formatting/link errors. CI builds internal docs across the feature matrix.
+- Generated partial types and fields have documentation, preserving original field
+  comments and supporting downstream `deny(missing_docs)` policies.
+
 - Restored the advertised Rust 1.85 core build by avoiding let-chain syntax.
 - Expression defaults are evaluated only when needed. Required flattened defaults
   work without a provider; absent optional flattened objects add no phantom default

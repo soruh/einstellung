@@ -1,6 +1,18 @@
+//! Derive macros for the `einstellung` configuration library.
+//!
+//! The macro parses configuration attributes, validates their combinations, and emits
+//! partial types with deserialization, merging, validation, and provenance support.
+
 use proc_macro::TokenStream;
 
 #[cfg(test)]
+#[allow(
+    missing_docs,
+    clippy::missing_docs_in_private_items,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    reason = "Macro fixtures intentionally exercise incomplete user types."
+)]
 mod test;
 
 mod derive_config;
@@ -21,14 +33,15 @@ mod derive_config;
 /// # The Generated `Partial` Type
 ///
 /// When you derive `Config` on a struct named `AppConfig`, the macro generates a
-/// companion struct named `AppConfigPartial`.
+/// companion struct named `AppConfigPartial`. Generated public types and fields have
+/// documentation; original field documentation is preserved on the partial fields.
 ///
 /// The generated partial type:
-/// * Wraps the fields of the complete type to make them optional
+/// * Wraps the fields of the complete type to make them optional.
 /// * Implements `Default`, `serde::Deserialize`, and `einstellung::PartialConfig`.
 /// * Inherits all `#[config(partial(...))]` attributes as `#[...]`
-/// * Is also accessible as `<AppConfig as Config>::Partial`
-/// * References the complete type as `<AppConfigPartial as PartialConfig>::Complete`
+/// * Is also accessible as `<AppConfig as Config>::Partial`.
+/// * References the complete type as `<AppConfigPartial as PartialConfig>::Complete`.
 ///
 /// If any field (or the struct) is marked as `freezable`, the partial struct will also
 /// implement the `einstellung::Freezable` trait, allowing layers to be locked against
@@ -73,7 +86,9 @@ mod derive_config;
 ///   `#[config(default = LogLevel::Info)]`).
 /// * `#[config(default = path::to::function())]` or `#[config(default = || "localhost".to_string())]`
 ///   Calls a function or closure to dynamically generate the default value at runtime.
-///   Note that non-closure functions need to be called with zero arguments to distinguish them from enum variants
+///   Function calls, including calls with arguments, are evaluated only when needed.
+///   A bare function path denotes a value rather than a call. Expression and block defaults
+///   are also lazy.
 ///
 /// ### Sub-configurations (`subconfig`)
 /// * `#[config(subconfig)]`
@@ -88,6 +103,9 @@ mod derive_config;
 ///   supported on flattened subconfigs; place defaults on the nested fields instead. `flatten`
 ///   is only supported on subconfigs, and it cannot be combined with
 ///   `#[config(deny_unknown_fields)]` because Serde does not support that combination.
+///   Malformed supplied values produce errors rather than being treated as absent.
+///   For typed values behind flattening in string providers, use `with_json` or
+///   `with_json_var`; Serde buffering otherwise preserves those inputs as strings.
 ///
 /// ### Merging Strategies (`merge`)
 /// Defines how values from a newer configuration layer interact with values from an
@@ -115,8 +133,9 @@ mod derive_config;
 ///   given type it may be more practical to write a custom `serde::Deserialize` implementation.
 /// * `#[config(freezable)]`
 ///   Marks an individual field as freezable. If a partial layer is `.freeze()`d, this field
-///   will reject overwrite attempts from subsequent layers always keeping the frozen value.
-///   If two frozen configs are attempted to be merged, a `ConfigError::FreezeCollision` will be returned instead
+///   keeps the protected value when merged with an unfrozen value. Merging two frozen
+///   values returns `ConfigError::FreezeCollision`, even if the values are equal. A freezable
+///   subconfig must itself generate or implement `Freezable`.
 ///
 /// ### Attribute Forwarding
 /// * `#[config(partial(...))]` attributes are forwarded to the fields of the partial struct as `#[...]`

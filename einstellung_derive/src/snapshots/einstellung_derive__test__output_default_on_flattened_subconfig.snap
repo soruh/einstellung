@@ -24,9 +24,11 @@ struct CredentialsConfig {
 }
 
 /// --- output ---
+///Partial configuration for the `CredentialsConfig` type.
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct CredentialsConfigPartial {
+    ///Partial value for the `api_key` configuration field.
     api_key: ::core::option::Option<String>,
 }
 #[automatically_derived]

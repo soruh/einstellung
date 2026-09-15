@@ -1,3 +1,5 @@
+//! Selected dotenv inputs with optional substitution rejection.
+
 use std::{
     io::Read,
     path::{Path, PathBuf},
@@ -11,23 +13,36 @@ use crate::{ConfigError, ConfigProvider, FileContentProvider, IntoFileContentPro
 use super::EnvProvider;
 
 #[derive(Debug, Error)]
+/// Dotenv failures rendered without source lines or environment values.
 enum DotenvReadError {
     #[error("dotenv syntax error at input index {index}")]
-    Syntax { index: usize },
+    /// Dotenv parsing rejected the input syntax.
+    Syntax {
+        /// Byte index reported by the dotenv parser or substitution check.
+        index: usize,
+    },
 
     #[error(transparent)]
+    /// Reading the configuration source failed.
     Io(#[from] std::io::Error),
 
     #[error("dotenv environment lookup failed: variable is not present")]
+    /// A dotenv substitution could not find an environment variable.
     EnvVarNotPresent,
 
     #[error("dotenv environment lookup failed: variable contains non-Unicode data")]
+    /// A dotenv environment lookup returned non-Unicode data.
     EnvVarNotUnicode,
 
     #[error("dotenv variable substitution is disabled at input index {index}")]
-    SubstitutionDisabled { index: usize },
+    /// Variable expansion was found while substitution was disabled.
+    SubstitutionDisabled {
+        /// Byte index reported by the dotenv parser or substitution check.
+        index: usize,
+    },
 
     #[error("dotenv parse error")]
+    /// An unclassified dotenv backend failure.
     Other,
 }
 
@@ -48,8 +63,11 @@ impl From<dotenvy::Error> for DotenvReadError {
 /// Like [`EnvProvider`], this provider loads no variables until mappings or a prefix are configured.
 /// This makes it suitable for keeping `.env` files limited to secrets and machine-local values.
 pub struct DotenvProvider<'i> {
+    /// Underlying source retained for loading or contextual diagnostics.
     source: FileContentProvider<'i>,
+    /// Allowlist and prefix mappings used to select dotenv values.
     selection: EnvProvider,
+    /// Whether the dotenv backend may perform variable expansion.
     allow_substitution: bool,
 }
 
@@ -130,6 +148,11 @@ impl<'i> DotenvProvider<'i> {
     }
 
     /// Convert borrowed source data to owned data.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a borrowed custom reader factory cannot be cloned.
+    /// Built-in inline and filesystem sources convert without performing I/O.
     pub fn into_owned(self) -> Result<DotenvProvider<'static>, ConfigError> {
         Ok(DotenvProvider {
             source: self.source.into_owned()?,
@@ -151,6 +174,11 @@ impl DotenvProvider<'static> {
     }
 }
 
+/// Parse dotenv bindings without modifying the process environment.
+///
+/// # Errors
+///
+/// Returns an I/O or sanitized dotenv parsing/substitution error.
 fn collect_vars(
     reader: impl Read,
 ) -> Result<Vec<(std::ffi::OsString, std::ffi::OsString)>, ConfigError> {
@@ -163,6 +191,7 @@ fn collect_vars(
         .collect()
 }
 
+/// Find a disallowed expansion marker while respecting dotenv quoting and comments.
 fn substitution_index(input: &str) -> Option<usize> {
     #[derive(Clone, Copy, Eq, PartialEq)]
     enum Quote {
@@ -269,6 +298,13 @@ impl ConfigProvider for DotenvProvider<'_> {
 }
 
 #[cfg(test)]
+#[allow(
+    missing_docs,
+    clippy::missing_docs_in_private_items,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    reason = "Test fixtures model user input rather than library APIs."
+)]
 mod tests {
     use serde::Deserialize;
 

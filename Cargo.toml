@@ -1,3 +1,38 @@
 [workspace]
 members = ["einstellung", "einstellung_derive"]
 resolver = "3"
+
+# Documentation is part of the API contract, including implementation internals.
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "deny"
+
+[workspace.lints.clippy]
+doc_broken_link = "deny"
+doc_comment_double_space_linebreaks = "deny"
+doc_include_without_cfg = "deny"
+doc_link_code = "deny"
+doc_link_with_quotes = "deny"
+doc_markdown = "deny"
+doc_paragraphs_missing_punctuation = "deny"
+missing_docs_in_private_items = "deny"
+missing_errors_doc = "deny"
+missing_panics_doc = "deny"
+too_long_first_doc_paragraph = "deny"
+undocumented_unsafe_blocks = "deny"
+unnecessary_safety_comment = "deny"
+unnecessary_safety_doc = "deny"
+doc_lazy_continuation = "deny"
+doc_nested_refdefs = "deny"
+doc_overindented_list_items = "deny"
+doc_suspicious_footnotes = "deny"
+empty_docs = "deny"
+empty_line_after_doc_comments = "deny"
+missing_safety_doc = "deny"
+needless_doctest_main = "deny"
+suspicious_doc_comments = "deny"
+tabs_in_doc_comments = "deny"
+test_attr_in_doctest = "deny"
+
+[workspace.lints.rustdoc]
+all = "deny"

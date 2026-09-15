@@ -28,10 +28,13 @@ struct TlsConfig {
 }
 
 /// --- output ---
+///Partial configuration for the `TlsConfig` type.
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct TlsConfigPartial {
+    ///Partial value for the `cert_path` configuration field.
     cert_path: ::core::option::Option<String>,
+    ///Partial value for the `port` configuration field.
     port: ::core::option::Option<u16>,
 }
 #[automatically_derived]

@@ -1,3 +1,5 @@
+//! Runtime selection among enabled structured configuration formats.
+
 use std::{
     ffi::OsStr,
     path::{Path, PathBuf},
@@ -12,10 +14,18 @@ use crate::{ConfigError, ConfigProvider, FileContentProvider, IntoFileContentPro
 #[derive(Debug, Error)]
 pub enum FormatProviderError {
     #[error("configuration path {path:?} has no file extension")]
-    MissingExtension { path: PathBuf },
+    /// The path has no extension from which to select a format.
+    MissingExtension {
+        /// Destination path or filesystem path involved in the failure.
+        path: PathBuf,
+    },
 
     #[error("unsupported configuration file extension {extension:?}")]
-    UnsupportedExtension { extension: String },
+    /// No enabled parser recognizes the path’s extension.
+    UnsupportedExtension {
+        /// Unrecognized file extension.
+        extension: String,
+    },
 }
 
 /// Built-in structured configuration formats available to [`FormatProvider`].
@@ -23,10 +33,13 @@ pub enum FormatProviderError {
 #[non_exhaustive]
 pub enum ConfigFormat {
     #[cfg(feature = "json")]
+    /// Decode the source as JSON.
     Json,
     #[cfg(feature = "toml")]
+    /// Decode the source as TOML.
     Toml,
     #[cfg(feature = "yaml")]
+    /// Decode the source as YAML.
     Yaml,
 }
 
@@ -67,7 +80,9 @@ impl ConfigFormat {
 /// [`ConfigProvider`] itself has a generic method and therefore is not object-safe. This provider
 /// gives applications a single concrete type when the input format is only known at runtime.
 pub struct FormatProvider<'i> {
+    /// Selected structured format used when loading the source.
     format: ConfigFormat,
+    /// Underlying source retained for loading or contextual diagnostics.
     source: FileContentProvider<'i>,
 }
 
@@ -93,11 +108,20 @@ impl<'i> FormatProvider<'i> {
     /// Build a provider from a filesystem path, detecting the format from its extension.
     ///
     /// Only formats enabled by the crate's Cargo features are recognized.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the path has no extension or no enabled format recognizes it.
     pub fn from_path_detect(path: &'i Path) -> Result<Self, ConfigError> {
         Ok(Self::from_path(detect_format(path)?, path))
     }
 
     /// Convert borrowed source data to owned data.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a borrowed custom reader factory cannot be cloned.
+    /// Built-in inline and filesystem sources convert without performing I/O.
     pub fn into_owned(self) -> Result<FormatProvider<'static>, ConfigError> {
         Ok(FormatProvider {
             format: self.format,
@@ -118,12 +142,21 @@ impl FormatProvider<'static> {
     }
 
     /// Build an owned provider from a filesystem path, detecting the format from its extension.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the path has no extension or no enabled format recognizes it.
     pub fn from_path_buf_detect(path: PathBuf) -> Result<Self, ConfigError> {
         let format = detect_format(&path)?;
         Ok(Self::from_path_buf(format, path))
     }
 }
 
+/// Select an enabled parser from a path extension, reporting unsupported paths.
+///
+/// # Errors
+///
+/// Returns an error if the path lacks an extension or no enabled parser recognizes it.
 fn detect_format(path: &Path) -> Result<ConfigFormat, ConfigError> {
     let extension = path.extension().ok_or_else(|| {
         ConfigError::provider(
@@ -170,6 +203,13 @@ impl ConfigProvider for FormatProvider<'_> {
 }
 
 #[cfg(test)]
+#[allow(
+    missing_docs,
+    clippy::missing_docs_in_private_items,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    reason = "Test fixtures model user input rather than library APIs."
+)]
 mod tests {
     use serde::Deserialize;
 

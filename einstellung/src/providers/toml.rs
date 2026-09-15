@@ -1,7 +1,9 @@
+//! TOML file and inline providers with safe parser diagnostics.
+
 use super::*;
 use crate::{ConfigProvider, FileContentProvider, IntoFileContentProvider};
 
-/// [`ConfigProvider`] which interprets the file contents as TOML
+/// [`ConfigProvider`] which interprets the file contents as TOML.
 pub struct TomlFileProvider<'i>(pub FileContentProvider<'i>);
 
 impl<'i> TomlFileProvider<'i> {
@@ -23,6 +25,12 @@ impl<'i> TomlFileProvider<'i> {
         Self(FileContentProvider::PathBorrowed(path))
     }
 
+    /// Convert borrowed provider data to owned data without reading its contents.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a borrowed custom reader factory cannot be cloned.
+    /// Built-in inline and filesystem sources convert without performing I/O.
     pub fn into_owned(self) -> Result<TomlFileProvider<'static>, ConfigError> {
         Ok(TomlFileProvider(self.0.into_owned()?))
     }
@@ -40,6 +48,11 @@ impl TomlFileProvider<'static> {
     }
 }
 
+/// Read TOML text, deserialize it, and retain safe location and path metadata.
+///
+/// # Errors
+///
+/// Returns an I/O, TOML syntax, or typed deserialization error.
 pub(super) fn load_toml<T: serde::de::DeserializeOwned>(
     source: &FileContentProvider<'_>,
 ) -> Result<T, ConfigError> {
@@ -70,6 +83,13 @@ impl<'i> ConfigProvider for TomlFileProvider<'i> {
 }
 
 #[cfg(test)]
+#[allow(
+    missing_docs,
+    clippy::missing_docs_in_private_items,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    reason = "Test fixtures model user input rather than library APIs."
+)]
 mod tests {
     use serde::Deserialize;
 

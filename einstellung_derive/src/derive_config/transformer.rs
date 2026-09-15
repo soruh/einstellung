@@ -1,3 +1,5 @@
+//! Validate parsed attributes and resolve field types, names, and merge policies.
+
 use super::parser::{ConfigFieldReceiver, ConfigStructReceiver};
 use crate::derive_config::parser::{DefaultStrategy, MergeStrategyReceiver};
 use syn::{
@@ -6,83 +8,140 @@ use syn::{
 };
 
 #[derive(Debug)]
+/// Validated model used to generate a partial type and its trait implementations.
 pub struct TransformedStruct {
+    /// Identifier of the user’s complete configuration type.
     pub complete_ident: syn::Ident,
+    /// Identifier of the generated companion partial type.
     pub partial_ident: syn::Ident,
+    /// Whether the partial needs a `Freezable` implementation.
     pub any_freezable: bool,
+    /// Whether the generated partial rejects unknown input keys.
     pub deny_unknown_fields: bool,
+    /// Visibility preserved on the generated declaration.
     pub vis: syn::Visibility,
+    /// Validated fields in declaration order.
     pub fields: Vec<TransformedField>,
+    /// Attributes forwarded to the generated partial declaration.
     pub attrs: Vec<syn::Attribute>,
+    /// Path to the runtime crate, including an explicit crate-path override.
     pub einstellung: syn::Path,
 }
 
 #[derive(Debug)]
+/// Validated type, merge, build, and provenance policy for one field.
 pub struct TransformedField {
+    /// Original Rust identifier used when emitting the corresponding declaration.
     pub ident: syn::Ident,
+    /// Canonical input field name after Serde deserialization renaming.
     pub logical_name: String,
+    /// Visibility preserved on the generated declaration.
     pub vis: syn::Visibility,
+    /// Rust type used by the complete configuration field.
     pub complete_type: syn::Type,
+    /// Instructions for constructing the partial field’s Rust type.
     pub partial_type: PartialType,
+    /// Whether nested keys share the containing object’s input namespace.
     pub flattened_subconfig: bool,
+    /// Policy for resolving the partial field into its complete value.
     pub build: BuildStategy,
+    /// Selected merge strategy for combining existing and incoming values.
     pub merge: MergeStrategy,
+    /// How the partial field participates in freeze-aware merging.
     pub freeze: FreezeStrategy,
+    /// Optional validator expression called after resolving the complete value.
     pub validate_func: Option<syn::Expr>,
+    /// Attributes forwarded to the generated partial declaration.
     pub attrs: Vec<syn::Attribute>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
+/// Representation used to enforce a field’s freeze policy.
 pub enum FreezeStrategy {
+    /// Merge this field without freeze state.
     NotFreezable,
+    /// Store the partial value in the runtime `Freeze` wrapper.
     Wrapped,
+    /// Delegate freeze state to a nested partial configuration.
     IntrinsicallyFreezable,
 }
 
 #[derive(Debug)]
+/// How an optional partial value becomes a complete field.
 pub enum UnwrapStrategy {
+    /// Preserve optionality in the complete configuration.
     DontUnwrap,
+    /// Require a supplied value and report a missing-field error otherwise.
     Unwrap,
+    /// Use the configured fallback if the partial contains no value.
     UnwrapWithDefault(DefaultStrategy),
 }
 
 #[derive(Debug)]
+/// Resolution and optionality policy for a completed field.
 pub struct BuildStategy {
+    /// Whether construction recursively builds a nested configuration.
     pub build: bool,
+    /// Policy for absent values after nested configuration construction.
     pub unwrap: UnwrapStrategy,
 }
 
 #[derive(Debug)]
+/// Validated operation used to combine two partial field values.
 pub enum MergeStrategy {
+    /// Recursively merge nested partial configurations.
     MergeSubconfig,
+    /// Keep the incoming value when present, otherwise retain the existing value.
     Replace,
+    /// Append incoming collection contents using `Extend`.
     Extend,
+    /// Call the user-supplied merge function at this path.
     Custom(syn::Path),
 }
 
 #[derive(Debug)]
+/// Describes how a complete field type is represented in a partial configuration.
 pub struct PartialType {
+    /// Field type after removing an outer `Option`, when present.
     pub core_type: syn::Type,
+    /// Use the core type’s associated partial type for a nested configuration.
     pub access_partial: bool,
+    /// Wrap the represented value in `Option` to record absence.
     pub wrap_option: bool,
+    /// Wrap the optional value in `Freeze` to retain merge protection.
     pub wrap_freeze: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
+/// Supported Serde field-renaming rules for canonical logical paths.
 enum SerdeRenameRule {
     #[default]
+    /// Preserve the original field name.
     None,
+    /// Apply Serde’s lowercase field-name rule.
     LowerCase,
+    /// Convert ASCII letters to uppercase.
     UpperCase,
+    /// Capitalize underscore-separated words and remove separators.
     PascalCase,
+    /// Apply Pascal casing with a lowercase initial character.
     CamelCase,
+    /// Preserve the snake-case Rust field name.
     SnakeCase,
+    /// Uppercase the snake-case field name.
     ScreamingSnakeCase,
+    /// Replace underscores with hyphens.
     KebabCase,
+    /// Uppercase the field name and replace underscores with hyphens.
     ScreamingKebabCase,
 }
 
 impl SerdeRenameRule {
+    /// Parse a Serde rename rule, rejecting unsupported spellings at the supplied span.
+    ///
+    /// # Errors
+    ///
+    /// Returns a diagnostic if the rename rule is not one of Serde’s supported spellings.
     fn parse(value: &str, span: proc_macro2::Span) -> syn::Result<Self> {
         let rule = match value {
             "lowercase" => Self::LowerCase,
@@ -103,6 +162,7 @@ impl SerdeRenameRule {
         Ok(rule)
     }
 
+    /// Apply the selected rule to a Rust field name with its raw prefix removed.
     fn apply_to_field(self, field: &str) -> String {
         match self {
             Self::None | Self::LowerCase | Self::SnakeCase => field.to_owned(),
@@ -137,6 +197,11 @@ impl SerdeRenameRule {
     }
 }
 
+/// Collect Serde settings from both shorthand and explicit partial attributes.
+///
+/// # Errors
+///
+/// Returns a syntax error when a forwarded Serde attribute cannot be parsed.
 fn forwarded_serde_metas(
     direct: &[Meta],
     partial: &[super::parser::PartialReceiver],
@@ -166,6 +231,11 @@ fn forwarded_serde_metas(
     Ok(metas)
 }
 
+/// Read a string setting, honoring a deserialize-specific nested override.
+///
+/// # Errors
+///
+/// Returns a syntax error when a nested deserialize-specific setting is malformed.
 fn serde_deserialize_setting(metas: &[Meta], name: &str) -> syn::Result<Option<syn::LitStr>> {
     for meta in metas {
         match meta {
@@ -203,6 +273,11 @@ fn serde_deserialize_setting(metas: &[Meta], name: &str) -> syn::Result<Option<s
     Ok(None)
 }
 
+/// Resolve the container’s Serde deserialization rename rule.
+///
+/// # Errors
+///
+/// Returns an error for malformed attributes or an unsupported rename rule.
 fn serde_rename_rule(
     direct: &[Meta],
     partial: &[super::parser::PartialReceiver],
@@ -214,6 +289,11 @@ fn serde_rename_rule(
     SerdeRenameRule::parse(&value.value(), value.span())
 }
 
+/// Check whether the forwarded Serde attributes contain a flag.
+///
+/// # Errors
+///
+/// Returns a syntax error if the forwarded Serde attributes cannot be parsed.
 fn serde_has_flag(
     direct: &[Meta],
     partial: &[super::parser::PartialReceiver],
@@ -224,6 +304,11 @@ fn serde_has_flag(
         .any(|meta| matches!(meta, Meta::Path(path) if path.is_ident(name))))
 }
 
+/// Resolve a field’s canonical input name for diagnostics and provenance.
+///
+/// # Errors
+///
+/// Returns a syntax error if the field’s forwarded Serde attributes are malformed.
 fn serde_field_name(
     field: &ConfigFieldReceiver,
     ident: &syn::Ident,
@@ -241,7 +326,7 @@ fn serde_field_name(
 
 /// Helper to extract inner type of an `Option`.
 /// For `Option<T>` return `Some(T)`
-/// For anything else return `None`
+/// For anything else return `None`.
 fn extract_type_from_option(ty: &Type) -> Option<&Type> {
     if let Type::Path(type_path) = ty
         && type_path.qself.is_none()
@@ -255,7 +340,12 @@ fn extract_type_from_option(ty: &Type) -> Option<&Type> {
     None
 }
 
-/// Transform the parsed struct into a type describing the output types and impls
+/// Transform the parsed struct into a type describing the output types and impls.
+///
+/// # Errors
+///
+/// Returns combined diagnostics for unsupported generics, invalid field policies,
+/// or duplicate canonical input names.
 pub fn transform_struct(mut receiver: ConfigStructReceiver) -> syn::Result<TransformedStruct> {
     if !receiver.generics.params.is_empty() {
         return Err(syn::Error::new(
@@ -342,7 +432,12 @@ pub fn transform_struct(mut receiver: ConfigStructReceiver) -> syn::Result<Trans
     }
 }
 
-/// Transform a parsed field into its partial form
+/// Transform a parsed field into its partial form.
+///
+/// # Errors
+///
+/// Returns a diagnostic for unsupported field types, incompatible attributes,
+/// or an invalid custom merge function path.
 fn transform_field(
     mut field: ConfigFieldReceiver,
     all_freezeable: bool,

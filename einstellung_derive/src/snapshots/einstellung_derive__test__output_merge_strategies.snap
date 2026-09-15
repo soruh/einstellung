@@ -13,11 +13,15 @@ struct LoggerConfig {
 }
 
 /// --- output ---
+///Partial configuration for the `LoggerConfig` type.
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct LoggerConfigPartial {
+    ///Partial value for the `level` configuration field.
     level: ::core::option::Option<String>,
+    ///Partial value for the `log_files` configuration field.
     log_files: ::core::option::Option<Vec<String>>,
+    ///Partial value for the `output_format` configuration field.
     output_format: ::core::option::Option<String>,
 }
 #[automatically_derived]

@@ -1,5 +1,12 @@
+//! Typed configuration loading, layered merging, and source provenance.
+//!
+//! Implement or derive [`Config`] to describe a complete configuration and use
+//! [`ConfigBuilder`] to combine partial layers before applying defaults and validation.
+//! Providers are enabled individually through Cargo features; the core traits and
+//! merge/provenance types are available with default features disabled.
+
 #![cfg_attr(
-    all(feature = "derive", feature = "json", feature = "toml", feature = "yaml", feature = "env", feature = "dotenv"),
+    all(doc, feature = "derive", feature = "json", feature = "toml", feature = "yaml", feature = "env", feature = "dotenv"),
     doc = include_str!("../README.md")
 )]
 
@@ -16,7 +23,14 @@ pub use einstellung_derive::Config;
 pub use serde;
 
 #[cfg(all(test, feature = "derive", feature = "json"))]
-pub mod tests;
+#[allow(
+    missing_docs,
+    clippy::missing_docs_in_private_items,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    reason = "Test fixtures model user input rather than library APIs."
+)]
+mod tests;
 
 mod providers;
 
@@ -25,19 +39,29 @@ pub mod validators;
 
 pub use providers::*;
 
-/// Describes a Configuration which can be built from its associated `::Partial` configuration.
-/// The Partial type contains optional variants of all fields of the Config.
+/// A complete configuration constructed from an associated partial configuration.
+///
+/// The partial type tracks which fields have been supplied so layers can be merged
+/// before required-field checks, defaults, and validation are applied.
 pub trait Config: Sized {
-    /// The Partial Configuration for this type. Contains all fields of this type, made optional.
-    /// See the documentation for [`PartialConfig`] for merging / building partial configs.
+    /// Partial representation used to merge layers before building this type.
     type Partial: PartialConfig<Complete = Self>;
 
     /// Load this config as a [`PartialConfig`] for merging with other partial configs.
+    ///
+    /// # Errors
+    ///
+    /// Returns the provider’s I/O, parsing, or conversion error if loading fails.
     fn load_partial(provider: &impl ConfigProvider) -> Result<Self::Partial, ConfigError> {
         provider.load_partial_with_source::<Self::Partial>()
     }
 
     /// Load this config in its complete form.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if loading fails, required fields are missing, or final
+    /// validation fails. Provider source context is attached to the failure.
     fn load_complete(provider: &impl ConfigProvider) -> Result<Self, ConfigError> {
         let source = provider.source();
         Self::load_partial(provider)?
@@ -62,6 +86,11 @@ pub trait Config: Sized {
 /// validated base config and may move values into a stricter target type.
 pub trait ConfigView<C>: Sized {
     /// Convert a complete base config into this view.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the completed base configuration cannot satisfy the
+    /// view’s requirements. Implementations define any additional checks.
     fn from_config(config: C) -> Result<Self, ConfigError>;
 }
 
@@ -70,6 +99,10 @@ pub trait ConfigView<C>: Sized {
 /// This is a convenience for the common pattern where the shared configuration keeps a field
 /// optional, but one command/view requires it. The returned error records the target view type
 /// and logical dotted field path.
+///
+/// # Errors
+///
+/// Returns `ConfigError::MissingForView` when `value` is `None`.
 pub fn require_for_view<V, T>(
     value: Option<T>,
     field: impl Into<String>,
@@ -82,13 +115,22 @@ pub fn require_for_view<V, T>(
 /// Providers are merged in call order. The builder records which sources supplied each field so
 /// callers can inspect provenance with [`Self::build_tracked`]. Once a layer fails, later providers
 /// are not loaded.
+///
+/// Adding a provider loads it immediately; final construction applies defaults and validation.
+/// User-defined providers, merge functions, defaults, and validators execute synchronously.
+/// Their returned errors are contextualized, but panics from callbacks are not caught.
 pub struct ConfigBuilder<C: Config> {
+    /// Current partial value or the first failure that stops further provider loading.
     state: ConfigBuilderState<C::Partial>,
+    /// Source histories retained alongside the configuration or failure.
     provenance: ConfigProvenance,
 }
 
+/// Composition state that preserves the first error and prevents further loads.
 enum ConfigBuilderState<P> {
+    /// Partial configuration available for the next merge.
     Ready(P),
+    /// First failure encountered while composing the configuration.
     Failed(ConfigError),
 }
 
@@ -186,6 +228,7 @@ impl<C: Config> ConfigBuilder<C> {
         builder
     }
 
+    /// Load and merge a provider only while the builder has no earlier failure.
     fn provider_with<F>(self, load: F) -> Self
     where
         F: FnOnce() -> (ConfigSource, Result<C::Partial, ConfigError>),
@@ -299,6 +342,10 @@ impl<C: Config> ConfigBuilder<C> {
     }
 
     /// Return the merged partial configuration without applying field defaults or validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first provider or merge failure with accumulated provenance.
     pub fn build_partial(self) -> Result<C::Partial, ConfigError> {
         self.build_tracked_partial().map(TrackedConfig::into_inner)
     }
@@ -307,6 +354,10 @@ impl<C: Config> ConfigBuilder<C> {
     ///
     /// Field defaults are not applied and therefore are not recorded. This is useful when a
     /// composed partial will be inspected, transformed, or merged again before final construction.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first provider or merge failure with accumulated provenance.
     pub fn build_tracked_partial(self) -> Result<TrackedConfig<C::Partial>, ConfigError> {
         match self.state {
             ConfigBuilderState::Failed(error) => Err(error.with_provenance(self.provenance)),
@@ -318,16 +369,31 @@ impl<C: Config> ConfigBuilder<C> {
     }
 
     /// Build the final configuration, applying field defaults and validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns a provider or merge failure, a missing required field, or a final
+    /// validation error. Builder failures retain accumulated provenance.
     pub fn build(self) -> Result<C, ConfigError> {
         self.finish().map(|tracked| tracked.config)
     }
 
     /// Build the final configuration while retaining field provenance.
+    ///
+    /// # Errors
+    ///
+    /// Returns a provider or merge failure, a missing required field, or a final
+    /// validation error, retaining accumulated provenance on the error.
     pub fn build_tracked(self) -> Result<TrackedConfig<C>, ConfigError> {
         self.finish()
     }
 
     /// Build a mode-specific typed view of this configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns a loading, merge, or final-construction error, or a rejection from
+    /// the view conversion. Errors retain the base configuration’s provenance.
     pub fn build_view<V>(self) -> Result<V, ConfigError>
     where
         V: ConfigView<C>,
@@ -338,6 +404,11 @@ impl<C: Config> ConfigBuilder<C> {
     }
 
     /// Build a mode-specific typed view while retaining field provenance.
+    ///
+    /// # Errors
+    ///
+    /// Returns a loading, merge, or final-construction error, or a rejection from
+    /// the view conversion, retaining provenance on failure.
     pub fn build_tracked_view<V>(self) -> Result<TrackedConfig<V>, ConfigError>
     where
         V: ConfigView<C>,
@@ -345,6 +416,11 @@ impl<C: Config> ConfigBuilder<C> {
         self.finish()?.into_view()
     }
 
+    /// Record applicable defaults and build the complete value with provenance context.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first stored load/merge error or a final construction/validation error.
     fn finish(self) -> Result<TrackedConfig<C>, ConfigError> {
         let Self {
             state,
@@ -377,22 +453,27 @@ impl<C: Config> Default for ConfigBuilder<C> {
 /// no secret data.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ConfigProvenance {
+    /// Successfully merged sources, including layers that supplied no fields.
     layers: Vec<ConfigSource>,
+    /// Supply histories indexed by canonical logical field path.
     fields: std::collections::BTreeMap<String, Vec<ConfigSource>>,
 }
 
 impl ConfigProvenance {
+    /// Record a successful layer and the field paths it supplied.
     fn record_layer(&mut self, source: ConfigSource, fields: Vec<String>) {
         self.layers.push(source.clone());
         self.record_fields(source, fields);
     }
 
+    /// Append a source to each supplied field’s history.
     fn record_fields(&mut self, source: ConfigSource, fields: Vec<String>) {
         for field in fields {
             self.fields.entry(field).or_default().push(source.clone());
         }
     }
 
+    /// Append another composition’s layers and field histories in merge order.
     fn extend(&mut self, other: Self) {
         self.layers.extend(other.layers);
         for (field, mut sources) in other.fields {
@@ -402,8 +483,8 @@ impl ConfigProvenance {
 
     /// Return every source that supplied a value for `path`, in merge order.
     ///
-    /// For replace semantics the last source is the winner. For extend/custom merge strategies,
-    /// earlier sources may still contribute to the final value, so the complete history is kept.
+    /// For unfrozen replacement fields the last source is the winner. Frozen fields and
+    /// extend/custom merge strategies can retain earlier values, so the full supply history is kept.
     pub fn explain(&self, path: impl AsRef<str>) -> Option<&[ConfigSource]> {
         self.fields.get(path.as_ref()).map(Vec::as_slice)
     }
@@ -463,7 +544,9 @@ impl ConfigProvenance {
 /// A built configuration together with the provenance captured during composition.
 #[derive(Clone, Debug)]
 pub struct TrackedConfig<C> {
+    /// Built value associated with the recorded source histories.
     config: C,
+    /// Source histories retained alongside the configuration or failure.
     provenance: ConfigProvenance,
 }
 
@@ -484,6 +567,10 @@ impl<C> TrackedConfig<C> {
     }
 
     /// Convert the configuration into a mode-specific typed view while retaining provenance.
+    ///
+    /// # Errors
+    ///
+    /// Returns the view conversion error with this configuration’s provenance attached.
     pub fn into_view<V>(self) -> Result<TrackedConfig<V>, ConfigError>
     where
         V: ConfigView<C>,
@@ -506,21 +593,30 @@ impl<C> TrackedConfig<C> {
     }
 }
 
-/// A Partial variant of a [`trait@Config`]. This means that every field is optional
-/// allowing incremental merging of configs.
+/// A mergeable, partially supplied representation of a complete [`Config`].
 pub trait PartialConfig: Default + DeserializeOwned {
-    /// The associated Complete Config
+    /// Complete configuration produced after defaults and validation.
     type Complete: Config;
 
     /// Merge two partial configs, treating `next` as the higher-precedence layer.
     ///
     /// For the default replace strategy, a missing value in `next` leaves the value from
     /// `self` unchanged; absence does not clear an earlier value. See the derive macro for
-    /// [`derive@Config`] for extend, custom, subconfig, and freeze behavior.
+    /// [`Config` derive](https://docs.rs/einstellung/latest/einstellung/derive.Config.html) for extend, custom, subconfig, and freeze behavior.
+    ///
+    /// # Errors
+    ///
+    /// Returns a freeze collision or a custom/nested merge error when the two
+    /// partials cannot be combined.
     fn merge(self, next: Self) -> Result<Self, ConfigError>;
 
     /// Build this partial config into its complete form. All required fields need to be present for this to succeed.
-    /// See the derive macro for [`derive@Config`] for how to define validation strategies and field contents.
+    /// See the derive macro for [`Config` derive](https://docs.rs/einstellung/latest/einstellung/derive.Config.html) for how to define validation strategies and field contents.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing required field, rejected validation, or
+    /// failed nested configuration construction.
     fn build(self) -> Result<Self::Complete, ConfigError>;
 
     /// Return logical dotted paths for fields explicitly present in this partial.
@@ -537,6 +633,10 @@ pub trait PartialConfig: Default + DeserializeOwned {
 }
 
 /// Deserialize a flattened partial without Serde's error-suppressing `Option` visitor.
+///
+/// # Errors
+///
+/// Returns the nested deserialization error without converting it into an absent value.
 #[doc(hidden)]
 pub fn deserialize_flattened<'de, T, D>(deserializer: D) -> Result<Option<T>, D::Error>
 where
@@ -547,13 +647,14 @@ where
 }
 
 /// Indicates that parts of this type can be "frozen".
+///
 /// This means that these parts cannot be overwritten by merges in any way.
-/// See the derive macro for [`derive@Config`] for how to mark fields as [`trait@Freezable`]
+/// See the derive macro for [`Config` derive](https://docs.rs/einstellung/latest/einstellung/derive.Config.html) for how to mark fields as [`trait@Freezable`].
 pub trait Freezable {
-    /// Freeze the freezable parts of this type
+    /// Freeze the freezable parts of this type.
     fn freeze(self) -> Self;
 
-    /// Check if any parts of this type are frozen
+    /// Check if any parts of this type are frozen.
     fn is_frozen(&self) -> bool;
 }
 
@@ -562,15 +663,19 @@ pub trait Freezable {
 /// This can be any type which can produce a `T: DeserializeOwned`. The generic
 /// [`ConfigProvider::load_partial`] method intentionally makes this trait non-object-safe. Use
 /// [`ConfigProviderFor<C>`] when heterogeneous providers need to be stored behind trait objects for
-/// a specific configuration type, or [`FormatProvider`] when only the structured file format is
+/// a specific configuration type, or `FormatProvider` when only the structured file format is
 /// selected at runtime.
 ///
-/// See the `json`, `yaml` and `toml` features and the associated [`JsonFileProvider`],
-/// [`YamlFileProvider`] and [`TomlFileProvider`] types for the built-in implementations. The
+/// See the `json`, `yaml` and `toml` features and the associated `JsonFileProvider`,
+/// `YamlFileProvider` and `TomlFileProvider` types for the built-in implementations. The
 /// [`FileContentProvider`] provides an ergonomic interface to specify the location or contents of
 /// an input file.
 pub trait ConfigProvider {
     /// Load a [`PartialConfig`] (or any other deserializable type) from this provider.
+    ///
+    /// # Errors
+    ///
+    /// Returns the provider’s I/O, parsing, or conversion error if loading fails.
     fn load_partial<T: DeserializeOwned>(&self) -> Result<T, ConfigError>;
 
     /// Load a value and attach this provider's source identity to any error.
@@ -578,6 +683,10 @@ pub trait ConfigProvider {
     /// The lower-level [`Self::load_partial`] method deliberately returns the provider's raw
     /// configuration error. Use this helper when diagnostics should include the same source
     /// context that [`Config::load_partial`] and [`ConfigBuilder`] attach automatically.
+    ///
+    /// # Errors
+    ///
+    /// Returns the provider’s loading or deserialization error with source context.
     fn load_partial_with_source<T: DeserializeOwned>(&self) -> Result<T, ConfigError> {
         self.load_partial::<T>()
             .map_err(|error| error.with_source(self.source()))
@@ -622,9 +731,17 @@ pub trait ConfigProvider {
 /// ```
 pub trait ConfigProviderFor<C: Config> {
     /// Load the partial associated with `C`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the provider cannot read or deserialize the partial.
     fn load_config_partial(&self) -> Result<C::Partial, ConfigError>;
 
     /// Load the partial associated with `C` and attach this provider's source on failure.
+    ///
+    /// # Errors
+    ///
+    /// Returns the provider’s loading or deserialization error with source context.
     fn load_config_partial_with_source(&self) -> Result<C::Partial, ConfigError> {
         self.load_config_partial()
             .map_err(|error| error.with_source(self.config_source()))
@@ -654,6 +771,7 @@ where
 /// or raw configuration contents.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ConfigSource {
+    /// Diagnostic source identity, which must not contain configuration values.
     label: String,
 }
 
@@ -670,6 +788,7 @@ impl ConfigSource {
         &self.label
     }
 
+    /// Construct the source identity used for final field defaults.
     fn defaults() -> Self {
         Self::new("field default")
     }
@@ -684,16 +803,16 @@ impl Display for ConfigSource {
 /// Indicates where a configuration error occurred.
 #[derive(Debug)]
 pub struct FieldPath {
-    /// Name of the [`PartialConfig`] type on which failing method was called.
+    /// Name of the complete configuration type at the outermost error context.
     pub base_type: &'static str,
-    /// Field which produced the error
+    /// Field which produced the error.
     pub field: &'static str,
-    /// Subconfig fields leading from the `base_type` to `field`
+    /// Subconfig fields leading from the `base_type` to `field`.
     pub path: Vec<&'static str>,
 }
 
 impl FieldPath {
-    /// Produce a path pointing to the error location without any outer context
+    /// Produce a path pointing to the error location without any outer context.
     pub fn new(base_type: &'static str, field: &'static str) -> Self {
         Self {
             base_type,
@@ -701,7 +820,7 @@ impl FieldPath {
             path: Vec::new(),
         }
     }
-    /// Push a field as context for this path. This means that the error passed through `complete::field`
+    /// Push a field as context for this path. This means that the error passed through `complete::field`.
     pub fn context(mut self, complete: &'static str, field: &'static str) -> Self {
         self.base_type = complete;
         self.path.push(field);
@@ -720,6 +839,11 @@ impl FieldPath {
     }
 }
 
+/// Build a nested partial and prefix its field errors with the containing field.
+///
+/// # Errors
+///
+/// Returns the nested construction error with its logical field path extended.
 #[doc(hidden)]
 pub fn build_with_context<P: PartialConfig>(
     partial: P,
@@ -731,6 +855,11 @@ pub fn build_with_context<P: PartialConfig>(
         .map_err(|err| context(err, complete, segment))
 }
 
+/// Merge nested partials and prefix their field errors with the containing field.
+///
+/// # Errors
+///
+/// Returns the nested merge error with its logical field path extended.
 #[doc(hidden)]
 pub fn merge_with_context<P: PartialConfig>(
     current: P,
@@ -743,6 +872,7 @@ pub fn merge_with_context<P: PartialConfig>(
         .map_err(|err| context(err, complete, segment))
 }
 
+/// Prefix nested error paths while preserving parser and provenance wrappers.
 fn context(error: ConfigError, complete: &'static str, segment: &'static str) -> ConfigError {
     match error {
         ConfigError::MissingField(field) => {
@@ -788,12 +918,17 @@ impl Display for FieldPath {
 /// One-based location in a structured configuration source.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SourceLocation {
+    /// One-based source line number.
     line: u64,
+    /// One-based source column number.
     column: u64,
 }
 
 impl SourceLocation {
     /// Create a source location. Line and column numbers are one-based.
+    ///
+    /// Values are stored as supplied; callers should pass positive numbers. Built-in providers
+    /// omit unknown locations instead of representing them with zero coordinates.
     pub const fn new(line: u64, column: u64) -> Self {
         Self { line, column }
     }
@@ -812,6 +947,7 @@ impl SourceLocation {
 /// Thread-safe boxed error used by configuration callbacks and providers.
 pub type BoxError = Box<dyn StdError + Send + Sync + 'static>;
 
+/// Convert a validator or merge error into the shared thread-safe error representation.
 #[doc(hidden)]
 pub fn into_box_error<E>(error: E) -> BoxError
 where
@@ -942,12 +1078,15 @@ impl From<serde_saphyr::Error> for YamlError {
 #[cfg(feature = "toml")]
 /// TOML parser error with source text suppressed in its default display.
 pub struct TomlError {
+    /// Underlying error retained without discarding its original variant.
     error: ::toml::de::Error,
+    /// Optional line and column derived from the original parser span.
     location: Option<(usize, usize)>,
 }
 
 #[cfg(feature = "toml")]
 impl TomlError {
+    /// Capture a safe line and column from the parser span before discarding source text.
     pub(crate) fn with_input(error: ::toml::de::Error, input: &str) -> Self {
         let location = error.span().map(|span| line_column(input, span.start));
         Self { error, location }
@@ -1000,6 +1139,7 @@ impl From<::toml::de::Error> for TomlError {
 }
 
 #[cfg(feature = "toml")]
+/// Translate a byte offset to a one-based line and Unicode-character column.
 fn line_column(input: &str, offset: usize) -> (usize, usize) {
     let mut line = 1;
     let mut column = 1;
@@ -1022,68 +1162,98 @@ fn line_column(input: &str, offset: usize) -> (usize, usize) {
 #[non_exhaustive]
 pub enum ConfigError {
     #[error("IO Error: {0}")]
+    /// Reading the configuration source failed.
     Io(#[from] std::io::Error),
 
     #[cfg(feature = "json")]
     #[error("JSON Parse Error: {0}")]
+    /// JSON parsing or deserialization failed; detailed backend output is opt-in.
     Json(#[from] JsonError),
 
     #[cfg(feature = "yaml")]
     #[error("YAML Parse Error: {0}")]
+    /// YAML parsing or deserialization failed; detailed backend output is opt-in.
     Yaml(#[from] YamlError),
 
     #[cfg(feature = "toml")]
     #[error("TOML Parse Error: {0}")]
+    /// TOML parsing or deserialization failed; detailed backend output is opt-in.
     Toml(#[from] TomlError),
 
     #[error("{provider} provider error: {source}")]
+    /// A provider reported a selection, conversion, or custom loading error.
     Provider {
+        /// Provider kind used to identify the loading operation.
         provider: &'static str,
         #[source]
+        /// Underlying provider failure; its display may contain provider-defined details.
         source: BoxError,
     },
 
     #[error("configuration source {source}: {error}")]
+    /// External source context attached to another configuration error.
     Source {
+        /// Source identity used for diagnostics and provenance.
         source: ConfigSource,
         #[source]
+        /// Underlying error retained without discarding its original variant.
         error: Box<ConfigError>,
     },
 
     #[error("{error}")]
+    /// Logical destination path attached to another configuration error.
     Path {
+        /// Logical destination path used for diagnostics and provenance lookup.
         path: String,
         #[source]
+        /// Underlying error retained without discarding its original variant.
         error: Box<ConfigError>,
     },
 
     #[error("{error}")]
+    /// Successfully accumulated provenance attached to a configuration failure.
     Composition {
+        /// Source histories retained alongside the configuration or failure.
         provenance: ConfigProvenance,
         #[source]
+        /// Underlying error retained without discarding its original variant.
         error: Box<ConfigError>,
     },
 
     #[error("Missing configuration field '{field}' required by view '{view}'")]
-    MissingForView { view: &'static str, field: String },
+    /// An optional base-config value is required by the selected typed view.
+    MissingForView {
+        /// Name of the view that requires the field.
+        view: &'static str,
+        /// Logical field path required by the view.
+        field: String,
+    },
 
     #[error("Missing required configuration field: '{0}'")]
+    /// A required field remained absent after all layers and defaults.
     MissingField(FieldPath),
 
     #[error("Attempted to merge two frozen fields: '{0}'")]
+    /// Both layers attempted to supply a frozen field.
     FreezeCollision(FieldPath),
 
     #[error("Validation failed for field '{field}': {reason}")]
+    /// A validator rejected a completed field value.
     Validation {
+        /// Field whose construction or merge failed.
         field: FieldPath,
         #[source]
+        /// Error returned by the user-supplied validation or merge function.
         reason: BoxError,
     },
 
     #[error("Custom Merge failed for field '{field}': {reason}")]
+    /// A user-supplied merge function rejected the field combination.
     CustomMerge {
+        /// Field whose construction or merge failed.
         field: FieldPath,
         #[source]
+        /// Error returned by the user-supplied validation or merge function.
         reason: BoxError,
     },
 }
@@ -1119,6 +1289,7 @@ impl ConfigError {
     }
 
     #[cfg(feature = "key-value")]
+    /// Attach a mapped destination when known, omitting empty path metadata.
     pub(crate) fn provider_at(
         provider: &'static str,
         path: impl Into<String>,
@@ -1170,6 +1341,7 @@ impl ConfigError {
         }
     }
 
+    /// Attach earlier layer histories, retaining any provenance already inside the error.
     fn with_provenance(self, provenance: ConfigProvenance) -> Self {
         match self {
             Self::Source { source, error } => Self::Source {
@@ -1310,13 +1482,13 @@ impl ConfigError {
 ///
 /// The derive macro also accepts validators reached through normal Rust argument coercions, such
 /// as `fn(&str)` for a `String` field. Validator errors must be convertible into [`BoxError`]. See
-/// the derive macro for [`derive@Config`] for more details on `validate`.
+/// the derive macro for [`Config` derive](https://docs.rs/einstellung/latest/einstellung/derive.Config.html) for more details on `validate`.
 pub type ValidationFunction<T, E> = for<'a> fn(&'a T) -> Result<(), E>;
 
 /// A function passed to `#[config(merge ... )]` needs to match this signature.
 ///
 /// The error type `E` may be any type convertible into [`BoxError`]. See the derive macro for
-/// [`derive@Config`] for more details on `merge`.
+/// [`Config` derive](https://docs.rs/einstellung/latest/einstellung/derive.Config.html) for more details on `merge`.
 pub type MergeFunction<T, E> = fn(T, T) -> Result<T, E>;
 
 /// Wrapper for secret configuration values.
@@ -1325,6 +1497,7 @@ pub type MergeFunction<T, E> = fn(T, T) -> Result<T, E>;
 /// redacts both its [`Debug`](std::fmt::Debug) and [`Display`] representations. Access to the
 /// wrapped value is explicit through [`Secret::expose_secret`], and no mutable accessor is
 /// provided.
+/// Formatting redaction does not encrypt or zeroize the underlying value.
 ///
 /// This protects common logging and accidental-serialization paths. Built-in TOML, YAML, and
 /// dotenv providers suppress raw source lines in their normal parse diagnostics. Callers that
@@ -1378,7 +1551,9 @@ impl<T> Display for Secret<T> {
 /// Wraps a type to make it [`trait@Freezable`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Freeze<T> {
+    /// Value that can participate in ordinary merging.
     Free(T),
+    /// Value protected from replacement by an unfrozen layer.
     Frozen(T),
 }
 
@@ -1412,14 +1587,18 @@ where
     }
 }
 
-/// Interaction of two [`Freezable`] types
+/// Interaction of two [`Freezable`] types.
 pub enum FreezeCombination<T> {
+    /// Both values are available for ordinary merging, in existing/incoming order.
     BothFree(T, T),
+    /// The protected value that takes precedence over the unfrozen value.
     OneFrozen(T),
+    /// Both values are protected, so merging must report a collision.
     BothFrozen,
 }
 
 impl<T: Freezable> FreezeCombination<T> {
+    /// Classify two values using their intrinsic freeze state.
     pub fn of(a: T, b: T) -> FreezeCombination<T> {
         match (a.is_frozen(), b.is_frozen()) {
             (false, false) => FreezeCombination::BothFree(a, b),
@@ -1431,6 +1610,7 @@ impl<T: Freezable> FreezeCombination<T> {
 }
 
 impl<T> FreezeCombination<T> {
+    /// Classify two explicit freeze wrappers and extract the retained values.
     pub fn of_freeze(a: Freeze<T>, b: Freeze<T>) -> FreezeCombination<T> {
         match (a, b) {
             (Freeze::Free(a), Freeze::Free(b)) => FreezeCombination::BothFree(a, b),
@@ -1442,6 +1622,7 @@ impl<T> FreezeCombination<T> {
 }
 
 impl<T> Freeze<T> {
+    /// Consume the freeze wrapper and return its value, discarding freeze state.
     pub fn into_inner(self) -> T {
         match self {
             Freeze::Free(x) => x,

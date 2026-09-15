@@ -14,11 +14,15 @@ struct NetworkConfig {
 }
 
 /// --- output ---
+///Partial configuration for the `NetworkConfig` type.
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct NetworkConfigPartial {
+    ///Partial value for the `host` configuration field.
     host: ::core::option::Option<String>,
+    ///Partial value for the `port` configuration field.
     port: ::core::option::Option<u16>,
+    ///Partial value for the `timeout` configuration field.
     timeout: ::core::option::Option<std::time::Duration>,
 }
 #[automatically_derived]

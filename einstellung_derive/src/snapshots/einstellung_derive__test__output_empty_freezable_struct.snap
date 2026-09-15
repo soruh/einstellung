@@ -8,6 +8,7 @@ expression: formatted
 struct Empty {}
 
 /// --- output ---
+///Partial configuration for the `Empty` type.
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct EmptyPartial {}

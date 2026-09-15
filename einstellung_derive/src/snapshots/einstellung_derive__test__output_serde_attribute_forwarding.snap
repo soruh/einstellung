@@ -14,13 +14,17 @@ struct ApiConfig {
 }
 
 /// --- output ---
+///Partial configuration for the `ApiConfig` type.
 #[derive(::core::default::Default, ::einstellung::serde::Deserialize)]
 #[serde(crate = "::einstellung::serde")]
 struct ApiConfigPartial {
+    ///Partial value for the `key` configuration field.
     #[serde(rename = "API_KEY")]
     key: ::core::option::Option<String>,
+    ///Partial value for the `retries` configuration field.
     #[serde(alias = "max_retries", default)]
     retries: ::core::option::Option<u8>,
+    ///Partial value for the `endpoint` configuration field.
     #[serde(skip_serializing_if = "Option::is_none")]
     endpoint: ::core::option::Option<String>,
 }

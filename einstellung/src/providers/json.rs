@@ -1,8 +1,10 @@
+//! JSON file and inline providers with source-aware decoding.
+
 use crate::{ConfigProvider, FileContentProvider, IntoFileContentProvider};
 
 use super::*;
 
-/// [`ConfigProvider`] which interprets the file contents as JSON
+/// [`ConfigProvider`] which interprets the file contents as JSON.
 pub struct JsonFileProvider<'i>(pub FileContentProvider<'i>);
 
 impl<'i> JsonFileProvider<'i> {
@@ -24,6 +26,12 @@ impl<'i> JsonFileProvider<'i> {
         Self(FileContentProvider::PathBorrowed(path))
     }
 
+    /// Convert borrowed provider data to owned data without reading its contents.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a borrowed custom reader factory cannot be cloned.
+    /// Built-in inline and filesystem sources convert without performing I/O.
     pub fn into_owned(self) -> Result<JsonFileProvider<'static>, ConfigError> {
         Ok(JsonFileProvider(self.0.into_owned()?))
     }
@@ -41,6 +49,11 @@ impl JsonFileProvider<'static> {
     }
 }
 
+/// Deserialize one JSON document and attach any available logical error path.
+///
+/// # Errors
+///
+/// Returns an I/O or JSON deserialization error, including trailing input.
 pub(super) fn load_json<T: serde::de::DeserializeOwned>(
     source: &FileContentProvider<'_>,
 ) -> Result<T, ConfigError> {
@@ -68,6 +81,13 @@ impl<'i> ConfigProvider for JsonFileProvider<'i> {
 }
 
 #[cfg(test)]
+#[allow(
+    missing_docs,
+    clippy::missing_docs_in_private_items,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    reason = "Test fixtures model user input rather than library APIs."
+)]
 mod tests {
     use serde::Deserialize;
 
